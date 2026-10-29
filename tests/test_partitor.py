@@ -1378,7 +1378,9 @@ class TestSelection(unittest.TestCase):
         try:
             os.environ["PARTITOR_MEMORY_MAX"] = "8G"
             os.environ.pop("PARTITOR_JOBS", None)
-            cpus = len(os.sched_getaffinity(0))
+            cpus = (len(os.sched_getaffinity(0))
+                    if hasattr(os, "sched_getaffinity")
+                    else (os.cpu_count() or 1))
             self.assertEqual(pt.job_count(None, 1.5, 1), 1)                  # one item: no workers
             self.assertEqual(pt.job_count("3", 1.5, 10), 3)                  # a number is taken as it is
             self.assertEqual(pt.job_count("9", 1.5, 4), 4)                   # never more than the items
@@ -1433,6 +1435,7 @@ class TestForkMap(unittest.TestCase):
         import signal as sg
         img = (np.random.rand(3000, 3000) * 255).astype(np.uint8)
         cv2.setNumThreads(4)
+        expected_threads = cv2.getNumThreads()
         cv2.GaussianBlur(img, (0, 0), 3)                  # the parent starts the pool
 
         def fn(i):
@@ -1447,7 +1450,7 @@ class TestForkMap(unittest.TestCase):
         finally:
             sg.alarm(0)
         self.assertEqual(len(out), 3)
-        self.assertEqual(cv2.getNumThreads(), 4)           # the parent has its pool size back
+        self.assertEqual(cv2.getNumThreads(), expected_threads)  # pool size restored to what this build accepted
 
     def test_one_job_runs_here(self):
         pid = os.getpid()

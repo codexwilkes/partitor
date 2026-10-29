@@ -6,7 +6,7 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
-## 0.4.0-rc.1 — unreleased
+## 0.4.0-rc.1 — 2026-10-29
 
 First public release candidate. The private line was 0.3.0-dev.42. The engine's
 processing is unchanged: a golden test of 50 cases gives identical PDF pages
@@ -35,6 +35,11 @@ before and after the move.
   `tools/m0_depmap.py` (function dependency map).
 - One version for engine, wrapper and installer: the file `VERSION`. A test
   checks that they agree.
+
+### Fixed
+
+- Made CPU-count and OpenCV thread-restoration tests portable across macOS and
+  OpenCV builds.
 
 ### Changed — BREAKING (for the private line)
 
