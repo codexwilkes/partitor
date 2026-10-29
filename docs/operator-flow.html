@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>partitor Operator Flow</title>
+<style>
+/* Layout: one reading column; a five-stage strip at the top links to the
+   stage sections; staff-line rules divide the stages (the parts' own look). */
+:root {
+  --paper: #f7f8f6;
+  --ink: #1d2427;
+  --muted: #5b676c;
+  --line: #c9d1d3;
+  --accent: #23566e;      /* ink blue: commands, stage numbers */
+  --accent-soft: #e2ecef;
+  --proof: #b3261e;       /* the red frame on the proof */
+  --ok: #2f6b3a;
+  --code-bg: #eef1f0;
+  --display: "EB Garamond", "Garamond", "Times New Roman", serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --step: 1.0625rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #14191b; --ink: #e3e8e9; --muted: #9aa7ab; --line: #34403f;
+    --accent: #8cc3d9; --accent-soft: #1e2d33; --proof: #f08a80; --ok: #8fc79a;
+    --code-bg: #1c2326; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #14191b; --ink: #e3e8e9; --muted: #9aa7ab; --line: #34403f;
+  --accent: #8cc3d9; --accent-soft: #1e2d33; --proof: #f08a80; --ok: #8fc79a;
+  --code-bg: #1c2326; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink);
+  font: 400 var(--step)/1.6 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 2.5rem 4rem;
+}
+.wrap { max-width: 46rem; margin: 0 auto; display: grid; gap: 2.25rem; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(2.1rem, 5vw, 2.9rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.75rem; }
+h3 { font-size: 1.25rem; font-weight: 500; }
+p, ul, ol { margin: 0; }
+.lede { color: var(--muted); max-width: 40rem; }
+.eyebrow { font: 700 0.78rem/1 var(--body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+header { display: grid; gap: 0.75rem; }
+code, kbd, .cmd { font-family: var(--mono); font-size: 0.9em; }
+code { background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 3px; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0.05em 0.4em; background: var(--paper); font-weight: 600; }
+pre { margin: 0; background: var(--code-bg); padding: 0.9rem 1rem; border-radius: 6px; overflow-x: auto; font: 400 0.88rem/1.55 var(--mono); }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* the five stages */
+.stages { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.5rem; counter-reset: st; }
+.stages li { min-width: 0; }
+.stages a {
+  display: grid; gap: 0.25rem; text-decoration: none; color: var(--ink);
+  border-top: 3px solid var(--accent); padding: 0.6rem 0.2rem 0.2rem;
+}
+.stages a:hover .s-name { color: var(--accent); }
+.stages .s-num { font: 600 0.8rem/1 var(--mono); color: var(--accent); }
+.stages .s-name { font: 600 1.15rem/1.1 var(--display); }
+.stages .s-what { font-size: 0.82rem; color: var(--muted); line-height: 1.35; }
+.stages .long { border-top-style: dashed; }
+@media (max-width: 640px) {
+  .stages { grid-template-columns: 1fr; gap: 0; }
+  .stages a { grid-template-columns: 2rem 1fr; column-gap: 0.75rem; border-top: none; border-left: 3px solid var(--accent); padding: 0.45rem 0.6rem; }
+  .stages .long { border-left-style: dashed; }
+  .stages .s-num { grid-row: span 2; align-self: start; padding-top: 0.2rem; }
+}
+.legend { font-size: 0.85rem; color: var(--muted); }
+
+/* staff-line rule between stages: five lines, as on the parts */
+.staff { height: 17px; background: repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px 4px); background-size: 100% 17px; opacity: 0.9; }
+
+section { display: grid; gap: 1rem; scroll-margin-top: 1rem; }
+.sec-head { display: grid; gap: 0.3rem; }
+.sec-head .eyebrow { font-family: var(--mono); letter-spacing: 0.04em; text-transform: none; font-size: 0.85rem; }
+ol.steps { padding-left: 1.4rem; display: grid; gap: 0.55rem; }
+ul.plain { padding-left: 1.2rem; display: grid; gap: 0.4rem; }
+
+.note { border-left: 3px solid var(--accent); padding: 0.2rem 0 0.2rem 0.9rem; color: var(--ink); }
+.note.proof { border-left-color: var(--proof); }
+.note strong { color: var(--accent); }
+.note.proof strong { color: var(--proof); }
+
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.45rem 0.6rem 0.45rem 0; border-bottom: 1px solid var(--line); }
+th { font: 700 0.75rem/1.2 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+td:first-child { white-space: nowrap; }
+.pill { display: inline-block; font: 600 0.78rem/1.4 var(--body); padding: 0.05rem 0.55rem; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.wait { color: var(--muted); }
+.pill.act { color: var(--proof); }
+.pill.go { color: var(--accent); }
+.pill.done { color: var(--ok); }
+
+.screen { background: var(--code-bg); border-radius: 6px; padding: 0.9rem 1rem; font: 400 0.86rem/1.55 var(--mono); overflow-x: auto; white-space: pre; }
+.screen b { color: var(--accent); font-weight: 600; }
+.screen i { color: var(--muted); font-style: normal; }
+footer { color: var(--muted); font-size: 0.85rem; display: grid; gap: 0.4rem; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+html { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">partitor 0.4.0-rc.1</span>
+  <h1>From score to parts</h1>
+  <p class="lede">How to turn a score PDF into large-print parts for your ensemble. You work on your phone or PC over SSH; partitor runs on your partitor host and keeps everything in the library folder (local, or on a NAS). Only the build takes a long time, so you make every change first, review it, and build once.</p>
+</header>
+
+<nav aria-label="Stages">
+  <ol class="stages">
+    <li><a href="#drop"><span class="s-num">1</span><span class="s-name">Drop</span><span class="s-what">PDF into the inbox</span></a></li>
+    <li><a href="#analyse" class="long"><span class="s-num">2</span><span class="s-name">Analyse</span><span class="s-what">proof of who plays what, 1–5 min</span></a></li>
+    <li><a href="#edit"><span class="s-num">3</span><span class="s-name">Edit</span><span class="s-what">names, choices, groups, layout</span></a></li>
+    <li><a href="#review"><span class="s-num">4</span><span class="s-name">Review</span><span class="s-what">one screen, every setting</span></a></li>
+    <li><a href="#build" class="long"><span class="s-num">5</span><span class="s-name">Build</span><span class="s-what">the part PDFs, minutes</span></a></li>
+  </ol>
+  <p class="legend">Dashed: the steps that take time. You can go back from Review to Edit as often as you like; nothing is printed until you build.</p>
+</nav>
+
+<div class="staff" role="presentation"></div>
+
+<section id="before">
+  <div class="sec-head"><span class="eyebrow">Before you start</span><h2>What you need</h2></div>
+  <ul class="plain">
+    <li>An SSH app on your phone or PC, logged in to your partitor host as a user that can use <code>sudo</code>. Run <code>partitor</code> with <code>sudo</code> if you are not root.</li>
+    <li>Access to the library folder (see <code>STORAGE-LOCAL.md</code> or <code>STORAGE-SMB.md</code>): a folder you can open with your file manager, SFTP or a NAS app. It has two folders: <code>inbox</code> and <code>library</code>.</li>
+    <li>A score PDF: a vector PDF (from notation software) or a scan. Scans at 300 dpi greyscale work best.</li>
+  </ul>
+  <p class="note"><strong>One command.</strong> Type <code>partitor</code> and press Enter. Everything else is a menu: you answer with a number or a letter. <kbd>Enter</kbd> accepts the value shown in [brackets]; <kbd>q</kbd> stops and keeps what is done.</p>
+</section>
+
+<div class="staff" role="presentation"></div>
+
+<section id="drop">
+  <div class="sec-head"><span class="eyebrow">Stage 1</span><h2>Drop the PDF in the inbox</h2></div>
+  <ol class="steps">
+    <li>Copy the score PDF into the <code>inbox</code> folder of the library.</li>
+    <li>On the partitor host, run <code>partitor</code>. The menu shows the pieces newest first, each under its own fixed number (the serial of its id: 12 is 2026-10-0012, the same number the commands take) and <code>n  new from inbox (1 waiting)</code>. With many pieces, the five changed last come first as <kbd>A</kbd>–<kbd>E</kbd>; <code>*</code> marks a piece with work pending. <code>/Bach</code> shows only matching pieces (composer, title, part), <code>/</code> shows all again, <kbd>+</kbd> and <kbd>-</kbd> turn the page.</li>
+    <li>Press <kbd>n</kbd>, then the number of the PDF, then the pages of the piece (<kbd>Enter</kbd> for all pages, or a range such as <code>8-9</code> when the PDF holds several pieces).</li>
+  </ol>
+  <p>The PDF moves out of the inbox into a new folder in the library, named by its id, for example <code>2026-10-0001</code> (year, month, number).</p>
+</section>
+
+<div class="staff" role="presentation"></div>
+
+<section id="analyse">
+  <div class="sec-head"><span class="eyebrow">Stage 2 · takes 1–5 minutes</span><h2>Analyse and check the proof</h2></div>
+  <p>partitor reads every page: staves, systems, barlines, bar numbers, staff labels. It does not make any parts yet. When it finishes, open the proof in the item folder:</p>
+  <pre>library/2026-10-0001-bach-example-piece/2026-10-0001-proof.pdf</pre>
+  <ul class="plain">
+    <li>Each page of the proof is a page of the score.</li>
+    <li>Each system has its name in blue, for example <code>p8.s2</code> (page 8, system 2).</li>
+    <li>Each staff shows the part it goes to. Follow one part down the pages to check that it continues without jumps.</li>
+  </ul>
+  <p class="note proof"><strong>Red frame.</strong> A system in a red frame is one partitor is not sure of. Its staves show <code>? name</code>, the suggestion. You answer these in stage 3.</p>
+  <p>If the analysis itself is wrong (wrong pages, a staff missed), you can run it again later with <kbd>y</kbd> in the item menu, or <code>partitor analyse ID</code>. A failed analysis also leaves a proof, with the problem marked in red.</p>
+</section>
+
+<div class="staff" role="presentation"></div>
+
+<section id="edit">
+  <div class="sec-head"><span class="eyebrow">Stage 3</span><h2>Edit: names, choices, groups, layout</h2></div>
+  <p>The wizard asks these in order. Every answer is saved at once but nothing is built, so you can stop with <kbd>q</kbd> and come back later.</p>
+
+  <h3>Title and composer</h3>
+  <p>Title, then the composer's full name (printed on page 1), then a short form for the head of the inside pages (suggested: the surname). Change them later with <kbd>m</kbd>.</p>
+
+  <h3>Part names</h3>
+  <p>The names come from the printed staff labels. Change one at a time, then <kbd>Enter</kbd> when done:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Type</th><th>Does</th></tr></thead>
+    <tbody>
+      <tr><td><code>7=Organ</code></td><td>renames part 7</td></tr>
+      <tr><td><code>7=-</code></td><td>no PDF for part 7; it stays in the list, marked “not extracted”</td></tr>
+      <tr><td><code>7=+</code></td><td>makes the PDF for part 7 again</td></tr>
+      <tr><td><code>7+8</code></td><td>joins part 7 into part 8: one part on two staves (a keyboard)</td></tr>
+      <tr><td><code>7=-; 8=Continuo</code></td><td>several in one line: basso continuo only, from a keyboard part</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Choices for the red systems</h3>
+  <p>For each uncertain system the wizard shows where it is (source page, system from the top, proof page), its clefs and labels, and the suggestion as part numbers. Answer with one part number per staff, top staff first:</p>
+  <pre>  [1/9] p8.s2: source page 8, system 2 of 4 from the top (proof page 8)
+     3 staves, clefs top to bottom: F4 G2 F4
+     suggestion: Bass Trombone, Continuo, Continuo  (= 6 7 7)
+  part number for each of the 3 staves, top first (Enter = suggestion;
+  0 = leave out; same number twice = one part on two staves): <b>6 7 7</b></pre>
+  <ul class="plain">
+    <li><kbd>Enter</kbd> takes the suggestion.</li>
+    <li>A corrected answer becomes the suggestion for the next systems with the same clefs: press <kbd>Enter</kbd> there.</li>
+    <li><code>0</code> leaves a staff out (a staff you left out shows as “(left out)” and 0 in the suggestion); the same number twice puts one part on two staves.</li>
+    <li><kbd>q</kbd> stops the questions; continue later with <kbd>r</kbd> in the item menu.</li>
+    <li>The proof is drawn again after each answer.</li>
+  </ul>
+
+  <h3>Bar numbers</h3>
+  <p>When a piece starts with a short bar (a pickup) or a repeat splits a bar, the wizard asks <kbd>Y</kbd>/<kbd>n</kbd>. <kbd>Enter</kbd> accepts. Check a few numbers against the proof. Correct later with <kbd>n</kbd>: <code>p 1</code> pickup on or off, <code>s 22 1</code> bar 1 of line 22 completes the bar before it (a half bar over a line break; both halves keep one number), <code>f 3=16</code> line 3 starts at bar 16, <code>j 4 1</code> join a false barline, <code>b 4</code> list the bars of line 4. The proof shows the barline ticks, the bar numbers (magenta) and the rehearsal letters (boxed): press <kbd>v</kbd>, open the proof, and press <kbd>Enter</kbd> to save. <code>partitor proof 12</code> draws it again from the saved file.</p>
+
+  <h3>Groups (optional)</h3>
+  <p>A group prints several parts together as a small score, for example the four trombones. Press <kbd>n</kbd> at “Build now?”, then <kbd>g</kbd> in the item menu, and type <code>Trombones=2,4,5,6</code> (part numbers). <code>Trombones=</code> deletes the group. The group becomes one more PDF; staves of other parts leave no gap, and each staff is labelled.</p>
+
+  <h3>The item menu</h3>
+  <p>Open it any time: <code>partitor</code>, then the item's number. The status line lists what has changed since the last build.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Key</th><th>Edit (saved, not built)</th></tr></thead>
+    <tbody>
+      <tr><td><kbd>m</kbd></td><td>title, subtitle, composer (full and short); after a change it offers to rename the folder to match (<code>partitor rename ID</code> does the same)</td></tr>
+      <tr><td><kbd>t</kbd></td><td>part names, not extracted, joined</td></tr>
+      <tr><td><kbd>g</kbd></td><td>groups</td></tr>
+      <tr><td><kbd>n</kbd></td><td>bar numbers and rehearsal marks (<code>m 95</code>: mark at bar 95 on/off; <code>m 95 110 120</code>: several; <code>m 22:1</code>: bar 1 of line 22; letters follow in bar order). <code>?</code> shows the help with an example; <code>v</code> draws the proof with the edits</td></tr>
+      <tr><td><kbd>e</kbd> / <kbd>c</kbd></td><td>expand / contract: one step larger or smaller (pages, then space between staves); asks for a part, Enter = all parts</td></tr>
+      <tr><td><kbd>p</kbd></td><td>number of pages (<code>auto</code> or 1–20)</td></tr>
+      <tr><td><kbd>a</kbd></td><td>paper: Letter → A4 → Ledger (17×11 landscape) → Letter</td></tr>
+      <tr><td><kbd>k</kbd></td><td>ambitus: pick a part, type its range (<code>F3-A4</code>), <code>auto</code>, <code>off</code> or <code>on</code>; Enter keeps it</td></tr>
+      <tr><td><kbd>s</kbd></td><td>any setting as <code>key=value</code>, e.g. <code>gap=11</code>, <code>reflow=on</code>, <code>large=off</code></td></tr>
+    </tbody>
+    <thead><tr><th>Key</th><th>Other</th></tr></thead>
+    <tbody>
+      <tr><td><kbd>v</kbd></td><td>review (stage 4)</td></tr>
+      <tr><td><kbd>y</kbd></td><td>analyse again (new proof; names, groups and settings kept; choices and bar numbers asked again, the previous answers offered)</td></tr>
+      <tr><td><kbd>x</kbd></td><td>repage: new page breaks from the lines of the last build, no new analysis (<code>x Trombones</code>). A page turn falls only beside a multi-bar rest; a turn while playing is a warning with page and bar. Break a page by hand: <kbd>s</kbd>, <code>Trombones:breaks=45,60</code>, then <kbd>x Trombones</kbd>. Needs one build with this version or later</td></tr>
+      <tr><td><kbd>r</kbd></td><td>build (stage 5). <code>r Trombones</code> or <code>r 2-4</code> builds only those parts or groups (numbers as in the file names); the other part files stay</td></tr>
+      <tr><td><kbd>b</kbd></td><td>back to the list</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<div class="staff" role="presentation"></div>
+
+<section id="review">
+  <div class="sec-head"><span class="eyebrow">Stage 4</span><h2>Review everything</h2></div>
+  <p>Press <kbd>v</kbd> in the item menu (or <code>partitor show ID</code>). The wizard also shows this screen before it asks “Build now?”.</p>
+  <div class="screen"><b>2026-10-0001 · Example piece · 7 parts · ready to build</b>
+  status:    ready to build
+  title:     Example piece
+  composer:  J. S. Bach
+  short:     Bach  <i>(from the composer)</i>
+  parts:
+     1  Canto  (G2)  — ambitus E4-G5
+     2  Alto Trombone  (C3)  — ambitus F3-A4
+     4  Tenor Trombone I  (C4)  — ambitus C3-F4 (by hand)
+     7  Continuo  (G2+F4)  — two staves, ambitus none (off)
+  group:     Trombones: Alto Trombone, Tenor Trombone I, …
+  bars:      line starts 1, 3, 6, 9 …; letters A (p10.s3)
+  settings:  paper=letter</div>
+  <p>Check the parts list, the groups and the title. If something is wrong, go back to stage 3; nothing has been built yet.</p>
+  <p><strong>Ambitus.</strong> Each part's lowest and highest note, printed in place of the part name at the start of the first line (in a group score, one per staff), as two stacked black noteheads at 80 % size, as in engravings. Every note counts, so check it: the proof rings each part's lowest and highest note in green, with its bar, page and system; <code>show</code> and <kbd>k</kbd> give the bars too, and a doubtful value is marked <code>?</code> and asked at the end of the analysis, with a suggested range without the doubtful note (Enter takes it, <kbd>k</kbd> keeps the value as read). A wrong value is fixed with <kbd>k</kbd> (or <code>s</code> and <code>Alto Trombone:ambitus=F3-A4</code>); <code>=auto</code> reads it again from the notes, <code>=off</code> prints none. Continuo parts have none unless <code>=on</code>.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Status</th><th>Means</th><th>Next</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill wait">not analysed</span></td><td>the analysis did not finish</td><td><kbd>y</kbd> or <kbd>r</kbd></td></tr>
+      <tr><td><span class="pill act">needs choices</span></td><td>red systems still open</td><td><kbd>r</kbd> asks them first</td></tr>
+      <tr><td><span class="pill go">ready to build</span></td><td>all set, never built</td><td><kbd>r</kbd></td></tr>
+      <tr><td><span class="pill act">changes not built</span></td><td>edits since the last build</td><td><kbd>v</kbd>, then <kbd>r</kbd></td></tr>
+      <tr><td><span class="pill done">built</span></td><td>the PDFs match the settings</td><td>print</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<div class="staff" role="presentation"></div>
+
+<section id="build">
+  <div class="sec-head"><span class="eyebrow">Stage 5 · takes minutes</span><h2>Build and print</h2></div>
+  <p>Press <kbd>r</kbd>. partitor reads the pages again and writes one PDF per part, one per group, and a large-print copy of each. A long score takes several minutes (the pages are read by several workers at once); other services on the host keep running (the build runs at low priority).</p>
+  <p>To change one part (a new gap, a corrected ambitus), edit it, then press <kbd>r</kbd> followed by its name or number, for example <kbd>r Trombones</kbd> or <kbd>r 2 4</kbd>. Only those parts are written again; the other files in <code>parts</code> are not touched. If a name in the list would change (title, composer, part number), partitor builds all parts and says why.</p>
+  <p>The parts are in the item's <code>parts</code> folder. The name starts with the part so a player finds it first:</p>
+  <pre>06-bass-trombone-Bach-Example--2026-10-0001.pdf
+06-bass-trombone-Bach-Example--2026-10-0001-11x17.pdf
+08-trombones-Bach-Example--2026-10-0001.pdf</pre>
+  <ul class="plain">
+    <li><strong>Normal copy:</strong> Letter (or A4), printed double-sided. Page turns fall at movement starts, new sections or rests; a section that fits on two pages stands on a facing pair.</li>
+    <li><strong>Large-print copy</strong> (<code>-11x17</code>): print on 11×17 (ledger) paper at 100 %, then cut at the short crop marks. A4 scores give an <code>-A3</code> copy instead, no cutting. Paper <code>ledger</code> gives no large copy: the sheet is 11×17 already.</li>
+    <li><strong>Ledger</strong> (<code>paper=ledger</code>, menu <kbd>a</kbd>): 17×11 in, landscape, for a larger staff (up to 8 mm; Letter holds 3.6–3.8 mm on long lines). The lines are 2.2 times as wide, so there are about twice as many pages. Print double-sided, flip on the short edge (the 11 in side, like a book). Stands for two pages side by side are wide: check the stand first. The staff is as large as the page allows (up to 8 mm) and the pages follow. To fit more systems on a page, set <code>Trombones:group_gap=5</code> (staff spaces between the staves of a group; also a part on two staves) or <code>gap=7</code> (space between lines).</li>
+  </ul>
+  <p class="note"><strong>Small print.</strong> When the score's lines are long, the staff can come out small. partitor then offers re-flow (experimental, off by default; for a larger staff use <code>paper=ledger</code>): lines cut at barlines with the clef copied, for a staff up to 8 mm, on more pages. It shows the size and pages before and after; you keep it or not. A group (for example the trombones) is cut only at barlines that all its staves have, and stays within 1.5 times its pages unless you set <code>pages</code>. The build prints a <code>re-flow:</code> line: how many lines can be cut and why the others stay whole.</p>
+</section>
+
+<div class="staff" role="presentation"></div>
+
+<section id="help">
+  <div class="sec-head"><span class="eyebrow">When something goes wrong</span><h2>Common problems</h2></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>You see</th><th>Do</th></tr></thead>
+    <tbody>
+      <tr><td>“library folder not reachable”</td><td>The library folder or the NAS is not reachable. Check it, wait a minute, run <code>partitor</code> again. See <code>STORAGE-SMB.md</code>.</td></tr>
+      <tr><td>The wizard stopped (<kbd>q</kbd>, lost connection)</td><td>The item is kept. Open it from the menu and continue; <kbd>r</kbd> asks what is still open.</td></tr>
+      <tr><td>A part is missing on some lines</td><td>Check the red systems on the proof; correct with <kbd>t</kbd> or analyse again with <kbd>y</kbd>.</td></tr>
+      <tr><td>Bar numbers are off from some line on</td><td><kbd>n</kbd>, then <code>f N=B</code> for the first wrong line.</td></tr>
+      <tr><td>A part rests for whole systems</td><td>Normal: those bars become one rest line with the count (for example 14), so the numbers continue.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>
+  <div class="staff" role="presentation"></div>
+  <p>partitor 0.4.0-rc.1. Install: <code>INSTALL.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Design: <code>DESIGN.md</code>.</p>
+</footer>
+</div>
+</body>
+</html>

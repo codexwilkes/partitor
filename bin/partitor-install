@@ -1,0 +1,389 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+# partitor-install — set up this machine for partitor (docs/INSTALL.md)
+#
+# Run as root from a clone of the repo (or through the symlink in
+# /usr/local/sbin). Idempotent: a second run changes nothing.
+#
+# Settings come from a KEY=value file, /etc/default/partitor or the file named
+# by --config (this file is then copied to /etc/default/partitor, which the
+# wrapper reads). The file is read, never sourced here.
+#   PARTITOR_LIBRARY     library folder (default /var/lib/partitor/library)
+#   PARTITOR_SMB_HOST    set: the library is an SMB share on this host
+#   PARTITOR_SMB_SHARE   SMB share name (default partitor)
+# Storage mode: PARTITOR_SMB_HOST set = smb, else local.
+#
+# Steps:
+#   1. apt packages python3-venv, tesseract-ocr (smb: cifs-utils too): checked
+#      only. Missing: FAIL with the apt command.
+#   2. System user `partitor` (own group, no login shell, no password, home
+#      /var/lib/partitor): created when missing.
+#   3. /var/lib/partitor and /var/lib/partitor/work: 0750 partitor:partitor.
+#   4. Config: --config file copied to /etc/default/partitor.
+#   5. Library folder (local mode): <library>, inbox/, library/ at 2770
+#      partitor:partitor. Members of group partitor can use the folder.
+#   6. venv <repo>/venv (root-owned, read-only for partitor): created when
+#      missing; packages reinstalled when the sha256 of requirements.txt
+#      differs from the stamp in the venv.
+#   7. Links in /usr/local/sbin: partitor, partitor-init, partitor-install
+#      (each -> <repo>/bin/<name>).
+#   8. Self-test: partitor --sandbox-check (runs the engine in the sandbox;
+#      every line must be ok).
+#   9. smb mode: /etc/partitor/smb.cred (0600 root:root, username= and
+#      password=); mount and automount units for the library folder written
+#      from share/systemd/*.in; automount enabled; the library is then
+#      checked as the sandbox user (--sandbox-check --library). local mode:
+#      the same library check. NAS not reachable: WARN.
+#
+# CHANGELOG:
+#   0.4.0 - Public release (renamed from `setup`, 1.0.1 in the private line;
+#           the version is now the version of the repo, file VERSION). BREAKING: PARTITOR_NAS is
+#           now PARTITOR_SMB_HOST (+ PARTITOR_SMB_SHARE); the mount point is
+#           PARTITOR_LIBRARY; mount units are written from templates (the old
+#           drop-in 10-nas.conf is removed). New: local storage mode, --config,
+#           --dry-run, the repo is the install (venv inside, symlink for the
+#           wrapper).
+#   Private line (1.0.x):
+#   1.0.1 - Share check: timeout -k 2 (a stuck mount attempt is killed).
+#   1.0.0 - Initial release.
+#
+# Usage:
+#   partitor-install [--config FILE]   make the system match (root)
+#   partitor-install --check           report only, change nothing, exit 1 on a difference
+#   partitor-install --dry-run         list what a run would change, exit 0
+#
+# Exit codes: 0 = all ok; 1 = a check failed or a step failed.
+#
+# Test hooks (env): PARTITOR_PREFIX (root of all paths), PARTITOR_ROOT (repo
+# folder), PARTITOR_WRAPPER (wrapper path), PARTITOR_SKIP_SELFTEST=1,
+# PARTITOR_SVC_USER, PARTITOR_SYSTEMCTL, PARTITOR_CRED_OWNER.
+
+set -euo pipefail
+
+CHECK=0
+DRY=0
+CONFIG_ARG=""
+while (( $# )); do
+  case "$1" in
+    --check) CHECK=1 ;;
+    --dry-run) CHECK=1; DRY=1 ;;
+    --config)
+      [[ -n "${2:-}" ]] || { echo "partitor-install: --config needs a file" >&2; exit 1; }
+      CONFIG_ARG="$2"; shift ;;
+    *) echo "usage: partitor-install [--check | --dry-run] [--config FILE]" >&2; exit 1 ;;
+  esac
+  shift
+done
+
+PFX="${PARTITOR_PREFIX:-}"
+ROOT="${PARTITOR_ROOT:-$(dirname "$(dirname "$(realpath -- "${BASH_SOURCE[0]}")")")}"
+STATE="$PFX/var/lib/partitor"
+WORK="$STATE/work"
+VENV="$ROOT/venv"
+REQ="$ROOT/requirements.txt"
+STAMP="$VENV/.requirements.sha256"
+SVC_USER="${PARTITOR_SVC_USER:-partitor}"
+WRAPPER="${PARTITOR_WRAPPER:-$ROOT/bin/partitor}"
+NOLOGIN="/usr/sbin/nologin"
+DEFAULTS="$PFX/etc/default/partitor"
+CONFIG="${CONFIG_ARG:-$DEFAULTS}"
+CRED_PATH="/etc/partitor/smb.cred"
+CRED="$PFX$CRED_PATH"
+UNIT_DIR="$PFX/etc/systemd/system"
+SYSTEMCTL="${PARTITOR_SYSTEMCTL:-systemctl}"
+CRED_OWNER="${PARTITOR_CRED_OWNER:-root:root}"
+
+FAIL=0
+say()  { echo "partitor-install: $1"; }
+ok()   { echo "partitor-install: ok   $1"; }
+bad()  { echo "partitor-install: FAIL $1"; FAIL=1; }
+warn() { echo "partitor-install: WARN $1"; }
+# needs — a difference that a normal run fixes: FAIL with --check, a note with --dry-run
+needs() {
+  if (( DRY )); then echo "partitor-install: todo $1"; else bad "$1"; fi
+}
+
+# cfg KEY — last value of KEY in the config file (read, not sourced)
+cfg() {
+  [[ -r "$CONFIG" ]] || return 0
+  sed -n 's/^[[:space:]]*'"$1"'=["'\'']\{0,1\}\([^"'\'']*\)["'\'']\{0,1\}[[:space:]]*$/\1/p' \
+    "$CONFIG" | tail -1
+}
+
+if [[ -n "$CONFIG_ARG" && ! -r "$CONFIG_ARG" ]]; then
+  bad "config file not readable: $CONFIG_ARG"
+  exit 1
+fi
+LIBRARY="$(cfg PARTITOR_LIBRARY)"; LIBRARY="${LIBRARY:-/var/lib/partitor/library}"
+SMB_HOST="$(cfg PARTITOR_SMB_HOST)"
+SMB_SHARE="$(cfg PARTITOR_SMB_SHARE)"; SMB_SHARE="${SMB_SHARE:-partitor}"
+MODE=local
+[[ -n "$SMB_HOST" ]] && MODE=smb
+if ! [[ "$LIBRARY" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+  bad "PARTITOR_LIBRARY must be an absolute path of letters, digits and . _ / - : $LIBRARY"
+  exit 1
+fi
+if [[ "$MODE" == smb ]]; then
+  if ! [[ "$SMB_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    bad "PARTITOR_SMB_HOST is not a host name or IPv4 address: $SMB_HOST"; exit 1
+  fi
+  if ! [[ "$SMB_SHARE" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    bad "PARTITOR_SMB_SHARE has a character outside letters, digits and . _ - : $SMB_SHARE"; exit 1
+  fi
+fi
+LIBDIR="$PFX$LIBRARY"
+say "storage mode: $MODE (library $LIBRARY)"
+
+# 1. apt packages (check only)
+APT_PKGS=(python3-venv tesseract-ocr)
+[[ "$MODE" == smb ]] && APT_PKGS+=(cifs-utils)
+missing=()
+for p in "${APT_PKGS[@]}"; do
+  st="$(dpkg-query -W -f='${Status}' "$p" 2>/dev/null || true)"
+  [[ "$st" == "install ok installed" ]] || missing+=("$p")
+done
+if (( ${#missing[@]} )); then
+  bad "apt packages missing: ${missing[*]}"
+  echo "  Run: sudo apt install ${missing[*]}"
+  exit 1                                   # later steps need them
+fi
+ok "apt packages: ${APT_PKGS[*]}"
+
+# 2. system user
+if ent="$(getent passwd "$SVC_USER")"; then
+  shell="${ent##*:}"
+  home="$(echo "$ent" | cut -d: -f6)"
+  if [[ "$shell" != "$NOLOGIN" ]]; then
+    bad "user $SVC_USER has login shell $shell (want $NOLOGIN)"
+    echo "  Run: sudo usermod -s $NOLOGIN $SVC_USER"
+  elif [[ "$home" != "$STATE" ]]; then
+    bad "user $SVC_USER home is $home (want $STATE)"
+    echo "  Run: sudo usermod -d $STATE $SVC_USER"
+  else
+    ok "user $SVC_USER (no login, home $STATE)"
+  fi
+elif (( CHECK )); then
+  needs "user $SVC_USER missing"
+  echo "  Run: sudo $ROOT/bin/partitor-install"
+else
+  useradd --system --user-group --home-dir "$STATE" --no-create-home \
+    --shell "$NOLOGIN" --comment "partitor score engine (sandboxed)" "$SVC_USER"
+  say "created user $SVC_USER"
+fi
+
+# folder MODE — ensure a folder exists with a mode and owner
+ensure_dir() {
+  local d="$1" want_mode="$2" got
+  if [[ -d "$d" ]]; then
+    got="$(stat -c '%a %U:%G' "$d")"
+    if [[ "$got" == "$want_mode $SVC_USER:$SVC_USER" ]]; then
+      ok "folder $d"
+    elif (( CHECK )); then
+      needs "folder $d is $got (want $want_mode $SVC_USER:$SVC_USER)"
+    else
+      chmod "$want_mode" "$d"; chown "$SVC_USER:$SVC_USER" "$d"
+      say "corrected folder $d ($got -> $want_mode $SVC_USER:$SVC_USER)"
+    fi
+  elif (( CHECK )); then
+    needs "folder $d missing"
+  else
+    install -d -m "$want_mode" -o "$SVC_USER" -g "$SVC_USER" "$d"
+    say "created folder $d"
+  fi
+}
+
+# 3. state and work folders
+ensure_dir "$STATE" 750
+ensure_dir "$WORK" 750
+
+# 4. config copied to /etc/default/partitor
+if [[ -n "$CONFIG_ARG" && "$(realpath -m -- "$CONFIG_ARG")" != "$(realpath -m -- "$DEFAULTS")" ]]; then
+  if [[ -f "$DEFAULTS" ]] && cmp -s "$CONFIG_ARG" "$DEFAULTS"; then
+    ok "config $DEFAULTS matches $CONFIG_ARG"
+  elif (( CHECK )); then
+    needs "config $DEFAULTS differs from $CONFIG_ARG"
+  else
+    install -d -m 0755 "$(dirname "$DEFAULTS")"
+    install -m 0644 "$CONFIG_ARG" "$DEFAULTS"
+    say "installed config $DEFAULTS from $CONFIG_ARG"
+  fi
+fi
+
+# 5. library folder (local mode; an SMB library is made by the mount)
+if [[ "$MODE" == local ]]; then
+  ensure_dir "$LIBDIR" 2770
+  ensure_dir "$LIBDIR/inbox" 2770
+  ensure_dir "$LIBDIR/library" 2770
+  if [[ -n "${SUDO_USER:-}" && "$SUDO_USER" != root ]] && ! id -nG "$SUDO_USER" 2>/dev/null | grep -qw "$SVC_USER"; then
+    echo "  Note: $SUDO_USER is not in group $SVC_USER. To put PDFs into $LIBRARY/inbox:"
+    echo "  Run: sudo usermod -aG $SVC_USER $SUDO_USER   (then log in again)"
+  fi
+fi
+
+# 6. venv and pinned packages
+if [[ ! -f "$REQ" ]]; then
+  bad "requirements not found: $REQ"
+elif [[ ! -x "$VENV/bin/python3" ]]; then
+  if (( CHECK )); then
+    needs "venv missing: $VENV"
+  else
+    python3 -m venv "$VENV"
+    say "created venv $VENV"
+  fi
+fi
+if [[ -f "$REQ" && -x "$VENV/bin/python3" ]]; then
+  want="$(sha256sum "$REQ" | awk '{print $1}')"
+  have="$(cat "$STAMP" 2>/dev/null || true)"
+  if [[ "$want" == "$have" ]]; then
+    ok "venv packages match requirements.txt"
+  elif (( CHECK )); then
+    needs "venv packages not installed from the current requirements.txt"
+  else
+    say "installing venv packages (requirements.txt changed)"
+    if "$VENV/bin/pip" install --disable-pip-version-check -q -r "$REQ"; then
+      echo "$want" > "$STAMP"
+      say "venv packages installed"
+    else
+      bad "pip install failed"
+    fi
+  fi
+fi
+
+# 7. links: partitor (wrapper), partitor-init, partitor-install
+for name in partitor partitor-init partitor-install; do
+  link="$PFX/usr/local/sbin/$name"
+  target="$ROOT/bin/$name"
+  if [[ -L "$link" && "$(readlink -- "$link")" == "$target" ]]; then
+    ok "link $link -> $target"
+  elif [[ -e "$link" || -L "$link" ]]; then
+    bad "$link exists and is not a link to $target"
+    echo "  Run: sudo rm $link ; then run partitor-install again"
+  elif (( CHECK )); then
+    needs "link $link missing"
+  else
+    install -d -m 0755 "$(dirname "$link")"
+    ln -s "$target" "$link"
+    say "linked $link -> $target"
+  fi
+done
+
+# 8. sandbox self-test (runs the engine as $SVC_USER through the wrapper)
+export PARTITOR_LIBRARY="$LIBRARY"
+selftest_ok=1
+if [[ "${PARTITOR_SKIP_SELFTEST:-0}" == "1" ]]; then
+  say "self-test skipped"; selftest_ok=0
+elif (( FAIL )); then
+  bad "self-test not run (fix the items above)"; selftest_ok=0
+elif (( CHECK && DRY )) && [[ ! -x "$VENV/bin/python3" ]]; then
+  say "self-test not run (venv missing)"; selftest_ok=0
+elif [[ ! -x "$WRAPPER" ]]; then
+  bad "wrapper not found: $WRAPPER"; selftest_ok=0
+else
+  out="$("$WRAPPER" --sandbox-check 2>&1)" && rc=0 || rc=$?
+  while IFS= read -r line; do echo "  $line"; done <<<"$out"
+  if (( rc == 0 )); then
+    ok "sandbox self-test"
+  else
+    bad "sandbox self-test (exit $rc)"
+  fi
+fi
+
+# 9a. smb mode: credentials, units, automount
+library_check() {
+  if (( ! selftest_ok )) || (( FAIL )); then
+    say "library check skipped"
+  elif ! timeout -k 2 20 stat -- "$LIBDIR/inbox" "$LIBDIR/library" >/dev/null 2>&1; then
+    if [[ "$MODE" == smb ]]; then
+      warn "library not reachable: $LIBRARY (NAS off, share or folders missing, or wrong credentials)"
+      echo "  Check: journalctl -u $UNIT_MOUNT -n 20 ; docs/STORAGE-SMB.md"
+    else
+      bad "library folders missing: $LIBRARY/inbox and $LIBRARY/library"
+    fi
+  else
+    out="$("$WRAPPER" --sandbox-check --library 2>&1)" && rc=0 || rc=$?
+    while IFS= read -r line; do echo "  $line"; done <<<"$out"
+    if (( rc == 0 )); then
+      ok "library writable by $SVC_USER in the sandbox"
+    else
+      bad "library check in the sandbox (exit $rc)"
+    fi
+  fi
+}
+
+# render TEMPLATE — template with the @...@ values filled in
+render() {
+  sed -e "s|@UNIT@|$1|g" -e "s|@LIBRARY@|$LIBRARY|g" -e "s|@SMB_HOST@|$SMB_HOST|g" \
+      -e "s|@SMB_SHARE@|$SMB_SHARE|g" -e "s|@SVC_USER@|$SVC_USER|g" -e "s|@CRED@|$CRED_PATH|g" "$2"
+}
+
+UNIT_MOUNT=""
+if [[ "$MODE" == smb ]]; then
+  UNIT_MOUNT="$(systemd-escape -p --suffix=mount "$LIBRARY")"
+  UNIT_AUTO="$(systemd-escape -p --suffix=automount "$LIBRARY")"
+  cred_ok=1
+  if [[ ! -e "$CRED" ]]; then
+    bad "credentials missing: $CRED"
+    echo "  Run: sudo install -d -m 0755 /etc/partitor ; then write username= and password= lines to $CRED_PATH (0600 root:root); docs/STORAGE-SMB.md"
+    cred_ok=0
+  else
+    got="$(stat -c '%a %U:%G' "$CRED")"
+    if [[ "$got" != "600 $CRED_OWNER" ]]; then
+      bad "credentials $CRED are $got (want 600 $CRED_OWNER)"
+      echo "  Run: sudo chown root:root $CRED_PATH && sudo chmod 600 $CRED_PATH"
+      cred_ok=0
+    fi
+    if ! grep -q '^username=.' "$CRED" || ! grep -q '^password=.' "$CRED"; then
+      bad "credentials $CRED need username= and password= lines (not shown)"
+      cred_ok=0
+    fi
+  fi
+  if (( cred_ok )); then
+    ok "credentials $CRED (600 $CRED_OWNER)"
+    old="$UNIT_DIR/$UNIT_MOUNT.d/10-nas.conf"
+    if [[ -f "$old" ]]; then
+      if (( CHECK )); then
+        needs "old drop-in $old exists (a run removes it)"
+      else
+        rm -f "$old"; rmdir "$(dirname "$old")" 2>/dev/null || true
+        say "removed old drop-in $old"
+      fi
+    fi
+    changed=0
+    for kind in mount automount; do
+      unit="$UNIT_MOUNT"; [[ "$kind" == automount ]] && unit="$UNIT_AUTO"
+      want="$(render "$unit" "$ROOT/share/systemd/library.$kind.in")"
+      if [[ -f "$UNIT_DIR/$unit" && "$(cat "$UNIT_DIR/$unit")" == "$want" ]]; then
+        ok "unit $unit"
+      elif (( CHECK )); then
+        needs "unit $UNIT_DIR/$unit missing or different"
+      else
+        install -d -m 0755 "$UNIT_DIR"
+        printf '%s\n' "$want" > "$UNIT_DIR/$unit"
+        chmod 0644 "$UNIT_DIR/$unit"
+        say "wrote unit $unit (//$SMB_HOST/$SMB_SHARE on $LIBRARY)"
+        changed=1
+      fi
+    done
+    if (( CHECK )); then
+      if "$SYSTEMCTL" is-enabled --quiet "$UNIT_AUTO" 2>/dev/null; then
+        ok "$UNIT_AUTO enabled"
+      else
+        needs "$UNIT_AUTO not enabled"
+      fi
+    else
+      (( changed )) && "$SYSTEMCTL" daemon-reload
+      if "$SYSTEMCTL" enable --now "$UNIT_AUTO" >/dev/null 2>&1; then
+        ok "$UNIT_AUTO enabled"
+      else
+        bad "systemctl enable --now $UNIT_AUTO failed"
+      fi
+    fi
+    library_check
+  fi
+else
+  library_check
+fi
+
+exit "$FAIL"

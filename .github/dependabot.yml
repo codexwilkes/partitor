@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+# Only the actions are updated automatically. requirements.txt is pinned on
+# purpose: a new package version is tested by hand against the golden renders
+# (tools/g0_golden.py) before the pin moves.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

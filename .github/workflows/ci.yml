@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+#
+# CI: repo gate and shellcheck, tests on Ubuntu (Python 3.12 and 3.13), and a
+# best-effort run on macOS (failures there do not block). The tests use
+# synthetic PDFs; corpus tests skip because no scores are in the repo.
+# Actions are pinned by version tag; dependabot proposes updates.
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["[0-9]*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: repo gate and shellcheck
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: repo gate (no scores, no private addresses, SPDX lines)
+        run: tools/check-repo.sh
+      - name: shellcheck (warnings and errors)
+        run: shellcheck -S warning bin/partitor bin/partitor-init bin/partitor-install tools/check-repo.sh
+
+  test-ubuntu:
+    name: tests (Ubuntu 24.04, Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: install packages (binary wheels only)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --only-binary=:all: -r requirements.txt
+      - name: tests
+        run: python -m unittest discover -s tests -v
+
+  test-macos:
+    name: tests (macOS, best effort)
+    runs-on: macos-14
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: install packages (binary wheels only)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --only-binary=:all: -r requirements.txt
+      - name: engine and document tests (the shell tests need GNU tools and systemd)
+        run: python -m unittest -v tests/test_partitor.py tests/test_docs.py

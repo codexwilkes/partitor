@@ -1,0 +1,19 @@
+# @UNIT@ — written by partitor-install (template: share/systemd/library.mount.in)
+# SMB share @SMB_SHARE@ on @SMB_HOST@ over SMB 3.1.1 with encryption (seal),
+# owned by the sandbox user @SVC_USER@. Started only by the automount unit
+# (first access), never at boot: the boot never depends on the NAS.
+# Credentials: @CRED@ (0600 root:root, not in the repo).
+# Do not edit: partitor-install writes this file again. Change PARTITOR_SMB_HOST
+# or PARTITOR_SMB_SHARE in /etc/default/partitor and run partitor-install.
+[Unit]
+Description=partitor library (SMB)
+Documentation=https://github.com/codexwilkes/partitor/blob/main/docs/STORAGE-SMB.md
+After=network-online.target
+Wants=network-online.target
+
+[Mount]
+What=//@SMB_HOST@/@SMB_SHARE@
+Where=@LIBRARY@
+Type=cifs
+Options=credentials=@CRED@,uid=@SVC_USER@,gid=@SVC_USER@,file_mode=0660,dir_mode=0770,vers=3.1.1,seal,nosuid,nodev,noexec,_netdev
+TimeoutSec=30

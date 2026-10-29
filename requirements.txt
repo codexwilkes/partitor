@@ -1,0 +1,16 @@
+# partitor — Python packages for the venv <repo>/venv (partitor-install makes it)
+# Install by hand: venv/bin/pip install -r requirements.txt
+#
+# All four have ready-built wheels for CPython 3.14 x86_64 (Ubuntu 26.04),
+# checked 2026-10-22 with `pip download --only-binary=:all:`. Python 3.12 and
+# 3.13 (Linux x86-64 and aarch64) and macOS 14+ arm64 wheels exist too (download
+# check 2026-10-29); the tests pass on CPython 3.12.3.
+#
+# pymupdf is pinned to 1.28.x on purpose: 2.0 pulls in pymupdf4llm,
+# pymupdf_layout and onnxruntime (+67 MB of wheels), which partitor does
+# not use. Output is identical: 17/17 test part pages matched pixel for
+# pixel between 2.0 and 1.28.2.
+pymupdf==1.28.2
+numpy==2.5.3
+opencv-python-headless==5.0.0.93
+PyYAML==6.0.3

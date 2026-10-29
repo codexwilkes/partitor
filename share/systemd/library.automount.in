@@ -1,0 +1,12 @@
+# @UNIT@ — written by partitor-install (template: share/systemd/library.automount.in)
+# Mounts the SMB library on first access; unmounts after 10 idle minutes.
+[Unit]
+Description=partitor library (SMB, automount)
+Documentation=https://github.com/codexwilkes/partitor/blob/main/docs/STORAGE-SMB.md
+
+[Automount]
+Where=@LIBRARY@
+TimeoutIdleSec=600
+
+[Install]
+WantedBy=remote-fs.target

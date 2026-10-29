@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+# partitor-init — guided setup: ask a few questions, write the settings file,
+# then run partitor-install (docs/INSTALL.md)
+#
+# Run as root from a clone of the repo (or through /usr/local/sbin/partitor-init).
+# It asks:
+#   1. where the library lives: a local folder, or an SMB share on a NAS
+#   2. the library folder (local) or the mount point (SMB)
+#   3. SMB: host, share name, user and password (the password is not echoed
+#      and not shown again; it goes to /etc/partitor/smb.cred, 0600 root)
+#   4. the memory cap of one run (auto, or a size like 8G)
+#   5. an optional logo file (PNG) for title and back pages
+# Then it shows a summary and asks to go on. Existing values in
+# /etc/default/partitor are the defaults, and settings it does not ask about
+# (for example PARTITOR_JOBS) are kept.
+#
+# CHANGELOG:
+#   0.4.0 - Initial release.
+#
+# Usage:
+#   partitor-init [options]
+#     --yes               take the defaults (and the options below); ask nothing
+#     --library PATH      library folder (local) or mount point (SMB)
+#     --smb-host HOST     SMB mode: host name or IPv4 address of the NAS
+#     --smb-share NAME    SMB share name (default partitor)
+#     --memory SIZE       memory cap: auto or a size (8G)
+#     --logo FILE         PNG file; "none" = no logo
+#     --no-install        write the settings to --out and stop
+#     --out FILE          settings file for --no-install (default ./partitor.conf)
+#   The password is only read from the terminal, never from an option.
+#
+# Exit codes: 0 = done; 1 = an error or the operator stopped; the exit code of
+# partitor-install when it fails.
+#
+# Test hooks (env): PARTITOR_PREFIX (root of all paths), PARTITOR_ROOT (repo
+# folder), PARTITOR_INSTALL (installer program), PARTITOR_TEST_NONROOT=1.
+
+set -euo pipefail
+
+PFX="${PARTITOR_PREFIX:-}"
+ROOT="${PARTITOR_ROOT:-$(dirname "$(dirname "$(realpath -- "${BASH_SOURCE[0]}")")")}"
+INSTALL="${PARTITOR_INSTALL:-$ROOT/bin/partitor-install}"
+DEFAULTS="$PFX/etc/default/partitor"
+CRED_PATH="/etc/partitor/smb.cred"
+CRED="$PFX$CRED_PATH"
+
+YES=0; DO_INSTALL=1; OUT=""
+O_LIBRARY=""; O_HOST=""; O_SHARE=""; O_MEMORY=""; O_LOGO=""
+die() { echo "partitor-init: $1" >&2; exit 1; }
+usage() { echo "usage: partitor-init [--yes] [--library PATH] [--smb-host HOST] [--smb-share NAME] [--memory SIZE] [--logo FILE] [--no-install] [--out FILE]" >&2; exit 1; }
+while (( $# )); do
+  case "$1" in
+    --yes) YES=1 ;;
+    --no-install) DO_INSTALL=0 ;;
+    --library|--smb-host|--smb-share|--memory|--logo|--out)
+      [[ -n "${2:-}" ]] || die "$1 needs a value"
+      case "$1" in
+        --library) O_LIBRARY="$2" ;; --smb-host) O_HOST="$2" ;; --smb-share) O_SHARE="$2" ;;
+        --memory) O_MEMORY="$2" ;; --logo) O_LOGO="$2" ;; --out) OUT="$2" ;;
+      esac
+      shift ;;
+    *) usage ;;
+  esac
+  shift
+done
+
+if [[ "$EUID" -ne 0 && "${PARTITOR_TEST_NONROOT:-0}" != "1" ]]; then
+  die "run as root (sudo partitor-init)"
+fi
+[[ -x "$INSTALL" ]] || die "installer not found: $INSTALL"
+
+# cfg KEY — last value of KEY in the current settings file (read, not sourced)
+cfg() {
+  [[ -r "$DEFAULTS" ]] || return 0
+  sed -n 's/^[[:space:]]*'"$1"'=["'\'']\{0,1\}\([^"'\'']*\)["'\'']\{0,1\}[[:space:]]*$/\1/p' \
+    "$DEFAULTS" | tail -1
+}
+
+# ask VAR "question" default regex "what is wrong"
+# --yes: the default is taken without a question (and must be valid).
+ask() {
+  local var="$1" q="$2" def="$3" re="$4" err="$5" ans
+  while :; do
+    if (( YES )); then
+      ans="$def"
+    else
+      read -r -p "$q [$def]: " ans || die "input ended"
+      ans="${ans:-$def}"
+    fi
+    if [[ "$ans" =~ $re ]]; then printf -v "$var" '%s' "$ans"; return 0; fi
+    (( YES )) && die "$err: $ans"
+    echo "  $err" >&2
+  done
+}
+
+# ── 1. storage mode ────────────────────────────────────────────────────────
+cur_host="$(cfg PARTITOR_SMB_HOST)"
+[[ -n "$O_HOST" ]] && cur_host="$O_HOST"
+mode_def=1; [[ -n "$cur_host" ]] && mode_def=2
+if [[ -n "$O_HOST" ]]; then
+  MODE=2
+elif (( YES )); then
+  MODE="$mode_def"
+else
+  echo "Where does the library live?"
+  echo "  1) a folder on this machine (local)"
+  echo "  2) a share on a NAS (SMB)"
+  ask MODE "Choose" "$mode_def" '^[12]$' "answer 1 or 2"
+fi
+
+# ── 2. library path ────────────────────────────────────────────────────────
+cur_lib="$(cfg PARTITOR_LIBRARY)"
+if [[ "$MODE" == 2 ]]; then lib_def="${cur_lib:-/mnt/partitor}"; else lib_def="${cur_lib:-/var/lib/partitor/library}"; fi
+[[ -n "$O_LIBRARY" ]] && lib_def="$O_LIBRARY"
+what="library folder"; [[ "$MODE" == 2 ]] && what="mount point of the share"
+ask LIBRARY "Absolute path of the $what" "$lib_def" '^/[A-Za-z0-9._/-]+$' \
+  "an absolute path of letters, digits and . _ / - is needed"
+if [[ "$MODE" == 1 && "$LIBRARY" == /home/* ]]; then
+  die "the sandbox cannot see /home; use a folder outside /home ($LIBRARY)"
+fi
+
+# ── 3. SMB ─────────────────────────────────────────────────────────────────
+SMB_HOST=""; SMB_SHARE=""; NEW_CRED=0; CRED_USER=""; CRED_PASS=""
+if [[ "$MODE" == 2 ]]; then
+  ask SMB_HOST "NAS host name or IPv4 address" "${cur_host:-}" '^[A-Za-z0-9.-]+$' \
+    "a host name or IPv4 address is needed (letters, digits, . and -)"
+  share_def="${O_SHARE:-$(cfg PARTITOR_SMB_SHARE)}"; share_def="${share_def:-partitor}"
+  ask SMB_SHARE "Share name" "$share_def" '^[A-Za-z0-9._-]+$' \
+    "letters, digits and . _ - only"
+  keep=n
+  if [[ -e "$CRED" ]]; then
+    if (( YES )); then keep=y; else
+      read -r -p "Credentials exist in $CRED_PATH. Keep them? [Y/n]: " keep || die "input ended"
+      keep="${keep:-y}"
+    fi
+  fi
+  if [[ ! "$keep" =~ ^[Yy] ]]; then
+    if (( YES )); then
+      echo "partitor-init: no credentials written (--yes); partitor-install will say what to do" >&2
+    else
+      read -r -p "NAS user: " CRED_USER || die "input ended"
+      read -r -s -p "NAS password (not shown): " CRED_PASS || die "input ended"; echo
+      [[ -n "$CRED_USER" && -n "$CRED_PASS" ]] || die "user and password may not be empty"
+      [[ "$CRED_USER$CRED_PASS" != *$'\n'* && "$CRED_USER$CRED_PASS" != *$'\r'* ]] || die "no line breaks in user or password"
+      NEW_CRED=1
+    fi
+  fi
+fi
+
+# ── 4. memory, logo ────────────────────────────────────────────────────────
+mem_def="${O_MEMORY:-$(cfg PARTITOR_MEMORY_MAX)}"; mem_def="${mem_def:-auto}"
+ask MEMORY "Memory cap of one run (auto = 70 % of the machine, or a size like 8G)" "$mem_def" \
+  '^(auto|[0-9]+[KMGT]?)$' "auto or a size such as 8G is needed"
+logo_def="${O_LOGO:-$(cfg PARTITOR_LOGO)}"; logo_def="${logo_def:-none}"
+ask LOGO "Logo PNG file for title and back pages (none = no logo)" "$logo_def" \
+  '^(none|/[A-Za-z0-9._/-]+)$' "none, or an absolute path of letters, digits and . _ / - "
+if [[ "$LOGO" != none && ! -f "$PFX$LOGO" ]]; then
+  echo "partitor-init: WARN logo file not found now: $LOGO (the engine then prints one warning and builds without it)" >&2
+fi
+
+# ── summary ────────────────────────────────────────────────────────────────
+echo
+echo "Summary"
+if [[ "$MODE" == 2 ]]; then
+  echo "  storage:  SMB //$SMB_HOST/$SMB_SHARE, mounted on $LIBRARY"
+  if (( NEW_CRED )); then echo "  login:    new credentials for user $CRED_USER (password not shown)"
+  elif [[ -e "$CRED" ]]; then echo "  login:    existing $CRED_PATH"
+  else echo "  login:    none yet ($CRED_PATH is missing)"; fi
+else
+  echo "  storage:  local folder $LIBRARY"
+fi
+echo "  memory:   $MEMORY"
+echo "  logo:     $LOGO"
+if (( ! YES )); then
+  read -r -p "Go on? [Y/n]: " go || die "input ended"
+  [[ "${go:-y}" =~ ^[Yy] ]] || die "stopped; nothing was changed"
+fi
+
+# ── settings file: managed keys replaced, other lines kept ─────────────────
+MANAGED='PARTITOR_LIBRARY|PARTITOR_SMB_HOST|PARTITOR_SMB_SHARE|PARTITOR_MEMORY_MAX|PARTITOR_LOGO'
+if (( DO_INSTALL )); then
+  CONF="$(mktemp)"; trap 'rm -f "$CONF"' EXIT
+else
+  CONF="${OUT:-./partitor.conf}"
+fi
+{
+  if [[ -r "$DEFAULTS" ]]; then grep -Ev "^[[:space:]]*($MANAGED)=" "$DEFAULTS" || true; fi
+  echo "PARTITOR_LIBRARY=$LIBRARY"
+  if [[ "$MODE" == 2 ]]; then
+    echo "PARTITOR_SMB_HOST=$SMB_HOST"
+    echo "PARTITOR_SMB_SHARE=$SMB_SHARE"
+  fi
+  echo "PARTITOR_MEMORY_MAX=$MEMORY"
+  [[ "$LOGO" != none ]] && echo "PARTITOR_LOGO=$LOGO"
+} > "$CONF"
+chmod 0644 "$CONF"
+
+# ── credentials (printf is a builtin: the password is not in `ps`) ─────────
+if (( NEW_CRED )); then
+  if (( DO_INSTALL )); then
+    install -d -m 0755 "$(dirname "$CRED")"
+    install -m 0600 /dev/null "$CRED"
+    printf 'username=%s\npassword=%s\n' "$CRED_USER" "$CRED_PASS" > "$CRED"
+    echo "partitor-init: wrote $CRED_PATH (0600)"
+  else
+    echo "partitor-init: --no-install does not write the credentials; make $CRED_PATH by hand (docs/STORAGE-SMB.md)" >&2
+  fi
+fi
+unset CRED_PASS
+
+if (( ! DO_INSTALL )); then
+  echo "partitor-init: wrote $CONF"
+  echo "Next: sudo $INSTALL --config $CONF"
+  exit 0
+fi
+echo "partitor-init: running partitor-install"
+"$INSTALL" --config "$CONF"

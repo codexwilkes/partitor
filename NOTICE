@@ -1,0 +1,28 @@
+partitor — Copyright (C) 2026 Nathan Wilkes and partitor contributors
+Licensed under the GNU Affero General Public License, version 3 or later
+(see LICENSE). SPDX: AGPL-3.0-or-later.
+
+Third-party software and data that partitor uses or ships:
+
+Python packages (installed from PyPI by partitor-install, not shipped here):
+  PyMuPDF (pymupdf)            AGPL-3.0 / commercial (Artifex)
+  numpy                        BSD-3-Clause
+  opencv-python-headless       Apache-2.0 (OpenCV); wheel also bundles FFmpeg
+                               and other libraries under their own licences
+  PyYAML                       MIT
+  The exact versions are in requirements.txt. Check each package's licence
+  file in your environment.
+
+Programs run as separate processes (not linked):
+  Tesseract OCR (tesseract-ocr)  Apache-2.0
+  systemd, cifs-utils            their own licences
+
+Fonts (shipped in share/fonts/, unmodified, with their licence texts):
+  EB Garamond (Regular, Italic, SemiBold)   SIL Open Font License 1.1
+                                            (share/fonts/OFL.txt)
+  Bravura (music font, SMuFL)               SIL Open Font License 1.1
+                                            (share/fonts/Bravura-OFL.txt)
+  Reserved Font Names stay with their owners. A PDF made by partitor embeds a
+  subset of the fonts, which the OFL allows.
+
+No score, image or logo of a third party is part of this repository.

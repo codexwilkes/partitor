@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+# partitor — root front end (the file may be linked to /usr/local/sbin/partitor)
+#
+# The engine (lib/partitor-engine) parses PDFs from the internet, so it never
+# runs as root: this wrapper starts it with systemd-run as the system user
+# `partitor` in a sandbox (docs/SANDBOX.md): no network, read-only system, no
+# /root or /home, private /tmp and /dev, no capabilities, writes only below
+# /var/lib/partitor and (library commands) the library folder, memory cap, low
+# CPU and IO weight (other services keep priority).
+#
+# Library (docs/STORAGE-LOCAL.md, docs/STORAGE-SMB.md): `partitor` alone opens
+# the menu; new, list, show, set, expand, contract and rebuild work on the
+# library folder PARTITOR_LIBRARY (default /var/lib/partitor/library; a local
+# folder or an SMB mount). The wrapper first touches the folder as root (this
+# mounts an SMB library through its automount) and stops with a hint when it is
+# not reachable.
+#
+# Work folder (no library needed): /var/lib/partitor/work. Copy PDFs there and
+# run the engine commands from inside it, e.g.:
+#   sudo install -o partitor -g partitor -m 0640 score.pdf /var/lib/partitor/work/
+#   sudo sh -c 'cd /var/lib/partitor/work && partitor detect score.pdf'
+#
+# CHANGELOG:
+#   0.4.0 - Public release (was 2.0.0 in the private line; from here the wrapper
+#           and the installer carry the version of the repo, file VERSION).
+#           BREAKING: PARTITOR_SHARE is now PARTITOR_LIBRARY
+#           (default /var/lib/partitor/library, was /mnt/partitor); the engine
+#           runs from the repo this wrapper belongs to (lib/partitor-engine,
+#           venv/ inside the repo); PARTITOR_MEMORY_MAX default is auto (70 %
+#           of the memory of the machine, at least 1G); --sandbox-check
+#           --share is now --sandbox-check --library.
+#   Private line (1.0.x):
+#   1.0.11 - PYTHONUNBUFFERED=1 for the engine: stdout is a pipe since 1.0.10, so
+#           Python would hold the output of a long build back in blocks.
+#   1.0.10 - fix(run): always `systemd-run --pipe`, never `--pty`. With --pty,
+#           systemd-run ends the session with ESC[!p (DECSTR, soft terminal
+#           reset); some terminals clear the screen on it, so the output of a
+#           command was lost. Colour is kept: the wrapper sets PARTITOR_COLOR=1
+#           when its stdout is a terminal (0 otherwise) and the engine reads it.
+#   1.0.9 - PARTITOR_JOBS (default auto) and PARTITOR_MEMORY_MAX are passed to
+#           the engine (a build runs page analysis and part rendering in worker
+#           processes; auto counts the workers from the CPUs and from the
+#           memory cap). The workers run in the same unit, so MemoryMax,
+#           CPUWeight, IOWeight and Nice cover all of them together.
+#   1.0.5 - PARTITOR_LIST_PAGE (items per menu page, 5-200, default 20).
+#   1.0.0 - Initial release.
+#
+# Usage:
+#   partitor                               menu (recent items, new from inbox)
+#   partitor <new|list|show|set|expand|contract|rebuild|repage|bars|proof|parts|groups|meta|analyse> ... library
+#   partitor rebuild <id> [part ...]       build all parts, or only the parts / groups named
+#                                          (numbers, 2-4, names: partitor rebuild 12 Trombones)
+#   partitor <pieces|detect|build> ...     engine commands in the work folder
+#   partitor --version | --help
+#   partitor --sandbox-check [--library]   (installer self-test)
+#   partitor --wrapper-version
+#
+# Settings (optional): /etc/default/partitor (KEY=value lines, sourced by this
+# wrapper; the installer reads PARTITOR_LIBRARY and PARTITOR_SMB_* from it too).
+#   PARTITOR_LIBRARY      (default /var/lib/partitor/library)  library folder; an
+#                                         environment variable of the same name wins
+#   PARTITOR_MEMORY_MAX   (default auto)  hard memory cap of one run (all workers
+#                                         together): auto, or a size like 8G
+#   PARTITOR_JOBS         (default auto)  worker processes of a build: auto or a number 1-99
+#                                         (1 = no workers). auto: CPUs - 1, at most 6, and
+#                                         as many as the memory cap holds (about 1.5 GB each,
+#                                         2 GB for the main process)
+#   PARTITOR_CPU_WEIGHT   (default 20)    cgroup CPU weight (100 = normal)
+#   PARTITOR_IO_WEIGHT    (default 20)    cgroup IO weight (100 = normal)
+#   PARTITOR_RUNTIME_MAX  (default 3600)  seconds before a run is stopped
+#   PARTITOR_LIST_PAGE    (default 20)    items per page in the menu (5-200)
+#   PARTITOR_LOGO         (default none)  PNG file drawn on title and back pages
+#   PARTITOR_SMB_HOST     (default none)  host of an SMB library (installer, hints)
+#   (PARTITOR_COLOR is not a setting: the wrapper sets it, 1 when its stdout is a
+#   terminal. The engine runs through a pipe, never a pty, see 1.0.10; the wrapper
+#   also sets PYTHONUNBUFFERED=1, see 1.0.11.)
+#
+# Exit codes: the engine's exit code; 2 = refused (not root, path outside the
+# work folder, engine or systemd-run missing).
+#
+# Test hooks (env): PARTITOR_TEST_NONROOT=1 skips the root check;
+# PARTITOR_SYSTEMD_RUN, PARTITOR_ENGINE (run this program instead of
+# python + lib/partitor-engine), PARTITOR_STATE, PARTITOR_DEFAULTS,
+# PARTITOR_MEMINFO replace the program and paths.
+
+set -euo pipefail
+
+RUN="${PARTITOR_SYSTEMD_RUN:-systemd-run}"
+ROOT="$(dirname "$(dirname "$(realpath -- "${BASH_SOURCE[0]}")")")"
+# one version for engine, wrapper and installer: the file VERSION of the repo
+WRAPPER_VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || true)"
+WRAPPER_VERSION="${WRAPPER_VERSION:-unknown}"
+PY="$ROOT/venv/bin/python3"
+if [[ -n "${PARTITOR_ENGINE:-}" ]]; then
+  ENGINE="$PARTITOR_ENGINE"
+  CMD=("$ENGINE")
+else
+  ENGINE="$ROOT/lib/partitor-engine"
+  CMD=("$PY" "$ENGINE")
+fi
+STATE="${PARTITOR_STATE:-/var/lib/partitor}"
+WORK="$STATE/work"
+SVC_USER="partitor"
+DEFAULTS="${PARTITOR_DEFAULTS:-/etc/default/partitor}"
+LIBRARY_ENV="${PARTITOR_LIBRARY:-}"
+PARTITOR_LIBRARY="/var/lib/partitor/library"
+PARTITOR_SMB_HOST=""
+PARTITOR_LOGO="${PARTITOR_LOGO:-}"
+LIBRARY_TIMEOUT=20
+MEMINFO="${PARTITOR_MEMINFO:-/proc/meminfo}"
+
+PARTITOR_MEMORY_MAX="auto"
+PARTITOR_CPU_WEIGHT="20"
+PARTITOR_IO_WEIGHT="20"
+PARTITOR_RUNTIME_MAX="3600"
+PARTITOR_LIST_PAGE="20"
+PARTITOR_JOBS="auto"
+if [[ -r "$DEFAULTS" ]]; then
+  # shellcheck source=/dev/null
+  . "$DEFAULTS"
+fi
+[[ -n "$LIBRARY_ENV" ]] && PARTITOR_LIBRARY="$LIBRARY_ENV"
+LIBRARY="$PARTITOR_LIBRARY"
+
+die() {
+  echo "partitor: $1" >&2
+  [[ -n "${2:-}" ]] && echo "  $2" >&2
+  exit 2
+}
+
+# a number, else the default (the value goes into the sandbox environment)
+[[ "$PARTITOR_LIST_PAGE" =~ ^[0-9]{1,3}$ ]] || PARTITOR_LIST_PAGE="20"
+[[ "$PARTITOR_JOBS" =~ ^(auto|[0-9]{1,2})$ ]] || PARTITOR_JOBS="auto"
+[[ "$LIBRARY" == /* ]] || die "PARTITOR_LIBRARY must be an absolute path: $LIBRARY"
+# auto: 70 % of the memory of the machine, at least 1G
+if [[ "$PARTITOR_MEMORY_MAX" == "auto" ]]; then
+  kb="$(awk '/^MemTotal:/ {print $2}' "$MEMINFO" 2>/dev/null || true)"
+  [[ "$kb" =~ ^[0-9]+$ ]] || kb=4194304
+  mb=$(( kb / 1024 * 70 / 100 ))
+  (( mb >= 1024 )) || mb=1024
+  PARTITOR_MEMORY_MAX="${mb}M"
+fi
+
+if [[ "$EUID" -ne 0 && "${PARTITOR_TEST_NONROOT:-0}" != "1" ]]; then
+  die "run as root; the engine itself runs as user $SVC_USER in a sandbox"
+fi
+if [[ "${1:-}" == "--wrapper-version" ]]; then
+  echo "partitor wrapper $WRAPPER_VERSION"
+  exit 0
+fi
+[[ -f "$ENGINE" ]] || die "engine not found: $ENGINE" "Run: sudo $ROOT/bin/partitor-install"
+[[ -n "${PARTITOR_ENGINE:-}" || -x "$PY" ]] || die "venv not found: $PY" "Run: sudo $ROOT/bin/partitor-install"
+command -v "$RUN" >/dev/null 2>&1 || die "systemd-run not found ($RUN)"
+[[ -d "$WORK" ]] || die "work folder missing: $WORK" "Run: sudo $ROOT/bin/partitor-install"
+
+work_real="$(realpath -- "$WORK")"
+
+# inside <path> — true when path (resolved, need not exist) is the work
+# folder or below it.
+inside() {
+  local p
+  p="$(realpath -m -- "$1")"
+  [[ "$p" == "$work_real" || "$p" == "$work_real"/* ]]
+}
+
+# Commands that read or write files run in the current folder, which must be
+# in the work folder (the sandbox can write nowhere else). --version, --help
+# and --sandbox-check run in the work folder from anywhere.
+needs_files=0
+needs_lib=0
+case "${1:-}" in
+  pieces|detect|build) needs_files=1 ;;
+  ""|menu|new|list|show|set|expand|contract|rebuild|bars|proof|parts|groups|meta|analyse|reid|rename|repage) needs_lib=1 ;;
+  --sandbox-check) [[ "${2:-}" == "--library" ]] && needs_lib=1 ;;
+esac
+(( $# )) || set -- menu
+cwd="$work_real"
+if (( needs_files )); then
+  inside "$PWD" || die "run partitor inside $WORK (now in $PWD)" \
+    "Copy the PDF there first: cp score.pdf $WORK/ ; then cd $WORK"
+  cwd="$(realpath -- "$PWD")"
+fi
+
+# Library commands: the library folder must answer (as root, so that the
+# automount of an SMB library mounts it) before the sandbox starts; the sandbox
+# may write there.
+rw_paths="$STATE"
+if (( needs_lib )); then
+  if ! timeout -k 2 "$LIBRARY_TIMEOUT" stat -- "$LIBRARY/inbox" "$LIBRARY/library" >/dev/null 2>&1; then
+    if [[ -n "$PARTITOR_SMB_HOST" ]]; then
+      unit="$(systemd-escape -p --suffix=mount "$LIBRARY" 2>/dev/null || echo "<library>.mount")"
+      hint="Check: systemctl status ${unit%.mount}.automount $unit; is the NAS on? See docs/STORAGE-SMB.md"
+    else
+      hint="Run: sudo partitor-init (see docs/INSTALL.md); the folder needs inbox/ and library/"
+    fi
+    die "library folder not reachable: $LIBRARY (inbox/ and library/)" "$hint"
+  fi
+  rw_paths="$STATE $LIBRARY"
+fi
+
+# Every argument that names a path must stay in the work folder: absolute
+# paths, --opt=/path forms, and relative paths that exist (../ escapes).
+# Library commands take ids and key=value pairs, not paths.
+(( needs_lib )) || for a in "$@"; do
+  v="$a"
+  [[ "$a" == --*=* ]] && v="${a#*=}"
+  if [[ "$v" == /* ]] || { [[ "$v" != -* ]] && [[ -e "$v" ]]; }; then
+    inside "$v" || die "path outside $WORK: $v" "Copy it into $WORK first."
+  fi
+done
+
+# --pty makes systemd-run end the session with ESC[!p (DECSTR), which
+# clears the screen in some terminals. Always use --pipe; keep colour by env.
+mode="--pipe"
+color=0
+if [[ -t 1 ]]; then
+  color=1
+fi
+
+exec "$RUN" --quiet --collect --wait "$mode" \
+  --uid="$SVC_USER" --gid="$SVC_USER" \
+  --working-directory="$cwd" \
+  --setenv=HOME="$STATE" --setenv=LANG=C.UTF-8 --setenv=OMP_THREAD_LIMIT=2 \
+  --setenv=PARTITOR_LIBRARY="$LIBRARY" --setenv=PARTITOR_LIST_PAGE="$PARTITOR_LIST_PAGE" \
+  --setenv=PARTITOR_JOBS="$PARTITOR_JOBS" --setenv=PARTITOR_MEMORY_MAX="$PARTITOR_MEMORY_MAX" \
+  --setenv=PARTITOR_COLOR="$color" --setenv=PYTHONUNBUFFERED=1 \
+  ${PARTITOR_LOGO:+--setenv=PARTITOR_LOGO="$PARTITOR_LOGO"} \
+  -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes \
+  -p PrivateDevices=yes -p PrivateNetwork=yes -p NoNewPrivileges=yes \
+  -p ReadWritePaths="$rw_paths" -p CapabilityBoundingSet= \
+  -p RestrictAddressFamilies=AF_UNIX -p RestrictNamespaces=yes \
+  -p ProtectKernelTunables=yes -p ProtectKernelModules=yes \
+  -p ProtectControlGroups=yes -p LockPersonality=yes -p RestrictRealtime=yes \
+  -p SystemCallArchitectures=native -p UMask=0027 \
+  -p MemoryMax="$PARTITOR_MEMORY_MAX" -p CPUWeight="$PARTITOR_CPU_WEIGHT" \
+  -p IOWeight="$PARTITOR_IO_WEIGHT" -p Nice=10 \
+  -p RuntimeMaxSec="$PARTITOR_RUNTIME_MAX" \
+  -- "${CMD[@]}" "$@"
