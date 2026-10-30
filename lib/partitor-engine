@@ -399,7 +399,7 @@ import numpy as np
 import pymupdf
 import yaml
 
-VERSION = "0.4.0-rc.2"
+VERSION = "0.4.0"
 
 # ── Output primitives (CLI-STYLE-GUIDE §4, Python port) ─────────────────────
 # PARTITOR_COLOR=1 forces colour and progress lines when stdout is no terminal:
