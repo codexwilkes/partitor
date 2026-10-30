@@ -13,7 +13,7 @@ result. It is safe to run again.
   systemd are not supported yet (`KNOWN-LIMITS.md`).
 - Root access (`sudo`).
 - Internet access during the install (apt and PyPI).
-- Memory: not measured on small hosts. A build uses worker processes under a
+- Memory: not measured on small hosts. A detect or a build uses worker processes under a
   memory cap; the default cap is 70 % of the RAM (`SANDBOX.md`). Long scans of
   books need more memory than clean vector scores.
 - Disk: the venv holds the Python packages (several hundred MB). The library

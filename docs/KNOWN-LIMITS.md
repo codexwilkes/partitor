@@ -68,5 +68,6 @@ per-system consistency.
   `systemd-run`. A mode without the sandbox is planned (best effort).
 
 Performance: a 70-page score takes minutes to analyse (about 30 minutes on a
-slow mini PC); a build of one piece takes minutes. The build runs at low
-priority.
+slow mini PC); a build of one piece takes minutes. `detect` and `build` analyse
+the pages in parallel workers (`PARTITOR_JOBS`, `--jobs`; `--jobs 1` = one
+process). The build runs at low priority.

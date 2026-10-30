@@ -1683,6 +1683,174 @@ class TestPartialBuildReal(unittest.TestCase):
 
 
 @needs_deps
+class TestDetectParallel(unittest.TestCase):
+    """detect with workers (0.4.1): the same output as one process."""
+
+    SYSTEMS = (1, 2, 3, 2)               # systems on pages 1-4 (base shifts on every page)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="detpar-")
+        doc = pymupdf.open()
+        for i, n in enumerate(cls.SYSTEMS):
+            one = os.path.join(cls.tmp, f"p{i}.pdf")
+            make_score_pdf(one, systems=n, staves=2, labels=("Alto", "Bass"),
+                           title="Test Chorale" if i == 0 else "")
+            doc.insert_pdf(pymupdf.open(one))
+        cls.pdf = os.path.join(cls.tmp, "score.pdf")
+        doc.save(cls.pdf)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def tearDown(self):
+        pt._reset_counts()
+
+    def detect(self, jobs, name, pages=None):
+        out = os.path.join(self.tmp, name)
+        ns = argparse.Namespace(pdf=self.pdf, pages=pages, parts="", title="", subtitle="",
+                                composer="", dpi=200, out=out, page_header_sp=pt.PAGE_HEADER_SP,
+                                force=True, jobs=jobs)
+        buf = io.StringIO()
+        pt._reset_counts()
+        with contextlib.redirect_stdout(buf):
+            rc = pt.cmd_detect(ns)
+        text = buf.getvalue().replace(out, "OUT")
+        text = re.sub(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \w+", "DATE", text)
+        text = re.sub(r"elapsed: \d+ms", "elapsed: T", text)
+        return rc, text, Path(out)
+
+    @staticmethod
+    def files(out):
+        import hashlib
+        return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in sorted((out / "preview").iterdir())}
+
+    def test_parallel_equals_sequential(self):
+        rc1, text1, o1 = self.detect("1", "seq")
+        rc2, text2, o2 = self.detect("2", "par")
+        self.assertEqual((rc1, rc2), (0, 0))
+        self.assertEqual((o1 / "layout.yaml").read_text().replace(str(o1), "OUT"),
+                         (o2 / "layout.yaml").read_text().replace(str(o2), "OUT"))
+        self.assertEqual(self.files(o1), self.files(o2))       # names and bytes
+        notes = ("worker", "analysis took")
+        self.assertFalse(any(n in text1 for n in notes))        # one job: no new text
+        self.assertIn("analysing 4 page(s) with 2 worker(s)", text2)
+        self.assertEqual(text1, "\n".join(l for l in text2.split("\n")
+                                          if not any(n in l for n in notes)))
+
+    def test_system_ids_follow_the_pages(self):
+        _, _, out = self.detect("2", "ids")
+        lay = yaml.safe_load((out / "layout.yaml").read_text())
+        want = [f"p{p + 1}.s{k + 1}" for p, n in enumerate(self.SYSTEMS) for k in range(n)]
+        self.assertEqual([e["id"] for e in lay["systems"]], want)
+        self.assertEqual([e["geom"]["page"] for e in lay["systems"]],
+                         [p + 1 for p, n in enumerate(self.SYSTEMS) for _ in range(n)])
+
+    def test_system_base_changes_no_record(self):
+        # nsys is only the base of the system index: a worker passes 0, the old
+        # loop passed the systems before. Pages with 1, 2 and 3 systems.
+        doc = pymupdf.open(self.pdf)
+        for pno, n in enumerate(self.SYSTEMS[:3]):
+            r0, rec0 = pt.analyse_one(doc, pno, 200, 0)
+            r7, rec7 = pt.analyse_one(doc, pno, 200, 7)
+            self.assertEqual(len(rec0), n)
+            self.assertEqual(rec0, rec7)
+            self.assertEqual([[st.system for st in g] for g in r7.systems],
+                             [[7 + k] * 2 for k in range(n)])
+            self.assertEqual(list(r0.barlines.values()), list(r7.barlines.values()))
+            self.assertTrue(np.array_equal(
+                np.where(r0.owner >= pt.OWN_HEADER_BASE, 1, r0.owner),
+                np.where(r7.owner >= pt.OWN_HEADER_BASE, 1, r7.owner)))
+
+    def test_what_a_worker_returns_is_small_and_transferable(self):
+        import pickle
+        doc = pymupdf.open(self.pdf)
+        res, recs = pt.analyse_one(doc, 1, 200, 0)
+        item = pt.preview_page(res, recs, Path(self.tmp))
+        small = pickle.dumps((recs, item, res.title, res.composer))
+        self.assertEqual(pickle.loads(small), (recs, item, res.title, res.composer))
+        self.assertLess(len(small), 64 * 1024)
+        self.assertGreater(len(pickle.dumps(res)), 20 * len(small))   # the image stays behind
+
+    def test_one_job_uses_no_workers(self):
+        def no_fork(*a, **k):
+            raise AssertionError("fork_map called with one job")
+        with mock_attr(pt, "fork_map", no_fork):
+            rc, _, _ = self.detect("1", "one")
+        self.assertEqual(rc, 0)
+
+    def test_jobs_from_the_environment(self):
+        old = os.environ.get("PARTITOR_JOBS")
+        os.environ["PARTITOR_JOBS"] = "2"
+        try:
+            _, text, _ = self.detect(None, "env")
+        finally:
+            if old is None:
+                os.environ.pop("PARTITOR_JOBS", None)
+            else:
+                os.environ["PARTITOR_JOBS"] = old
+        self.assertIn("with 2 worker(s)", text)
+
+    def test_die_in_a_worker_stops_detect(self):
+        real = pt.analyse_one
+
+        def die_on_page_two(doc, pno, dpi, nsys, **kw):
+            if pno == 1:
+                pt._die("page 2: test failure")
+            return real(doc, pno, dpi, nsys, **kw)
+        out = Path(self.tmp, "die")
+        with mock_attr(pt, "analyse_one", die_on_page_two), \
+                contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as cm:
+                self.detect("2", "die")
+        self.assertEqual(cm.exception.code, 1)
+        self.assertFalse((out / "layout.yaml").exists())      # nothing half written
+
+    def test_error_in_a_worker_names_the_page_position(self):
+        real = pt.analyse_one
+
+        def fail_on_page_three(doc, pno, dpi, nsys, **kw):
+            if pno == 2:
+                raise KeyError("boom")
+            return real(doc, pno, dpi, nsys, **kw)
+        with mock_attr(pt, "analyse_one", fail_on_page_three):
+            with self.assertRaises(RuntimeError) as cm:
+                self.detect("2", "err")
+        self.assertIn("item 3 of 4", str(cm.exception))
+        self.assertIn("KeyError", str(cm.exception))
+
+    def test_detect_then_build_in_one_process(self):
+        # `new`: detect, then (after the prompts) build, in one process
+        item = Path(self.tmp, "2026-10-0001-c-t")
+        item.mkdir()
+        shutil.copy(self.pdf, item / "2026-10-0001-source.pdf")
+        pt.save_item(item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-30"})
+        old = os.environ.get("PARTITOR_JOBS")
+        os.environ["PARTITOR_JOBS"] = "2"
+        threads = cv2.getNumThreads()
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
+                self.assertEqual(cv2.getNumThreads(), threads)   # pool restored after the fork
+                self.assertEqual(pt.run_build(item), 0)
+        finally:
+            if old is None:
+                os.environ.pop("PARTITOR_JOBS", None)
+            else:
+                os.environ["PARTITOR_JOBS"] = old
+        self.assertTrue(list((item / "parts").glob("*.pdf")))
+
+    def test_help_lists_jobs(self):
+        env = dict(os.environ, PARTITOR_ALLOW_ROOT="1")
+        r = subprocess.run([sys.executable, SRC, "detect", "--help"], capture_output=True,
+                           text=True, env=env)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("--jobs", r.stdout)
+
+
+@needs_deps
 class TestLayoutModel(unittest.TestCase):
     def strip(self, low=False, sp=10.0):
         img = np.zeros((120, 600), bool)

@@ -6,6 +6,23 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.4.1 — 2026-10-30
+
+### Changed
+
+- `detect` (and `new`, which runs it) analyses the pages in parallel worker
+  processes, as `build` does. Before, one process analysed the pages one by
+  one, so a long score took much longer in `detect` than in `build`. The
+  output is the same as with one process: the same `layout.yaml`, preview
+  files, system ids, titles, check counts and printed text, in page order.
+- With workers, `detect` prints the worker count, the memory of the largest
+  worker, and the analysis time.
+
+### Added
+
+- `detect --jobs N|auto`. `PARTITOR_JOBS` applies to `detect` and `new` too.
+  `--jobs 1` keeps the single-process loop.
+
 ## 0.4.0 — 2026-10-29
 
 First public release. Same code as 0.4.0-rc.2; checked on the production host (50 golden cases, parts identical).

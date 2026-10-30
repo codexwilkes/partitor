@@ -64,7 +64,7 @@
 #                                         environment variable of the same name wins
 #   PARTITOR_MEMORY_MAX   (default auto)  hard memory cap of one run (all workers
 #                                         together): auto, or a size like 8G
-#   PARTITOR_JOBS         (default auto)  worker processes of a build: auto or a number 1-99
+#   PARTITOR_JOBS         (default auto)  worker processes of a detect or build: auto or a number 1-99
 #                                         (1 = no workers). auto: CPUs - 1, at most 6, and
 #                                         as many as the memory cap holds (about 1.5 GB each,
 #                                         2 GB for the main process)

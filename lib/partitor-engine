@@ -21,7 +21,7 @@
 # YYYY-MM-NNNN); list, show, set, expand, contract, rebuild. `rebuild ID
 # [part ...]` builds only the parts / groups named (3, 2-4, Trombones); the
 # other files in parts/ stay. --jobs N|auto (PARTITOR_JOBS): workers for the
-# page analysis and the rendering (auto: CPUs - 1, at most 6, within
+# page analysis (detect, build) and the rendering (build) (auto: CPUs - 1, at most 6, within
 # PARTITOR_MEMORY_MAX).
 #
 # Installed as /opt/partitor/bin/partitor-engine. Run it through
@@ -45,7 +45,7 @@
 #   partitor pieces SCORE.pdf
 #   partitor detect SCORE.pdf [--pages A-B] [--parts "Canto,Alto,Tenore,Basso"]
 #                   [--title T] [--subtitle S] [--composer C] [--dpi N]
-#                   [--out DIR] [--page-header-sp SP] [--force]
+#                   [--out DIR] [--page-header-sp SP] [--force] [--jobs N|auto]
 #   partitor build  SCORE.pdf [--pages A-B] [--out DIR] [--paper a4|letter|ledger]
 #                   [--scale F] [--gap SP] [--min-gap SP] [--clearance SP]
 #                   [--page-count N] [--min-staff-mm MM] [--ink normal|darker]
@@ -53,7 +53,7 @@
 #                   [--margin-top MM] [--margin-bottom MM] [--margin-side MM]
 #                   [--gutter MM] [--duplex auto|on|off] [--large on|off]
 #                   [--reflow on|off] [--max-staff-mm MM] [--title-page auto|off]
-#                   [--rests compress|keep]
+#                   [--rests compress|keep] [--jobs N|auto]
 #   partitor --sandbox-check [--library]   (installer self-test)
 #
 # ID: 12 = serial 12 of the current year, or 2026-10-0012 (old: 2026-012).
@@ -150,6 +150,13 @@
 # =============================================================================
 #
 # CHANGELOG:
+#   0.4.1 - `detect` (and `new`, which calls it) analyses pages in forked workers,
+#           as `build` does (fork_map, job_count; --jobs, PARTITOR_JOBS). A worker
+#           analyses a page with system base 0, runs the gate line and the preview,
+#           and returns only the system records, the preview section, the title and
+#           the composer. Output is the same as with one job; --jobs 1 keeps the
+#           old single-process loop. With workers the run prints the worker count,
+#           the largest worker's memory and the analysis time.
 #   0.4.0-rc.1 - Public release candidate. The version is the version of the
 #           repo (file VERSION); wrapper and installer carry it too. BREAKING:
 #           PARTITOR_SHARE is now PARTITOR_LIBRARY (default
@@ -399,7 +406,7 @@ import numpy as np
 import pymupdf
 import yaml
 
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 
 # ── Output primitives (CLI-STYLE-GUIDE §4, Python port) ─────────────────────
 # PARTITOR_COLOR=1 forces colour and progress lines when stdout is no terminal:
@@ -2928,7 +2935,10 @@ def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: boo
 
     nsys: the number of systems on the pages before (only a base for the
     global system index; nothing reads it across pages, so a worker that
-    analyses a page alone passes 0). bar_edits ({system id: [edit]},
+    analyses a page alone passes 0 (detect with workers and build do). The
+    index is only a key inside one page (barlines, repeats, system window,
+    owner code OWN_HEADER_BASE + index); the records and ids use the place of
+    the system on its page (p3.s2). bar_edits ({system id: [edit]},
     bar_edits_by_system): the operator's corrections are applied to the
     barlines of those systems (build)."""
     res = analyse_page(doc[pno], pno, dpi, nsys, ocr=ocr)
@@ -2971,7 +2981,9 @@ def iter_pages(pdf: Path, dpi: int, pages: list[int], ocr: bool = True,
                bar_edits: dict | None = None):
     """iter_pages -> yields (PageResult, system records of that page).
 
-    One page at a time: the caller uses the owner image, then drops it."""
+    One page at a time, in this process: the caller uses the owner image,
+    then drops it. Callers: `pieces` (200 dpi, no OCR) and `detect` with one
+    job. `detect` with more jobs and `build` use analyse_one in workers."""
     doc = pymupdf.open(pdf)
     nsys = 0
     for k, pno in enumerate(pages):
@@ -6319,6 +6331,12 @@ def cmd_pieces(a: argparse.Namespace) -> int:
 
 
 def cmd_detect(a: argparse.Namespace) -> int:
+    """detect: analyse the pages, write layout.yaml and the preview.
+
+    jobs (--jobs, else PARTITOR_JOBS, else auto) > 1: forked workers analyse
+    the pages (fork_map, as build); each returns only small data and the
+    parent joins it in page order, so the output equals the one-job run.
+    One job: this process, page by page (iter_pages)."""
     start = time.monotonic()
     pdf = Path(a.pdf)
     if not pdf.is_file():
@@ -6342,15 +6360,51 @@ def cmd_detect(a: argparse.Namespace) -> int:
     items: list[str] = []
     titles: list[str] = []
     composers: list[str] = []
-    for res, recs in iter_pages(pdf, a.dpi, pages):
+    t_analysis = time.monotonic()
+    jobs = job_count(getattr(a, "jobs", None), PAGE_WORKER_GB, len(pages))
+
+    def page_out(res: PageResult, recs: list[dict]) -> tuple:
+        """Gate line and preview of one page -> only small data (system
+        records, preview section, title, composer). The PageResult holds the
+        large owner image: it stays in the process that made it."""
         check_page(res)
-        items.append(preview_page(res, recs, pdir))
-        sysrecs.extend(recs)
-        if res.title:
-            titles.append(res.title)
-        if res.composer:
-            composers.append(res.composer)
-        del res
+        return recs, preview_page(res, recs, pdir), res.title, res.composer
+
+    if jobs <= 1:
+        # one process, as before 0.4.1 (iter_pages carries the system base)
+        results = (page_out(res, recs) for res, recs in iter_pages(pdf, a.dpi, pages))
+    else:
+        _note(f"analysing {len(pages)} page(s) with {jobs} worker(s)")
+        wdocs: dict[int, "pymupdf.Document"] = {}
+
+        def page_task(pno: int) -> tuple:
+            d_ = wdocs.get(os.getpid())
+            if d_ is None:                    # one open document per process
+                d_ = wdocs[os.getpid()] = pymupdf.open(pdf)
+            # nsys = 0: the system index is a key inside one page (analyse_one)
+            res, recs = analyse_one(d_, pno, a.dpi, 0)
+            return page_out(res, recs)
+
+        results = fork_map(page_task, pages, jobs)
+    try:
+        for k_, pno in enumerate(pages):
+            if jobs > 1:
+                _progress(f"page {pno + 1} ({k_ + 1}/{len(pages)}): waiting for its worker")
+            recs, item, title, composer = next(results)
+            if jobs > 1:
+                _progress_end()
+            items.append(item)
+            sysrecs.extend(recs)
+            if title:
+                titles.append(title)
+            if composer:
+                composers.append(composer)
+    finally:
+        results.close()
+    if jobs > 1:
+        _note(f"workers: {jobs}; the largest used {worker_peak_mb()} MB "
+              f"(estimate for the worker count: {PAGE_WORKER_GB:.1f} GB)")
+        _note(f"analysis took {time.monotonic() - t_analysis:.0f} s")
     if not sysrecs:
         _fail("music:  no staves found")
         return _summary(start)
@@ -9721,6 +9775,8 @@ def main() -> int:
                    default=PAGE_HEADER_SP)
     d.add_argument("--out")
     d.add_argument("--force", action="store_true")
+    d.add_argument("--jobs", help="worker processes for the page analysis: a number or auto "
+                   "(default: PARTITOR_JOBS, else auto)")
     b = sub.add_parser("build")
     b.add_argument("pdf")
     b.add_argument("--pages")

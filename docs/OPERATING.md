@@ -63,7 +63,7 @@ the `set` keys (`DESIGN.md` §3 and §6.2).
 | `venv not found`, `engine not found` | Run `sudo /opt/partitor/bin/partitor-install`. |
 | `path outside /var/lib/partitor/work` | Copy the PDF into the work folder first. |
 | A run stops after an hour | Raise `PARTITOR_RUNTIME_MAX`. |
-| Killed during a build (out of memory) | Lower `PARTITOR_JOBS` or raise `PARTITOR_MEMORY_MAX`. |
+| Killed during a detect or a build (out of memory) | Lower `PARTITOR_JOBS` or raise `PARTITOR_MEMORY_MAX`. |
 | Wrong parts or bar numbers | `KNOWN-LIMITS.md`; correct in the item menu; check the proof PDF. |
 
 An interrupted build leaves the previous `parts/` set in place; a build that
