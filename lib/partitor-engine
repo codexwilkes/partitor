@@ -31,7 +31,7 @@
 #
 # Usage:
 #   partitor                               menu
-#   partitor new [N] | list | show ID (review) | rebuild ID (build) | analyse ID
+#   partitor new [N] [--jobs N|auto] | list | show ID (review) | rebuild ID (build) | analyse ID
 #   Edits are saved, not built (--build: build too):
 #   partitor expand ID | contract ID | meta ID (title, composer, short composer)
 #   partitor bars ID                       pickups, split bars, barlines, line
@@ -150,6 +150,8 @@
 # =============================================================================
 #
 # CHANGELOG:
+#   0.4.2 - `new --jobs N|auto` (detect and build steps of the wizard). Output
+#           unchanged.
 #   0.4.1 - `detect` (and `new`, which calls it) analyses pages in forked workers,
 #           as `build` does (fork_map, job_count; --jobs, PARTITOR_JOBS). A worker
 #           analyses a page with system base 0, runs the gate line and the preview,
@@ -406,7 +408,7 @@ import numpy as np
 import pymupdf
 import yaml
 
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 
 # ── Output primitives (CLI-STYLE-GUIDE §4, Python port) ─────────────────────
 # PARTITOR_COLOR=1 forces colour and progress lines when stdout is no terminal:
@@ -7529,11 +7531,12 @@ def _engine_step(fn, ns: argparse.Namespace) -> int:
 
 
 def run_detect(item: Path, pages: str | None, title: str, composer: str,
-               parts: str = "") -> int:
+               parts: str = "", jobs: str | None = None) -> int:
+    """Run detect for an item (jobs: workers, a number or auto; None = PARTITOR_JOBS)."""
     ns = argparse.Namespace(pdf=str(item_file(item, "source.pdf")), pages=pages,
                             parts=parts, title=title, subtitle="", composer=composer,
                             dpi=400, out=str(item), page_header_sp=PAGE_HEADER_SP,
-                            force=True, layout_name=score_name(item))
+                            force=True, layout_name=score_name(item), jobs=jobs)
     sf = item_file(item, SCORE_FILE)
     before = load_item(item) if sf.is_file() else {}
     rc = _engine_step(cmd_detect, ns)
@@ -8518,8 +8521,10 @@ def _lib_or_die() -> tuple[Path, Path]:
 
 
 def cmd_new(a: argparse.Namespace) -> int:
-    """new [n]: wizard for an inbox PDF (DESIGN.md §6.2)."""
+    """new [n]: wizard for an inbox PDF (DESIGN.md §6.2). --jobs: workers of the
+    detect and build steps (default PARTITOR_JOBS, else auto)."""
     start = time.monotonic()
+    jobs = getattr(a, "jobs", None)
     share, lib = _lib_or_die()
     pdfs = inbox_pdfs(share)
     print(f"{BOLD}partitor {VERSION} — new{RST}")
@@ -8555,7 +8560,7 @@ def cmd_new(a: argparse.Namespace) -> int:
     keep = {"id": iid, "slug": "new", "created": time.strftime("%Y-%m-%d")}
     save_item(item, {**keep, "source": src.name})
     print(f"\n  {GRN}✔{RST}  item:  {item.name}  (moved {src.name} here)")
-    rc = run_detect(item, rng, "", "")
+    rc = run_detect(item, rng, "", "", jobs=jobs)
     detected = load_item(item) if item_file(item, SCORE_FILE).is_file() else {}
     if rc or "systems" not in detected:
         _reset_counts()
@@ -8589,7 +8594,7 @@ def cmd_new(a: argparse.Namespace) -> int:
         new = rename_parts(item)
         if new:
             _note(f"{len(new)} names for {len(data.get('parts') or [])} parts: detecting again")
-            if run_detect(item, rng, title, composer, ",".join(new)):
+            if run_detect(item, rng, title, composer, ",".join(new), jobs=jobs):
                 _die("detect failed", f"partitor rebuild {iid}")
             merge_item_keys(item, keep)
             proof_from_preview(item)
@@ -8612,7 +8617,7 @@ def cmd_new(a: argparse.Namespace) -> int:
         _note(f"Edit in the menu (g groups, s set, m title/composer), then r to build; "
               f"or: partitor groups {iid}; partitor rebuild {iid}")
         return _summary(start)
-    rc = run_build(item)
+    rc = run_build(item, jobs=jobs)
     _reset_counts()
     _head(f"Result: {item.name}")
     if rc:
@@ -9725,6 +9730,8 @@ def main() -> int:
     sub.add_parser("menu", help="recent items and new from inbox (default)")
     nw = sub.add_parser("new", help="wizard for an inbox PDF")
     nw.add_argument("n", nargs="?", help="inbox number (default: ask)")
+    nw.add_argument("--jobs", help="worker processes of the analysis and the build: a number "
+                    "or auto (default: PARTITOR_JOBS, else auto)")
     ls_ = sub.add_parser("list", help="all library items, or those matching words")
     ls_.add_argument("words", nargs="*", help="e.g. Schein (composer, title, part, id)")
     sub.add_parser("show").add_argument("id", help="12 or 2026-10-0012")

@@ -2425,6 +2425,23 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(pt.item_status(data), "ready to build")
         self.assertFalse((item / "parts").exists() and any((item / "parts").iterdir()))
 
+    def test_new_jobs_reaches_the_detect_and_build_steps(self):
+        one = self.share / "one.pdf"
+        make_score_pdf(str(one))
+        doc = pymupdf.open()
+        for _ in range(2):
+            doc.insert_pdf(pymupdf.open(str(one)))
+        doc.save(str(self.share / "inbox" / "chorale.pdf"))
+        one.unlink()
+        r = self.run_cli("new", "--jobs", "2", stdin="1\n\nTest Chorale\nJ. H. Schein\n\nA,T,B\n\n\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("analysing 2 page(s) with 2 worker(s)", r.stdout)     # detect
+        self.assertIn("analysing 2 of 2 page(s) with 2 worker(s)", r.stdout)  # build
+        item = next((self.share / "library").iterdir())
+        self.assertEqual(pt.item_status(pt.load_item(item)), "built")
+        h = self.run_cli("new", "--help")
+        self.assertIn("--jobs", h.stdout)
+
     def test_composer_short(self):
         self.assertEqual(pt.composer_surname("Johann Hermann Schein"), "Schein")
         self.assertEqual(pt.composer_surname("J.S. Bach"), "Bach")

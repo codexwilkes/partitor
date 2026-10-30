@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.4.0. Section numbers are stable: the code cites
+Status: describes partitor 0.4.2. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -331,9 +331,9 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
    found (title text above a first system, page ranges), and the operator
    chooses one or more; each becomes its own library item.
 8. **Memory.** The engine processes page by page and keeps only compact
-   results (strips, or a compressed cache per page). A build uses worker
-   processes (`PARTITOR_JOBS`); the memory cap (`PARTITOR_MEMORY_MAX`) covers
-   all workers together.
+   results (strips, or a compressed cache per page). `detect` and `build` use
+   worker processes (`PARTITOR_JOBS`, `--jobs`; §4.4); the memory cap
+   (`PARTITOR_MEMORY_MAX`) covers all workers together.
 9. **Page-edge artefacts.** Book-spine shadow, dark scan borders and corner
    marks are found and discarded as a known class.
 10. **Scan conditioning (poor scans, light grey print).** The engine tolerates
@@ -447,6 +447,36 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
     - Wrong extremes come from clef misreads, lyrics under ledger notes,
       filled ledger lines and staff-line remnants. The operator corrects what
       remains. See `KNOWN-LIMITS.md`.
+
+---
+
+### 4.4 Parallel page analysis
+
+`detect` and `build` analyse the pages in forked worker processes
+(`fork_map`; no threads). One worker takes one page. The number of workers is
+`--jobs`, else `PARTITOR_JOBS`, else auto (one CPU stays free, at most 6, and
+as many as the memory cap holds at about 1.5 GB per worker plus 2 GB for the
+main process). `--jobs 1` runs in one process, page by page.
+
+- **Same output.** Parallel and single-process runs give the same
+  `layout.yaml`, preview files, system ids, titles, check counts and printed
+  text, in page order. A worker passes system base 0 to the analysis: the
+  system index is only a key inside one page (barlines, repeats, system
+  window, owner code). Ids and records use the place of the system on its page
+  (`p3.s2`), so the parent needs no renumbering.
+- **Small results.** A `detect` worker runs the gate line and the preview
+  itself and returns only the system records, the preview section, the title
+  and the composer. The large owner image never leaves the worker.
+- **Progress.** The parent prints one self-overwriting line per page
+  ("waiting for its worker"). With workers it ends with the worker count, the
+  memory of the largest worker and the analysis time. A single-process run
+  prints no such lines.
+- **OpenCV.** The parent stops the OpenCV thread pool before the fork and
+  starts it again after (a pool copied into a child hangs). `new` analyses and
+  builds in one process, so this holds across both steps.
+- **Failures.** A worker that raises, calls `_die` or is killed (out of
+  memory) ends the run with its message; the other workers are stopped.
+- `pieces` still analyses in one process.
 
 ---
 
@@ -617,7 +647,7 @@ as a rest to turn in; a group line counts as rest only when every staff rests.
 - Logo (optional): `PARTITOR_LOGO` names a PNG file (black on alpha works
   best). Unset: no logo, no room kept, no warning. Set but missing: no logo, one
   warning, no failure. `logo=off` removes it per piece; it is not a per-part
-  key.
+  key. `partitor-install` warns in advance when the file cannot be used (§9).
   - Title page (constructed, 3+ pages, mostly blank): centred on the text
     block, logo centre at 76 % of the page height, 64 pt high.
   - Back page (last page of every part, one page included): centred on the text
@@ -660,21 +690,21 @@ PDF (`large: on`, default):
 
 ```
 partitor                       menu: recent items + "new from inbox (N waiting)"
-partitor new [n]               wizard for an inbox PDF
+partitor new [n] [--jobs N|auto]   wizard for an inbox PDF
 partitor list [words] | show <id>
 partitor expand <id> [part] | contract <id> [part]
 partitor set <id> pages=2 scale=1.2 gap=11 paper=a4 title="..."
 partitor set <id> "Continuo:pages=2"      (one part)
 partitor rename <id>           folder name follows title and composer
 partitor reid <id>             old YYYY-NNN item -> YYYY-MM-NNNN
-partitor rebuild <id> [part ...]
+partitor rebuild <id> [part ...] [--jobs N|auto]
 partitor repage <id> [part ...]           page breaks again from the saved lines
 partitor analyse <id> [--yes] | analyse --all
 partitor bars | parts | groups | meta | proof <id>
 ```
 
 Engine commands that work on a single PDF in the work folder (no library):
-`pieces`, `detect`, `build`.
+`pieces`, `detect`, `build` (`detect` and `build` take `--jobs`, §4.4).
 
 Menu: items are listed newest first under their stable serial (`12` =
 `2026-10-0012`; another year: `2025-14`), `PARTITOR_LIST_PAGE` items per page
@@ -684,7 +714,8 @@ part, `/` clears. From 9 items on, the five changed last come first as A-E. A
 
 Details:
 
-- `new`: the PDF moves into `library/<id>-<slug>/<id>-source.pdf` once title
+- `new`: `--jobs` sets the workers of its detect and build steps (default
+  `PARTITOR_JOBS`, else auto). The PDF moves into `library/<id>-<slug>/<id>-source.pdf` once title
   and composer are confirmed (q before that leaves it in the inbox). Part
   names: Enter keeps the suggested names; the same number of names renames; a
   different number runs detect again with `--parts`. Uncertain systems: "parts,
@@ -831,6 +862,7 @@ the script and in `INSTALL.md`):
 | Library folder (local mode) | `<library>`, `inbox/`, `library/` at 2770, owner and group `partitor`. |
 | venv `<repo>/venv` | Create if missing (root-owned, read-only for `partitor`). Reinstall the pinned packages when the `requirements.txt` hash changes. |
 | Links | `partitor`, `partitor-init`, `partitor-install` in `/usr/local/sbin` -> `<repo>/bin/<name>`. |
+| Logo (optional) | Check `PARTITOR_LOGO` in the settings: WARN when the file is missing, lies where the sandbox cannot see it (`/home`, `/root`, `/run/user`, `/tmp`, `/var/tmp`) or cannot be read by user `partitor`. Never a FAIL: without the logo the engine builds as before. |
 | Self-test | `partitor --sandbox-check`: every line must be ok. |
 | SMB mode: credentials | Check `/etc/partitor/smb.cred` (0600 root:root). |
 | SMB mode: units | Mount and automount units for the library folder, written from `share/systemd/*.in`; automount enabled. The share mounts on first use and unmounts when idle; the boot never depends on the NAS. |

@@ -29,6 +29,10 @@
 #      differs from the stamp in the venv.
 #   7. Links in /usr/local/sbin: partitor, partitor-init, partitor-install
 #      (each -> <repo>/bin/<name>).
+#   7a. Logo (optional, PARTITOR_LOGO in the config): WARN when the file is
+#      missing, lies where the sandbox cannot see it (/home, /root, /run/user,
+#      /tmp, /var/tmp: ProtectHome, PrivateTmp), or the service user cannot
+#      read it. A warning only: the engine builds without the logo.
 #   8. Self-test: partitor --sandbox-check (runs the engine in the sandbox;
 #      every line must be ok).
 #   9. smb mode: /etc/partitor/smb.cred (0600 root:root, username= and
@@ -38,6 +42,7 @@
 #      the same library check. NAS not reachable: WARN.
 #
 # CHANGELOG:
+#   0.4.2 - WARN when the service user cannot read PARTITOR_LOGO (step 7a).
 #   0.4.0 - Public release (renamed from `setup`, 1.0.1 in the private line;
 #           the version is now the version of the repo, file VERSION). BREAKING: PARTITOR_NAS is
 #           now PARTITOR_SMB_HOST (+ PARTITOR_SMB_SHARE); the mount point is
@@ -58,7 +63,7 @@
 #
 # Test hooks (env): PARTITOR_PREFIX (root of all paths), PARTITOR_ROOT (repo
 # folder), PARTITOR_WRAPPER (wrapper path), PARTITOR_SKIP_SELFTEST=1,
-# PARTITOR_SVC_USER, PARTITOR_SYSTEMCTL, PARTITOR_CRED_OWNER.
+# PARTITOR_SVC_USER, PARTITOR_SYSTEMCTL, PARTITOR_CRED_OWNER, PARTITOR_RUNUSER.
 
 set -euo pipefail
 
@@ -94,6 +99,7 @@ CRED="$PFX$CRED_PATH"
 UNIT_DIR="$PFX/etc/systemd/system"
 SYSTEMCTL="${PARTITOR_SYSTEMCTL:-systemctl}"
 CRED_OWNER="${PARTITOR_CRED_OWNER:-root:root}"
+RUNUSER="${PARTITOR_RUNUSER:-runuser}"
 
 FAIL=0
 say()  { echo "partitor-install: $1"; }
@@ -268,6 +274,33 @@ for name in partitor partitor-init partitor-install; do
     say "linked $link -> $target"
   fi
 done
+
+# 7a. logo (optional): the sandbox user must be able to read the PNG file.
+# A warning only: without the logo the engine prints one warning and builds.
+LOGO="$(cfg PARTITOR_LOGO)"
+if [[ -n "$LOGO" && "$LOGO" != none ]]; then
+  if [[ "$LOGO" != /* ]]; then
+    warn "PARTITOR_LOGO is not an absolute path: $LOGO"
+  else
+    case "$LOGO" in
+      /home/*|/root/*|/run/user/*|/tmp/*|/var/tmp/*)
+        warn "logo $LOGO is hidden in the sandbox (ProtectHome, PrivateTmp)"
+        echo "  Fix: move the file to a folder such as /etc/partitor and set PARTITOR_LOGO to it" ;;
+      *)
+        if [[ ! -f "$PFX$LOGO" ]]; then
+          warn "logo file not found: $LOGO (the engine builds without it)"
+        elif ! command -v "$RUNUSER" >/dev/null 2>&1; then
+          warn "logo readability not checked ($RUNUSER not found)"
+        elif "$RUNUSER" -u "$SVC_USER" -- test -r "$PFX$LOGO" >/dev/null 2>&1; then
+          ok "logo readable by $SVC_USER: $LOGO"
+        else
+          warn "logo not readable by $SVC_USER: $LOGO (the engine builds without it)"
+          echo "  Check: namei -l $LOGO   (every folder needs x for others; the file needs r)"
+          echo "  Run: sudo chmod o+r $LOGO"
+        fi ;;
+    esac
+  fi
+fi
 
 # 8. sandbox self-test (runs the engine as $SVC_USER through the wrapper)
 export PARTITOR_LIBRARY="$LIBRARY"

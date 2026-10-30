@@ -9,7 +9,7 @@ systems, asks you which staff is which part, and writes one PDF per part, in
 large print if you want it: big staves, a calm layout, page turns at rests,
 bar numbers, rehearsal marks. It was made for amateur players with older eyes.
 
-Status: release candidate for 0.4.0. It works for the author, on one setup. Read
+Status: first public release line (0.4). It works for the author, on one setup. Read
 `docs/KNOWN-LIMITS.md` before you rely on it.
 
 ## Scope

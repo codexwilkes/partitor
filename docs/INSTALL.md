@@ -108,7 +108,9 @@ run. Keys: `PARTITOR_LIBRARY`, `PARTITOR_SMB_HOST`, `PARTITOR_SMB_SHARE`
 (storage; the installer reads these); `PARTITOR_MEMORY_MAX`, `PARTITOR_JOBS`,
 `PARTITOR_CPU_WEIGHT`, `PARTITOR_IO_WEIGHT`, `PARTITOR_RUNTIME_MAX`
 (`SANDBOX.md`); `PARTITOR_LIST_PAGE` (menu items per page, 5-200);
-`PARTITOR_LOGO` (a PNG file for title and back pages; unset = no logo).
+`PARTITOR_LOGO` (a PNG file for title and back pages; unset = no logo). Keep the file
+outside `/home`, `/root` and `/tmp` (the sandbox hides them) and readable by the service
+user; `partitor-install` warns when it is not.
 An environment variable `PARTITOR_LIBRARY` beats the file.
 
 ## Upgrade

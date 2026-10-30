@@ -25,7 +25,7 @@ jobs:
     name: repo gate and shellcheck
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: repo gate (no scores, no private addresses, SPDX lines)
         run: tools/check-repo.sh
       - name: shellcheck (warnings and errors)
@@ -39,8 +39,8 @@ jobs:
       matrix:
         python: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
       - name: install packages (binary wheels only)
@@ -55,8 +55,8 @@ jobs:
     runs-on: macos-14
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
       - name: install packages (binary wheels only)

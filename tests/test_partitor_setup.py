@@ -467,6 +467,54 @@ class TestSetup(SetupFixture):
         self.assertEqual(r.returncode, 1)
         self.assertIn("usermod -s /usr/sbin/nologin", r.stdout)
 
+    def logo_run(self, logo, make=True, unreadable=False, smb=False):
+        """Install with PARTITOR_LOGO=logo in the config; a runuser stub stands for the service user."""
+        self.configure(smb=smb, extra=f"PARTITOR_LOGO={logo}\n")
+        write(os.path.join(self.stubs, "runuser"),
+              "#!/bin/sh\n[ -n \"$STUB_LOGO_UNREADABLE\" ] && exit 1\n"
+              "shift 2; [ \"$1\" = -- ] && shift; exec \"$@\"\n")
+        if make:
+            path = self.pfx + logo
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            write(path, "png", 0o644)
+        return self.run_s(extra={"STUB_LOGO_UNREADABLE": "1" if unreadable else ""})
+
+    def test_logo_readable_is_ok(self):
+        r = self.logo_run("/etc/partitor/logo.png")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("ok   logo readable by", r.stdout)
+
+    def test_logo_not_readable_warns_and_does_not_fail(self):
+        r = self.logo_run("/etc/partitor/logo.png", unreadable=True)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("WARN logo not readable by", r.stdout)
+        self.assertIn("chmod o+r /etc/partitor/logo.png", r.stdout)
+
+    def test_logo_where_the_sandbox_cannot_see_it_warns(self):
+        for where in ("/home/ann/logo.png", "/root/logo.png", "/tmp/logo.png", "/var/tmp/l.png"):
+            with self.subTest(where=where):
+                r = self.logo_run(where)
+                self.assertEqual(r.returncode, 0, r.stdout)
+                self.assertIn(f"WARN logo {where} is hidden in the sandbox", r.stdout)
+
+    def test_logo_missing_or_relative_warns(self):
+        r = self.logo_run("/etc/partitor/none.png", make=False)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("WARN logo file not found: /etc/partitor/none.png", r.stdout)
+        r = self.logo_run("logo.png", make=False)
+        self.assertIn("WARN PARTITOR_LOGO is not an absolute path", r.stdout)
+
+    def test_no_logo_or_none_says_nothing(self):
+        self.configure(smb=False)
+        self.assertNotIn("logo", self.run_s().stdout)
+        r = self.logo_run("none", make=False)
+        self.assertNotIn("logo", r.stdout.replace("PARTITOR_LOGO=none", ""))
+
+    def test_logo_check_runs_with_check_and_changes_nothing(self):
+        self.logo_run("/etc/partitor/logo.png")
+        r = self.run_s("--check", extra={"STUB_LOGO_UNREADABLE": "1"})
+        self.assertIn("WARN logo not readable by", r.stdout)
+
     def test_self_test_result_decides(self):
         self.run_s()
         w = os.path.join(self.tmp, "wrapper")

@@ -6,6 +6,29 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.4.2 — 2026-10-30
+
+### Added
+
+- `new --jobs N|auto`: workers for the analysis and the build steps of the
+  wizard. `PARTITOR_JOBS` still applies when the option is absent.
+- `partitor-install` warns when `PARTITOR_LOGO` names a file that is missing,
+  that lies where the sandbox cannot see it (`/home`, `/root`, `/run/user`,
+  `/tmp`, `/var/tmp`), or that the service user cannot read. It is a warning
+  only: without the logo the engine builds as before.
+
+### Changed
+
+- CI uses `actions/checkout@v6` and `actions/setup-python@v6`, which run on
+  Node 24 (the Node 20 deprecation notices go away).
+
+### Fixed
+
+- Docs: the README status line and a line in `KNOWN-LIMITS.md` named
+  0.4.0 release candidates. `docs/DESIGN.md` now describes the parallel
+  analysis (new §4.4), `--jobs` for `new`, `detect` and `rebuild`, and the
+  installer's logo check.
+
 ## 0.4.1 — 2026-10-30
 
 ### Changed

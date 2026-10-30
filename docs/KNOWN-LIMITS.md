@@ -64,7 +64,7 @@ per-system consistency.
   test suite passes on CPython 3.12.3. Not checked: the golden renders on 3.12,
   and the installer on a real 24.04 host. CI runs the tests on 24.04 with
   Python 3.12 and 3.13.
-- macOS, WSL2 without systemd: not supported in 0.4.0-rc.1. The wrapper needs
+- macOS, WSL2 without systemd: not supported in 0.4. The wrapper needs
   `systemd-run`. A mode without the sandbox is planned (best effort).
 
 Performance: a 70-page score takes minutes to analyse (about 30 minutes on a
