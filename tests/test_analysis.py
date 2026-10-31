@@ -32,7 +32,9 @@ sys.path.insert(0, HERE)
 from support import (  # noqa: E402,F401
     SP,
     SRC,
+    analysis,
     config,
+    console,
     cv2,
     make_score_pdf,
     mock_attr,
@@ -403,7 +405,10 @@ class TestDetectParallel(unittest.TestCase):
                                 force=True, jobs=jobs)
         buf = io.StringIO()
         pt._reset_counts()
-        with contextlib.redirect_stdout(buf):
+        # No terminal: on a terminal one job prints "\r  · page n" progress lines that a
+        # run with workers does not (console._TTY comes from isatty() at import).
+        with mock_attr(console, "_TTY", False), contextlib.redirect_stdout(buf):
+            self.assertIs(console._TTY, False)                 # the fake state is in force
             rc = pt.cmd_detect(ns)
         text = buf.getvalue().replace(out, "OUT")
         text = re.sub(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \w+", "DATE", text)
@@ -442,8 +447,8 @@ class TestDetectParallel(unittest.TestCase):
         # loop passed the systems before. Pages with 1, 2 and 3 systems.
         doc = pymupdf.open(self.pdf)
         for pno, n in enumerate(self.SYSTEMS[:3]):
-            r0, rec0 = pt.analyse_one(doc, pno, 200, 0)
-            r7, rec7 = pt.analyse_one(doc, pno, 200, 7)
+            r0, rec0 = analysis.analyse_one(doc, pno, 200, 0)
+            r7, rec7 = analysis.analyse_one(doc, pno, 200, 7)
             self.assertEqual(len(rec0), n)
             self.assertEqual(rec0, rec7)
             self.assertEqual([[st.system for st in g] for g in r7.systems],
@@ -456,7 +461,7 @@ class TestDetectParallel(unittest.TestCase):
     def test_what_a_worker_returns_is_small_and_transferable(self):
         import pickle
         doc = pymupdf.open(self.pdf)
-        res, recs = pt.analyse_one(doc, 1, 200, 0)
+        res, recs = analysis.analyse_one(doc, 1, 200, 0)
         item = pt.preview_page(res, recs, Path(self.tmp))
         small = pickle.dumps((recs, item, res.title, res.composer))
         self.assertEqual(pickle.loads(small), (recs, item, res.title, res.composer))
@@ -496,14 +501,14 @@ class TestDetectParallel(unittest.TestCase):
         self.assertIn("with 2 worker(s)", text)
 
     def test_die_in_a_worker_stops_detect(self):
-        real = pt.analyse_one
+        real = analysis.analyse_one
 
         def die_on_page_two(doc, pno, dpi, nsys, **kw):
             if pno == 1:
                 pt._die("page 2: test failure")
             return real(doc, pno, dpi, nsys, **kw)
         out = Path(self.tmp, "die")
-        with mock_attr(pt, "analyse_one", die_on_page_two), \
+        with mock_attr(analysis, "analyse_one", die_on_page_two), \
                 contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit) as cm:
                 self.detect("2", "die")
@@ -511,17 +516,76 @@ class TestDetectParallel(unittest.TestCase):
         self.assertFalse((out / "layout.yaml").exists())      # nothing half written
 
     def test_error_in_a_worker_names_the_page_position(self):
-        real = pt.analyse_one
+        real = analysis.analyse_one
 
         def fail_on_page_three(doc, pno, dpi, nsys, **kw):
             if pno == 2:
                 raise KeyError("boom")
             return real(doc, pno, dpi, nsys, **kw)
-        with mock_attr(pt, "analyse_one", fail_on_page_three):
+        with mock_attr(analysis, "analyse_one", fail_on_page_three):
             with self.assertRaises(RuntimeError) as cm:
                 self.detect("2", "err")
         self.assertIn("item 3 of 4", str(cm.exception))
         self.assertIn("KeyError", str(cm.exception))
+
+    def _spy(self, log):
+        """A fork-safe fake of analyse_one: it appends the page number to a file, then calls the
+        real function. A counter in memory would stay in the child."""
+        real = analysis.analyse_one
+
+        def spy(doc, pno, *a, **k):
+            with open(log, "a", encoding="utf-8") as fh:
+                fh.write(f"{pno}\n")
+            return real(doc, pno, *a, **k)
+        return spy
+
+    @staticmethod
+    def _pages_seen(log):
+        if not os.path.exists(log):
+            return []
+        with open(log, encoding="utf-8") as fh:
+            return sorted(int(x) for x in fh.read().split())
+
+    def test_analyse_one_has_no_shim_in_the_script(self):
+        # R1: a patched name is read as analysis.analyse_one; the script keeps no copy
+        self.assertFalse(hasattr(pt, "analyse_one"))
+        self.assertTrue(callable(analysis.analyse_one))
+
+    def test_one_job_reaches_analyse_one_through_the_analysis_module(self):
+        # detect with one job: iter_pages (module analysis) reads its own name
+        log = os.path.join(self.tmp, "spy-one.log")
+        with mock_attr(analysis, "analyse_one", self._spy(log)):
+            rc, _, _ = self.detect("1", "spy-one")
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._pages_seen(log), [0, 1, 2, 3])
+
+    def test_detect_workers_reach_analyse_one_through_the_analysis_module(self):
+        # detect with workers: the reader in the script is analysis.analyse_one (a fork sees the fake)
+        log = os.path.join(self.tmp, "spy-two.log")
+        with mock_attr(analysis, "analyse_one", self._spy(log)):
+            rc, _, _ = self.detect("2", "spy-two")
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._pages_seen(log), [0, 1, 2, 3])
+
+    def test_build_reaches_analyse_one_through_the_analysis_module(self):
+        item = Path(self.tmp, "2026-10-0002-c-t")
+        item.mkdir()
+        shutil.copy(self.pdf, item / "2026-10-0002-source.pdf")
+        pt.save_item(item, {"id": "2026-10-0002", "slug": "c-t", "created": "2026-10-30"})
+        log = os.path.join(self.tmp, "spy-build.log")
+        old = os.environ.get("PARTITOR_JOBS")
+        os.environ["PARTITOR_JOBS"] = "2"
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
+                with mock_attr(analysis, "analyse_one", self._spy(log)):
+                    self.assertEqual(pt.run_build(item), 0)
+        finally:
+            if old is None:
+                os.environ.pop("PARTITOR_JOBS", None)
+            else:
+                os.environ["PARTITOR_JOBS"] = old
+        self.assertEqual(self._pages_seen(log), [0, 1, 2, 3])
 
     def test_detect_then_build_in_one_process(self):
         # `new`: detect, then (after the prompts) build, in one process

@@ -260,6 +260,8 @@ class TestRealRepo(unittest.TestCase):
             self.assertIn(m, present)              # moved in step M1
         for m in ("vision", "clef", "strips"):
             self.assertIn(m, present)              # moved in step M2
+        for m in ("reflow", "ownership", "analysis"):
+            self.assertIn(m, present)              # moved in step M3
         for m in present:
             with self.subTest(module=m):
                 code = f"import sys; sys.path.insert(0, {lib!r}); import partitor.{m}"
@@ -294,6 +296,73 @@ class TestRealRepo(unittest.TestCase):
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.level:
                     self.assertFalse({a.name for a in node.names} & patched, m)
+
+    def test_m3_modules_sit_on_their_levels_and_import_only_lower_ones(self):
+        """reflow (1), ownership (2) and analysis (3): imports go to strictly lower levels (plan 3)."""
+        import ast
+        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
+                 "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
+                 "ownership": 2, "analysis": 3}
+        for m in ("reflow", "ownership", "analysis"):
+            with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    got = {node.module} if node.module else {a.name for a in node.names}
+                    for g in got:
+                        self.assertLess(level[g], level[m], f"{m} imports {g}")
+
+    def test_m3_modules_import_no_patched_name_by_name(self):
+        """analyse_one is patched by tests: analysis defines it, no module imports it by name."""
+        import ast
+        with open(os.path.join(ROOT, "tests", "patchable.txt"), encoding="utf-8") as fh:
+            patched = {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
+        self.assertIn("analyse_one", patched)
+        for m in ("reflow", "ownership", "analysis"):
+            with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    self.assertFalse({a.name for a in node.names} & patched, m)
+
+    def test_ownership_reaches_tune_through_config(self):
+        """TUNE is changed in place by the script and read by ownership as config.TUNE (R1)."""
+        import ast
+        with open(os.path.join(ROOT, "lib", "partitor", "ownership.py"), encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+        self.assertNotIn("TUNE", names)                  # no name of its own, no copy
+        attrs = {(n.value.id, n.attr) for n in ast.walk(tree)
+                 if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)}
+        self.assertIn(("config", "TUNE"), attrs)
+
+    def test_proof_h_is_read_only_data_of_the_analysis_module(self):
+        """PROOF_H = 1400 lives in analysis; no other file binds it (nothing sets it at run time)."""
+        import ast
+        import glob
+        files = sorted(glob.glob(os.path.join(ROOT, "lib", "partitor", "*.py")))
+        files.append(os.path.join(ROOT, "lib", "partitor-engine"))
+        for path in files:
+            with open(path, encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            binds = [n for n in ast.walk(tree)
+                     if (isinstance(n, ast.Name) and n.id == "PROOF_H"
+                         and isinstance(n.ctx, (ast.Store, ast.Del)))
+                     or (isinstance(n, ast.Attribute) and n.attr == "PROOF_H"
+                         and isinstance(n.ctx, (ast.Store, ast.Del)))
+                     or (isinstance(n, ast.Global) and "PROOF_H" in n.names)]
+            if os.path.basename(path) == "analysis.py":
+                self.assertEqual(len(binds), 1, path)    # the one assignment at top level
+            else:
+                self.assertEqual(binds, [], path)
+        code = ("import sys; sys.path.insert(0, %r); from partitor import analysis; "
+                "print(analysis.PROOF_H)" % os.path.join(ROOT, "lib"))
+        r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL)
+        if r.returncode != 0 and "No module named" in r.stderr:
+            self.skipTest("the venv packages are not installed")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "1400")
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 """Shared helpers for the engine tests (tests/test_*.py) and for tools/g0_golden.py.
 
 What is here: the loader that makes the engine script importable as `pt`, the package
-modules that tests patch or read state from (`clef`, `config`, `console`, `parallel`, `vision`; patch the
+modules that tests patch or read state from (`analysis`, `clef`, `config`, `console`, `parallel`, `vision`; patch the
 owner, never a copy: rule R1 in CONTRIBUTING.md), `HAVE_DEPS` and `needs_deps`, the synthetic score and scan drawers
 (`make_score_pdf`, `rasterize`), `mock_attr`, and the module fixtures
 `setUpModule` and `tearDownModule` (a synthetic logo in PARTITOR_LOGO). A test
@@ -42,7 +42,7 @@ except ImportError:          # system python without the venv packages
     cv2 = np = pymupdf = yaml = None
     HAVE_DEPS = False
 
-pt = clef = config = console = parallel = vision = None
+pt = analysis = clef = config = console = parallel = vision = None
 if HAVE_DEPS:
     if LIB not in sys.path:
         sys.path.insert(0, LIB)          # the loader does not run the file as a script
@@ -58,7 +58,7 @@ if HAVE_DEPS:
             sys.modules.pop("partitor_mod", None)
             raise
     # The same objects the script uses: the package is imported once per process.
-    from partitor import clef, config, console, parallel, vision  # noqa: E402,F401
+    from partitor import analysis, clef, config, console, parallel, vision  # noqa: E402,F401
 
 needs_deps = unittest.skipUnless(HAVE_DEPS, "partitor venv packages not installed")
 

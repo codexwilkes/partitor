@@ -6,6 +6,33 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.5.0-dev.4 — 2026-10-31
+
+Third move of engine code (plan: `docs/DESIGN.md` §12). Three modules leave the engine
+script and go to the package `lib/partitor/`. No behaviour change: the output is the same
+(50 golden cases checked with `tools/g0_golden.py`); saved `.lines` files still load.
+
+### Added
+
+- Modules `reflow` (re-flow of strips), `ownership` (ink ownership, safety gate, barline
+  detection) and `analysis` (page loop and preview) in `lib/partitor/` (about 1 560
+  definition lines). The script imports their names, so commands, options and output stay
+  as they were. `ownership` is the one module above the usual size limit.
+- 8 new tests: 520 are found now (512 before). They cover that `analyse_one` is reached
+  through the `analysis` module (one job, workers, build), that the script keeps no copy of
+  it, the levels and imports of the three modules, that `ownership` reads `config.TUNE`,
+  and that `PROOF_H` is data of `analysis` that no other file sets.
+
+### Changed
+
+- The script reads `analysis.analyse_one` (tests patch that name, so it has no copy in the
+  script).
+- The comment on `PROOF_H` no longer says that `preview_page` sets it: nothing does.
+- `tests/test_analysis.py::TestDetectParallel` no longer depends on a terminal: the helper
+  that runs `detect` sets `console._TTY` to false, so one job and workers print the same
+  text (before, the test failed when run on a terminal). No engine code changed for this.
+- Docs: `docs/DESIGN.md` §12 and `CONTRIBUTING.md` list the 13 modules that exist.
+
 ## 0.5.0-dev.3 — 2026-10-31
 
 Second move of engine code (plan: `docs/DESIGN.md` §12). Three modules leave the engine
