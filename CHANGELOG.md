@@ -6,10 +6,31 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.5.0-dev.3 — 2026-10-31
 
+Second move of engine code (plan: `docs/DESIGN.md` §12). Three modules leave the engine
+script and go to the package `lib/partitor/`. No behaviour change: the output is the same
+(50 golden cases checked with `tools/g0_golden.py`); saved `.lines` files still load.
 
+### Added
 
+- Modules `vision` (page render, staff and system detection, OCR), `clef` (clef
+  signature, note steps, ambitus maths) and `strips` (strip build, bar marks, rehearsal
+  boxes) in `lib/partitor/` (about 1 410 definition lines). The script imports their
+  names, so commands, options and output stay as they were.
+- 8 new tests: 512 are found now (504 before). They cover the OCR state in `vision`, the
+  clef caches, that `refresh_ambitus` has no menu code, that the three new modules do not
+  import each other or a patched name, that they import alone, and the move tool check
+  against a script that already holds shims of an earlier step.
 
+### Changed
+
+- The script reads the path of tesseract as `vision._TESS["path"]`. The key `"warned"`
+  of that dictionary was never used and is removed.
+- `tools/move-symbols.py --check` now counts the modules of earlier steps as existing, so
+  it can check a step against the script of the last release. The file has the executable
+  mode.
+- Docs: `docs/DESIGN.md` §12 and `CONTRIBUTING.md` list the 10 modules that exist.
 
 ## 0.5.0-dev.2 — 2026-10-31
 

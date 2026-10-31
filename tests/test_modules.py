@@ -258,6 +258,8 @@ class TestRealRepo(unittest.TestCase):
         present = [m for m in listed if os.path.isfile(os.path.join(lib, "partitor", m + ".py"))]
         for m in ("console", "config", "model", "typography", "mapping", "bars", "parallel"):
             self.assertIn(m, present)              # moved in step M1
+        for m in ("vision", "clef", "strips"):
+            self.assertIn(m, present)              # moved in step M2
         for m in present:
             with self.subTest(module=m):
                 code = f"import sys; sys.path.insert(0, {lib!r}); import partitor.{m}"
@@ -265,6 +267,33 @@ class TestRealRepo(unittest.TestCase):
                                    text=True, stdin=subprocess.DEVNULL)
                 self.assertEqual(r.returncode, 0, r.stderr)
                 self.assertEqual(r.stdout, "")             # importing prints nothing
+
+    def test_m2_modules_are_one_level_and_do_not_import_each_other(self):
+        """vision, clef and strips sit on level 1: none may import another (plan section 3)."""
+        import ast
+        level1 = ("vision", "clef", "strips")
+        for m in level1:
+            path = os.path.join(ROOT, "lib", "partitor", m + ".py")
+            self.assertTrue(os.path.isfile(path), m)
+            with open(path, encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and (node.level or node.module == "partitor"):
+                    got = {a.name for a in node.names} if not node.module else {node.module}
+                    got = {g.split(".")[-1] for g in got}
+                    self.assertFalse(got & (set(level1) - {m}), f"{m} imports {got}")
+
+    def test_m2_modules_import_no_patched_name_by_name(self):
+        """No name of tests/patchable.txt is imported with `from .x import NAME` (rule R1)."""
+        import ast
+        with open(os.path.join(ROOT, "tests", "patchable.txt"), encoding="utf-8") as fh:
+            patched = {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
+        for m in ("vision", "clef", "strips"):
+            with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    self.assertFalse({a.name for a in node.names} & patched, m)
 
 
 if __name__ == "__main__":

@@ -39,7 +39,8 @@ What it does, per module (in the order given):
      name stays undefined in the module or in the script after the edits.
 --apply refuses a module whose file exists already.
 --check rebuilds the expected result from --pristine and compares it with the files on
-disk: module text equals the original text plus the listed edits; the script equals the
+disk (the modules of earlier steps, already in lib/partitor/, count as existing, so the
+pristine script may be the script of the last release): module text equals the original text plus the listed edits; the script equals the
 original minus the moved statements plus shims and listed edits. Exit 1 on a difference.
 
 Exit codes: 0 ok; 1 refusal or difference; 2 usage or input error.
@@ -523,8 +524,9 @@ def main(argv=None):
                 return 2
             with open(a.pristine, encoding="utf-8") as fh:
                 pristine = fh.read()
+            earlier = load_package(pkg_dir, skip=modules)      # modules of earlier steps
             exp_script, exp_files, report, problems = simulate(
-                root, pristine, modules, levels, symbols, cfg, patch, {}, a.final)
+                root, pristine, modules, levels, symbols, cfg, patch, earlier, a.final)
             bad = [f"UNRESOLVED {p}" for p in problems]
             with open(script, encoding="utf-8") as fh:
                 now = fh.read()

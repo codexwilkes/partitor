@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.5.0-dev.2. Section numbers are stable: the code cites
+Status: describes partitor 0.5.0-dev.3. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -913,9 +913,9 @@ See `KNOWN-LIMITS.md`.
 
 The engine is mostly one script today, `lib/partitor-engine`. It moves in small steps into
 the package `lib/partitor/`, in 23 modules (releases `0.5.0-dev.1` to `0.5.0`).
-Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.2
-these modules exist: `console`, `config`, `model`, `typography`, `mapping`, `bars`,
-`parallel`; the script imports their names until the last step. A module that is not in
+Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.3
+these 10 modules exist: `console`, `config`, `model`, `typography`, `mapping`, `bars`,
+`parallel`, `vision`, `clef`, `strips`; the script imports their names until the last step. A module that is not in
 `lib/partitor/` yet is a proposal in the tables below.
 
 ### 12.1 Modules and import levels
@@ -981,9 +981,12 @@ This map comes from function names and headings. Check it when a module exists.
   `tests/patchable.txt`, is used as `owner.NAME` (import the module, not the name).
   `from owner import NAME` makes a copy: a test patch or a rebinding then changes the
   owner and leaves the copy as it was. Today these are `console._TTY` (rebound in a
-  worker), `config.TUNE`, `config.SIZE_FIRST` and `parallel.fork_map`. An object that
-  is changed in place and never rebound (`console._counts`, `_FAILURES`, `_WARNINGS`) may
-  be imported by name: both names are the same object. `console._reset_counts` keeps it so.
+  worker), `config.TUNE`, `config.SIZE_FIRST`, `parallel.fork_map` and `vision._TESS` (the
+  path of the tesseract program; nothing rebinds it, but the plan names the owner, so the
+  script reads `vision._TESS["path"]`). An object that is changed in place and never
+  rebound (`console._counts`, `_FAILURES`, `_WARNINGS`, `clef.CLEF_LAST`, `clef._CLEF_TPL`)
+  may be imported by name: both names are the same object. `console._reset_counts` keeps
+  it so; the two clef caches are private to `clef`.
 - **`global`.** `global NAME` is allowed only for a name that the same module assigns
   or defines at top level. For a name of another module write `owner.NAME = value`.
 - **Size.** At most 1 100 definition lines per module. One module is exempt

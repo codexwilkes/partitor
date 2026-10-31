@@ -9,7 +9,9 @@ is skipped. Run with the venv interpreter:
 
 Shared helpers: tests/support.py.
 """
+import inspect
 import os
+import re
 import sys
 import unittest
 
@@ -18,6 +20,7 @@ sys.path.insert(0, HERE)
 
 from support import (  # noqa: E402,F401
     SP,
+    clef,
     cv2,
     flow_line,
     needs_deps,
@@ -362,3 +365,26 @@ class TestClefsAndSpacing(unittest.TestCase):
         extra_max = (pt.SYSTEM_GAP_LAST - pt.SYSTEM_GAP_FACTOR) * 40
         self.assertGreater(spread, plain)        # room on the page is used
         self.assertLessEqual(spread / plain, (p + extra_max) / p + 1e-6)
+
+
+@needs_deps
+class TestClefModuleState(unittest.TestCase):
+    """Step M2: the clef caches live in `clef`; the script shares the objects (rule R1)."""
+
+    def test_caches_are_changed_in_place_and_shared_with_the_script(self):
+        # Never rebound, so the shim import by name stays valid (DESIGN §12.3).
+        self.assertIs(pt.CLEF_LAST, clef.CLEF_LAST)
+        self.assertIs(pt._CLEF_TPL, clef._CLEF_TPL)
+        self.assertIsInstance(clef.CLEF_LAST, dict)
+        self.assertIsInstance(clef._CLEF_TPL, dict)
+        src = inspect.getsource(clef)
+        for name in ("CLEF_LAST", "_CLEF_TPL"):          # no rebinding anywhere in the module
+            self.assertIsNone(re.search(rf"(?m)^\s+global {name}\b|^\s*{name}\s*=(?!=)", src.split(
+                "\n\n\n", 1)[1].replace(f"{name}: dict = {{}}", "")), name)
+
+    def test_refresh_ambitus_has_no_cli_code(self):
+        # It stays pure: the menu part (confirm_ambitus) is for cli_parts (step M7).
+        src = inspect.getsource(clef.refresh_ambitus)
+        self.assertIsNone(re.search(r"\b(ask|yes|_die|_ok|_warn|cmd_set|load_item|input)\(", src))
+        self.assertFalse(hasattr(clef, "confirm_ambitus"))
+

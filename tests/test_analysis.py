@@ -24,6 +24,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -44,6 +45,7 @@ from support import (  # noqa: E402,F401
     yaml,
     setUpModule,
     tearDownModule,
+    vision,
 )
 
 
@@ -335,6 +337,38 @@ class TestSafetyGate(unittest.TestCase):
         res = pt.PageResult(0, (50, 50), 24.0, 3, 0.0, 0.0, [], [], owner, ink_px=10)
         pt._finish_discard(res)
         self.assertIn("ink without owner", res.gate)
+
+
+@needs_deps
+class TestOcrState(unittest.TestCase):
+    """_TESS lives in `vision` (step M2): the script reaches it as `vision._TESS` (rule R1)."""
+
+    def test_state_holds_only_the_path(self):
+        # The key "warned" was never read or written; it is gone.
+        self.assertEqual(set(vision._TESS), {"path"})
+
+    def test_script_reads_it_through_the_owner(self):
+        text = Path(SRC).read_text(encoding="utf-8")
+        self.assertIn('vision._TESS["path"]', text)
+        code = "\n".join(ln for ln in text.split("\n") if not ln.lstrip().startswith("#"))
+        self.assertIsNone(re.search(r"(?<!vision\.)\b_TESS\b", code))   # no bare name, no shim
+
+    def test_detect_sees_a_change_of_the_owner_state(self):
+        tmp = tempfile.mkdtemp(prefix="tess-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        pdf = os.path.join(tmp, "one.pdf")
+        make_score_pdf(pdf, systems=1, staves=2, labels=("Alto", "Bass"), title="")
+        out = os.path.join(tmp, "out")
+        ns = argparse.Namespace(pdf=pdf, pages=None, parts="", title="", subtitle="", composer="",
+                                dpi=200, out=out, page_header_sp=pt.PAGE_HEADER_SP,
+                                force=True, jobs="1")
+        buf = io.StringIO()
+        pt._reset_counts()
+        with mock.patch.dict(vision._TESS, {"path": None}), contextlib.redirect_stdout(buf):
+            rc = pt.cmd_detect(ns)
+        pt._reset_counts()
+        self.assertEqual(rc, 0)
+        self.assertIn("tesseract not found", buf.getvalue())
 
 
 @needs_deps

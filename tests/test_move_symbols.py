@@ -348,6 +348,16 @@ class TestCheck(Fixture):
         self.assertEqual(rc, 2)
         self.assertIn("--check needs --pristine", err)
 
+    def test_check_accepts_a_pristine_script_that_holds_earlier_shims(self):
+        # Step N+1 is checked against the script of step N: it already imports the
+        # names of the earlier module from the package (they are not header imports).
+        self.apply("low")
+        self.put("pristine", self.get("lib/partitor-engine"))
+        self.apply("high")
+        rc, out, _ = self.check("high")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("from .low import", self.get("lib/partitor/high.py"))
+
     def test_final_edits_are_part_of_the_check(self):
         self.config({"edits": [{"step": "final", "file": "script",
                                 "old": "FLAG = True\n", "new": "FLAG = False\n"}]})

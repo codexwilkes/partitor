@@ -55,9 +55,10 @@ For a refactor of the engine, record and check golden renders with
 ## Where does my change go
 
 The engine is mostly one script today (`lib/partitor-engine`). It is moving, step by step,
-into the package `lib/partitor/` (`DESIGN.md` §12). These modules exist now: `console`,
-`config`, `model`, `typography`, `mapping`, `bars`, `parallel`. Until another module
-exists, its code is in the script. The target modules and their import levels:
+into the package `lib/partitor/` (`DESIGN.md` §12). These 10 modules exist now: `console`,
+`config`, `model`, `typography`, `mapping`, `bars`, `parallel`, `vision`, `clef`, `strips`.
+Until another module exists, its code is in the script. The target modules and their import
+levels:
 
 | Lvl | Module | Put here |
 |---|---|---|
@@ -117,7 +118,8 @@ comment block above each, text unchanged, writes the module header and only the 
 code uses, and leaves a shim import in the script. It refuses a missing, duplicated or
 conditional name, and a dependency on a name that stays in the script or sits in the same or
 a higher level. `--check --pristine FILE` proves that the moved text equals the original plus
-the listed edits. Run it without `--apply` first: it prints the plan.
+the listed edits; FILE may be the script of the last release (modules of earlier steps count
+as existing). Run it without `--apply` first: it prints the plan.
 
 Saved `.lines` files: the reader accepts the class paths of every earlier layout
 (`__main__`, `partitor.*`); do not narrow it. The fixture `tests/data/lines-0.4.2.lines`
