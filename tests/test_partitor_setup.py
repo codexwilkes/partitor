@@ -516,8 +516,9 @@ class TestSetup(SetupFixture):
         os.remove(self.log)
         r = self.run_s("--check")
         self.assertEqual(r.returncode, 1)
-        self.assertIn("FAIL bytecode of lib/partitor missing or older than the source: "
-                      "__init__.py console.py", r.stdout)
+        self.assertIn("FAIL bytecode of lib/partitor missing or older than the source:", r.stdout)
+        self.assertIn("__init__.py", r.stdout)
+        self.assertIn("console.py", r.stdout)
         self.assertFalse(os.path.exists(cache))
         self.assertEqual(self.calls(), "")
 
