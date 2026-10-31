@@ -6,6 +6,54 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.5.0-dev.1 — 2026-10-31
+
+Start of the modular split of the engine (plan: `docs/DESIGN.md` §12). This step moves
+no engine code. No behaviour change: the output is the same (50 golden cases checked
+with `tools/g0_golden.py`).
+
+### Added
+
+- Package `lib/partitor/`. For now it holds only `VERSION`; the engine code follows in
+  small steps.
+- `tools/check-modules.py` with the list `tools/modules.txt`: checks the module structure
+  (import levels, cycles, file headers, `global` use, names that tests patch, module size,
+  leftover files). `--import` imports each module alone; `--affected MODULE` lists the
+  modules that import it and the tests to run. It runs in `tools/check-repo.sh` and in CI.
+- `tests/patchable.txt`: the names that tests replace at run time. No module may import
+  one of them with `from ... import NAME`.
+- `tests/support.py`: the shared test helpers, with the engine loader. An import error of
+  the engine now stops the test run; before, it skipped all engine tests without notice.
+- `partitor-install` compiles the bytecode of `lib/partitor` as root, so the read-only
+  service user does not compile every module in memory at each start. It also warns when
+  the service user cannot read the package.
+- `tools/bench-start.sh [N]`: wall time of `partitor-engine --version`, with the median.
+- A test fails when fewer tests are found than before (`MIN_TESTS` in `tests/test_ci.py`).
+- 62 new tests: 464 are found now (402 before). They cover the module checks, the test
+  support, the engine start, the installer steps, `m0_depmap` input handling, the start
+  script, and the match of `docs/DESIGN.md` §12 and `CONTRIBUTING.md` with
+  `tools/modules.txt`.
+- `docs/DESIGN.md` §12 (code map: modules, import levels, where a DESIGN section lives,
+  rules); `CONTRIBUTING.md` "Where does my change go".
+
+### Changed
+
+- `VERSION` of the engine now lives in `lib/partitor/__init__.py`; the script imports it.
+  The file `VERSION` stays for the wrapper and the installer, and a test checks that both
+  agree.
+- `tests/test_partitor.py` is split into nine files by area (`test_analysis.py`,
+  `test_mapping.py`, `test_bars.py`, `test_parallel.py`, `test_layout.py`,
+  `test_render.py`, `test_clef.py`, `test_library.py`, `test_cli.py`). The 292 tests are
+  the same.
+- `tools/g0_golden.py`: the default of `--tests` is `tests/support.py`.
+- `tools/m0_depmap.py` reads a folder or several inputs. A name defined in two files stops
+  the run. One file is read as before. `networkx` is imported only when the map is built.
+- CI: the best-effort macOS job runs on `macos-15` (GitHub retires the `macos-14` image on
+  2026-11-02); the gate job runs `tools/check-modules.py --static`; the Ubuntu job also
+  runs `tools/check-modules.py --import`; shellcheck covers `tools/bench-start.sh`.
+- Docs: `docs/DESIGN.md` §9 and §10, `docs/INSTALL.md`, `docs/SANDBOX.md` and
+  `CONTRIBUTING.md` describe the new files and installer steps.
+
 ## 0.4.2 — 2026-10-30
 
 ### Added

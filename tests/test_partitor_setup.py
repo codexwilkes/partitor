@@ -305,10 +305,10 @@ class TestWrapper(unittest.TestCase):
 
 
 class TestVersion(unittest.TestCase):
-    def test_one_version_for_repo_engine_and_wrapper(self):
+    def test_one_version_for_repo_package_and_wrapper(self):
         with open(os.path.join(ROOT, "VERSION"), encoding="utf-8") as fh:
             ver = fh.read().strip()
-        with open(os.path.join(ROOT, "lib", "partitor-engine"), encoding="utf-8") as fh:
+        with open(os.path.join(ROOT, "lib", "partitor", "__init__.py"), encoding="utf-8") as fh:
             self.assertIn(f'VERSION = "{ver}"', fh.read())
         env = dict(os.environ, PARTITOR_TEST_NONROOT="1")
         r = subprocess.run(["bash", WRAPPER, "--wrapper-version"], env=env,
@@ -323,6 +323,10 @@ class SetupFixture(unittest.TestCase):
         self.opt = os.path.join(self.pfx, "opt", "partitor")          # the repo folder
         os.makedirs(self.opt)
         os.makedirs(os.path.join(self.opt, "share", "systemd"))
+        self.pkg = os.path.join(self.opt, "lib", "partitor")             # the engine package
+        os.makedirs(self.pkg)
+        write(os.path.join(self.pkg, "__init__.py"), 'VERSION = "0.0.0"\n', 0o644)
+        write(os.path.join(self.pkg, "console.py"), "X = 1\n", 0o644)
         for kind in ("mount", "automount"):
             shutil.copy(os.path.join(ROOT, "share", "systemd", f"library.{kind}.in"),
                         os.path.join(self.opt, "share", "systemd"))
@@ -343,9 +347,27 @@ class SetupFixture(unittest.TestCase):
               "#!/bin/sh\necho \"useradd $*\" >> \"$STUB_LOG\"\n"
               "for a; do last=$a; done\n"
               "echo \"$last:x:999:999::$STUB_HOME:/usr/sbin/nologin\" > \"$STUB_PASSWD\"\n")
+        # python3 inside the venv: does nothing, except `-m compileall DIR`, which logs
+        # and writes an empty cpython-312 .pyc for every .py file of DIR
+        self.venv_py = os.path.join(self.tmp, "venv-python3")
+        write(self.venv_py,
+              "#!/bin/sh\ncase \"$*\" in *compileall*)\n"
+              "  echo \"venv-python3 $*\" >> \"$STUB_LOG\"\n"
+              "  for a; do dir=$a; done\n"
+              "  for f in \"$dir\"/*.py; do\n"
+              "    mkdir -p \"$dir/__pycache__\"; : > \"$dir/__pycache__/$(basename \"$f\" .py).cpython-312.pyc\"\n"
+              "  done ;;\nesac\nexit 0\n")
+        # runuser: runs the command as the current user; STUB_LOGO_UNREADABLE makes `test`
+        # fail, STUB_PKG_UNREADABLE=PATH makes `find` report PATH as unreadable
+        write(os.path.join(self.stubs, "runuser"),
+              "#!/bin/sh\nshift 2; [ \"$1\" = -- ] && shift\n"
+              "[ -n \"$STUB_LOGO_UNREADABLE\" ] && [ \"$1\" = test ] && exit 1\n"
+              "if [ \"$1\" = find ] && [ -n \"$STUB_PKG_UNREADABLE\" ]; then\n"
+              "  printf '%s\\n' \"$STUB_PKG_UNREADABLE\"; exit 0; fi\n"
+              "exec \"$@\"\n")
         write(os.path.join(self.stubs, "python3"),
               "#!/bin/sh\necho \"python3 $*\" >> \"$STUB_LOG\"\nv=$3\nmkdir -p \"$v/bin\"\n"
-              "printf '#!/bin/sh\\nexit 0\\n' > \"$v/bin/python3\"\n"
+              "cp \"$STUB_VENV_PY\" \"$v/bin/python3\"\n"
               "printf '#!/bin/sh\\necho \"pip $*\" >> \"$STUB_LOG\"\\nexit 0\\n' > \"$v/bin/pip\"\n"
               "chmod 755 \"$v/bin/python3\" \"$v/bin/pip\"\n")
 
@@ -378,6 +400,7 @@ class SetupFixture(unittest.TestCase):
                    PARTITOR_PREFIX=self.pfx, PARTITOR_ROOT=self.opt, PARTITOR_SVC_USER=ME,
                    PARTITOR_SKIP_SELFTEST="1", STUB_LOG=self.log, STUB_PASSWD=self.passwd,
                    STUB_HOME=os.path.join(self.pfx, "var", "lib", "partitor"), STUB_MISSING="",
+                   STUB_VENV_PY=self.venv_py,
                    PARTITOR_SYSTEMCTL="systemctl", PARTITOR_CRED_OWNER=f"{ME}:{grp}")
         env.update(extra or {})
         return subprocess.run(["bash", SETUP, *args], env=env, capture_output=True, text=True)
@@ -461,6 +484,87 @@ class TestSetup(SetupFixture):
         r = self.run_s("--dry-run")
         self.assertNotIn("todo", r.stdout)
 
+    def test_bytecode_is_compiled_once_as_checked_hash(self):
+        r = self.run_s()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(f"venv-python3 -m compileall -q --invalidation-mode checked-hash {self.pkg}",
+                      self.calls())
+        self.assertIn("compiled bytecode of lib/partitor (2 file(s))", r.stdout)
+        for name in ("__init__", "console"):
+            self.assertTrue(os.path.exists(os.path.join(self.pkg, "__pycache__",
+                                                        f"{name}.cpython-312.pyc")), name)
+        os.remove(self.log)
+        r = self.run_s()
+        self.assertIn("ok   bytecode of lib/partitor is current", r.stdout)
+        self.assertEqual(self.calls(), "")                  # a second run compiles nothing
+
+    def test_changed_source_is_compiled_again(self):
+        self.run_s()
+        os.remove(self.log)
+        src = os.path.join(self.pkg, "console.py")
+        later = os.stat(src).st_mtime + 60
+        os.utime(src, (later, later))                       # newer than its .pyc, as after a git pull
+        r = self.run_s()
+        self.assertIn("compiled bytecode of lib/partitor (1 file(s))", r.stdout)
+        self.assertIn("compileall", self.calls())
+
+    def test_check_reports_missing_bytecode_and_writes_nothing(self):
+        self.run_s()
+        self.assertEqual(self.run_s("--check").returncode, 0)
+        cache = os.path.join(self.pkg, "__pycache__")
+        shutil.rmtree(cache)
+        os.remove(self.log)
+        r = self.run_s("--check")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("FAIL bytecode of lib/partitor missing or older than the source: "
+                      "__init__.py console.py", r.stdout)
+        self.assertFalse(os.path.exists(cache))
+        self.assertEqual(self.calls(), "")
+
+    def test_check_reports_a_source_newer_than_its_bytecode(self):
+        self.run_s()
+        src = os.path.join(self.pkg, "__init__.py")
+        later = os.stat(src).st_mtime + 60
+        os.utime(src, (later, later))
+        r = self.run_s("--check")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("older than the source: __init__.py", r.stdout)
+
+    def test_dry_run_lists_the_bytecode_and_writes_nothing(self):
+        self.run_s()
+        shutil.rmtree(os.path.join(self.pkg, "__pycache__"))
+        os.remove(self.log)
+        r = self.run_s("--dry-run")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("todo bytecode of lib/partitor missing", r.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.pkg, "__pycache__")))
+        self.assertEqual(self.calls(), "")
+
+    def test_missing_package_folder_fails(self):
+        shutil.rmtree(self.pkg)
+        r = self.run_s()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn(f"FAIL package folder missing: {self.pkg}", r.stdout)
+
+    def test_package_readable_is_ok(self):
+        r = self.run_s()
+        self.assertIn(f"ok   package readable by {ME}: lib/partitor", r.stdout)
+
+    def test_unreadable_package_file_warns_and_does_not_fail(self):
+        bad_file = os.path.join(self.pkg, "console.py")
+        r = self.run_s(extra={"STUB_PKG_UNREADABLE": bad_file})
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn(f"WARN package not readable by {ME}: lib/partitor", r.stdout)
+        self.assertIn(bad_file, r.stdout)
+        self.assertIn(f"namei -l {self.pkg}", r.stdout)
+        self.assertIn(f"chmod -R a+rX {self.pkg}", r.stdout)
+
+    def test_missing_runuser_warns_for_the_package(self):
+        r = self.run_s(extra={"PARTITOR_RUNUSER": "runuser-not-installed"})
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("WARN package readability not checked (runuser-not-installed not found)",
+                      r.stdout)
+
     def test_login_shell_is_reported(self):
         write(self.passwd, f"{ME}:x:999:999::{self.pfx}/var/lib/partitor:/bin/bash\n", 0o644)
         r = self.run_s()
@@ -470,9 +574,6 @@ class TestSetup(SetupFixture):
     def logo_run(self, logo, make=True, unreadable=False, smb=False):
         """Install with PARTITOR_LOGO=logo in the config; a runuser stub stands for the service user."""
         self.configure(smb=smb, extra=f"PARTITOR_LOGO={logo}\n")
-        write(os.path.join(self.stubs, "runuser"),
-              "#!/bin/sh\n[ -n \"$STUB_LOGO_UNREADABLE\" ] && exit 1\n"
-              "shift 2; [ \"$1\" = -- ] && shift; exec \"$@\"\n")
         if make:
             path = self.pfx + logo
             os.makedirs(os.path.dirname(path), exist_ok=True)

@@ -3,11 +3,19 @@
 # Copyright (C) 2026 Nathan Wilkes and partitor contributors
 """M0: static dependency map of the partitor engine (read-only).
 
-Usage: python3 -I m0_depmap.py ENGINE_FILE OUT_DIR
+Usage: python3 -I m0_depmap.py INPUT [INPUT ...] OUT_DIR
 
-Parses ENGINE_FILE with ast (never imports or runs it). Writes to OUT_DIR:
+INPUT is a Python file or a folder. A folder gives every *.py file in it (not its
+sub-folders), so `lib/partitor` can be mapped as one program. Several INPUTs are
+merged: pass the folder `lib/partitor` and, if wanted, the script `lib/partitor-engine`
+as a second input. The top-level names of all inputs are merged into one name space; a
+name defined in two files stops the run with an error. One file behaves as before.
+
+Parses the inputs with ast (never imports or runs them). Writes to OUT_DIR:
   depmap.json   functions, classes, globals, edges, clusters
   M0-REPORT.md  human report
+
+Needs networkx (not a dependency of partitor): use a scratch venv.
 
 Method
  1. Nodes: top-level def, class, and module-level assignments (constants/state).
@@ -29,8 +37,6 @@ import re
 import sys
 from pathlib import Path
 
-import networkx as nx
-
 MUTATORS = {"append", "extend", "add", "update", "pop", "clear", "insert",
             "remove", "setdefault", "discard", "popitem", "sort", "reverse"}
 
@@ -38,6 +44,44 @@ MUTATORS = {"append", "extend", "add", "update", "pop", "clear", "insert",
 def load(path):
     src = Path(path).read_text(encoding="utf-8")
     return src, ast.parse(src, filename=str(path))
+
+
+def input_files(inputs):
+    """Files of the inputs: a file as given; a folder gives its *.py files, sorted."""
+    files = []
+    for item in inputs:
+        p = Path(item)
+        if p.is_dir():
+            found = sorted(f for f in p.glob("*.py") if f.is_file())
+            if not found:
+                raise SystemExit(f"m0_depmap: no *.py file in folder {p}")
+            files += found
+        elif p.is_file():
+            files.append(p)
+        else:
+            raise SystemExit(f"m0_depmap: not a file or folder: {p}")
+    return files
+
+
+def load_all(inputs):
+    """(source text, merged ast.Module) of the inputs. One file: exactly load(file)."""
+    if isinstance(inputs, (str, Path)):
+        inputs = [inputs]
+    files = input_files(inputs)
+    if len(inputs) == 1 and Path(inputs[0]).is_file():
+        return load(files[0])
+    srcs, body, owner = [], [], {}
+    for f in files:
+        src, tree = load(f)
+        funcs, classes, assigns = top_level(tree)
+        for name in list(funcs) + list(classes) + list(assigns):
+            if name in owner and owner[name] != str(f):
+                raise SystemExit(f"m0_depmap: duplicate top-level name '{name}' in "
+                                 f"{owner[name]} and {f}")
+            owner[name] = str(f)
+        srcs.append(src)
+        body += tree.body
+    return "\n".join(srcs), ast.Module(body=body, type_ignores=[])
 
 
 def top_level(tree):
@@ -123,6 +167,7 @@ def build_graph(funcs, classes, assigns):
 
 
 def cluster(funcs, classes, edges):
+    import networkx as nx
     g = nx.Graph()
     callables = set(funcs) | set(classes)
     g.add_nodes_from(callables)
@@ -145,9 +190,12 @@ def label(members):
 
 
 def main(engine, out):
+    import networkx as nx
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
-    src, tree = load(engine)
+    src, tree = load_all(engine)
+    if not isinstance(engine, (str, Path)):
+        engine = ", ".join(str(e) for e in engine)
     funcs, classes, assigns = top_level(tree)
     edges = build_graph(funcs, classes, assigns)
     state = shared_state(funcs, classes, assigns)
@@ -254,6 +302,6 @@ def main(engine, out):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        sys.exit("usage: m0_depmap.py ENGINE_FILE OUT_DIR")
-    main(sys.argv[1], sys.argv[2])
+    if len(sys.argv) < 3:
+        sys.exit("usage: m0_depmap.py INPUT [INPUT ...] OUT_DIR   (INPUT: file or folder)")
+    main(sys.argv[1] if len(sys.argv) == 3 else sys.argv[1:-1], sys.argv[-1])

@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+#
+# Names that tests replace at run time (mock_attr or an assignment on `pt`).
+# No module may import one of them with `from ... import NAME`: the test would
+# patch the owner and the copy would stay unchanged. Use `owner.NAME` instead
+# (tools/check-modules.py, rule R1). One name per line.
+SIZE_FIRST
+fork_map
+analyse_one
+SYSTEM_GAP_LAST
+run_build
+cmd_build
+cmd_rebuild

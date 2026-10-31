@@ -6,7 +6,8 @@
 # Repo gate (CI and before a release). Fails when the tracked files hold:
 #   - a score or scan: *.pdf, *.jpg, *.jpeg, *.tif, *.tiff (copyright; no samples ship)
 #   - a private network address (RFC 1918) or a *.invalid host
-#   - a file without an SPDX line (bin/, lib/, tests/, tools/)
+#   - a file without an SPDX line (bin/, lib/, tests/, tools/; lib/ includes lib/partitor/)
+#   - a broken module structure (tools/check-modules.py --static)
 # A private token list is checked by the maintainer, not here (it is itself personal).
 # Usage: tools/check-repo.sh   (run from anywhere inside the repo)
 set -euo pipefail
@@ -28,5 +29,8 @@ while IFS= read -r f; do
     head -n 6 "$f" | grep -q 'SPDX-License-Identifier: AGPL-3.0-or-later' || bad "no SPDX line: $f" ;;
   esac
 done < <(files)
+if ! python3 tools/check-modules.py --static; then
+  bad "module structure (tools/check-modules.py --static)"
+fi
 (( fail )) && exit 1
 echo "check-repo: ok"

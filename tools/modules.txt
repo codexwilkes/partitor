@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+#
+# Modules of the package lib/partitor, one line each (docs/DESIGN.md §12):
+#   LEVEL MODULE TESTS [exempt]
+# A module imports only modules of a strictly lower level (tools/check-modules.py).
+# TESTS: file names in tests/ that cover the module (comma separated), or * = all tests.
+# exempt: lifts the line limit for this module (analyse_page is one 852-line function).
+# Modules that do not exist yet are listed too; the checks skip them until they appear.
+0 bars        test_bars.py
+0 config      *
+0 console     *
+0 mapping     test_mapping.py
+0 model       *
+0 typography  test_render.py
+1 clef        test_clef.py
+1 parallel    test_parallel.py
+1 reflow      test_layout.py
+1 strips      test_layout.py
+1 vision      test_analysis.py
+2 lines       test_layout.py
+2 ownership   test_analysis.py exempt
+3 analysis    test_analysis.py
+3 render      test_render.py
+4 library     test_library.py
+5 build       test_library.py
+5 proof       test_bars.py,test_library.py
+6 cli_common  test_cli.py,test_library.py
+7 cli_bars    test_cli.py,test_library.py
+7 cli_parts   test_cli.py,test_library.py
+8 cli_items   test_cli.py,test_library.py
+9 cli_main    test_cli.py,test_library.py

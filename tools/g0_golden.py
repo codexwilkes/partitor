@@ -9,9 +9,9 @@ inputs and stores what it produces; `check` runs again and reports every
 difference.
 
 Usage (use the engine's venv python):
-  g0_golden.py record    --engine ENGINE --tests tests/test_partitor.py --golden golden.json
-  g0_golden.py check     --engine ENGINE --tests tests/test_partitor.py --golden golden.json
-  g0_golden.py selfcheck --engine ENGINE --tests tests/test_partitor.py --golden golden.json
+  g0_golden.py record    --engine ENGINE --tests tests/support.py --golden golden.json
+  g0_golden.py check     --engine ENGINE --tests tests/support.py --golden golden.json
+  g0_golden.py selfcheck --engine ENGINE --tests tests/support.py --golden golden.json
   options: --only a,b      run cases whose name starts with one of these
            --workers N     cases run in parallel (default 2)
            --corpus DIR    optional local corpus (see below)
@@ -453,7 +453,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("mode", choices=["record", "check", "selfcheck"])
     ap.add_argument("--engine", required=True)
-    ap.add_argument("--tests", default="tests/test_partitor.py")
+    ap.add_argument("--tests", default="tests/support.py")
     ap.add_argument("--corpus")
     ap.add_argument("--golden", default="golden.json")
     ap.add_argument("--fixtures")

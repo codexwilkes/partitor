@@ -25,6 +25,12 @@ The wrapper never reads a PDF. It needs systemd (`systemd-run`).
 | `UMask=0027` | New files are not world-readable. |
 | `MemoryMax`, `CPUWeight`, `IOWeight`, `Nice=10`, `RuntimeMaxSec` | Limits (below). Other services keep priority. |
 
+The repo tree is root-owned and read-only for the engine, so Python cannot write
+`__pycache__` there at run time. The installer compiles the bytecode of `lib/partitor`
+as root (`compileall`, `checked-hash`), and warns when the user `partitor` cannot read the
+package. Without the compiled files the engine still runs, but compiles its modules in
+memory at every start.
+
 ## Limits you can change
 
 Set them in `/etc/default/partitor` (`KEY=value` lines):

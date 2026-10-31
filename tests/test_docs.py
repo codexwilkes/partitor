@@ -27,6 +27,13 @@ def doc_files():
     return out
 
 
+def tests_source():
+    """The text of all test files except this one (a checker must not satisfy itself)."""
+    names = sorted(n for n in os.listdir(os.path.join(ROOT, "tests"))
+                   if n.endswith(".py") and n != "test_docs.py")
+    return "\n".join(read("tests", n) for n in names)
+
+
 ENGINE = read("lib", "partitor-engine")
 WRAPPER = read("bin", "partitor")
 INSTALLER = read("bin", "partitor-install")
@@ -103,13 +110,44 @@ class TestVersionInDocs(unittest.TestCase):
         self.assertIn(f"## {v}", read("CHANGELOG.md"))
 
 
+class TestTestsSource(unittest.TestCase):
+    def test_helper_reads_every_test_file_but_this_one(self):
+        src = tests_source()
+        self.assertIn("class TestCommands", src)                 # tests/test_cli.py
+        self.assertIn("class TestWrapper", src)                  # tests/test_partitor_setup.py
+        self.assertNotIn("def test_helper_reads_every_test_file_but_this_one", src)
+
+
+class TestCodeMap(unittest.TestCase):
+    """The module table of docs/DESIGN.md §12 and of CONTRIBUTING.md follows tools/modules.txt."""
+
+    def listed(self):
+        rows = {}
+        with open(os.path.join(ROOT, "tools", "modules.txt"), encoding="utf-8") as fh:
+            for line in fh:
+                f = line.split("#", 1)[0].split()
+                if len(f) >= 3:
+                    rows[f[1]] = int(f[0])
+        return rows
+
+    def table(self, text):
+        return {m: int(lv) for lv, m in re.findall(r"^\|\s*(\d)\s*\|\s*`(\w+)`\s*\|", text, re.M)}
+
+    def test_design_code_map_matches_modules_txt(self):
+        part = DESIGN.split("## 12. ", 1)[1]
+        self.assertEqual(self.table(part), self.listed())
+
+    def test_contributing_module_table_matches_modules_txt(self):
+        self.assertEqual(self.table(read("CONTRIBUTING.md")), self.listed())
+
+
 class TestDesignSections(unittest.TestCase):
     def headings(self):
         return set(re.findall(r"^#+ (\d+(?:\.\d+)?)\.? ", DESIGN, re.M))
 
     def test_cited_sections_exist(self):
         cites = set()
-        for src in (ENGINE, read("tests", "test_partitor.py"), WRAPPER, INSTALLER):
+        for src in (ENGINE, tests_source(), WRAPPER, INSTALLER):
             cites |= set(re.findall(r"DESIGN\.md\s+§(\d+(?:\.\d+)?)", src))
         self.assertTrue(cites)
         for c in cites:
@@ -118,7 +156,7 @@ class TestDesignSections(unittest.TestCase):
 
     def test_cited_items_exist(self):
         cites = set()
-        for src in (ENGINE, read("tests", "test_partitor.py")):
+        for src in (ENGINE, tests_source()):
             cites |= set(re.findall(r"§(4\.[23]) item (\d+)", src))
         for sec, item in cites:
             start = DESIGN.index(f"### {sec} ")
@@ -172,7 +210,7 @@ class TestSettingsDocs(unittest.TestCase):
                 self.assertTrue(key in install, key)
 
     def test_documented_keys_exist_in_code(self):
-        code = ENGINE + WRAPPER + INSTALLER + read("tests", "test_partitor.py")
+        code = ENGINE + WRAPPER + INSTALLER + tests_source()
         for p in doc_files():
             for key in set(re.findall(r"\bPARTITOR_[A-Z_]+\b", open(p, encoding="utf-8").read())):
                 with self.subTest(file=os.path.basename(p), key=key):

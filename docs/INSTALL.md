@@ -92,10 +92,13 @@ In order (details in the header of `bin/partitor-install`):
 5. Local library: creates `<library>`, `inbox/`, `library/` with mode `2770`.
 6. Creates the venv in the clone, and installs `requirements.txt` into it again
    when the file changes.
-7. Links `partitor`, `partitor-init` and `partitor-install` in
+7. Compiles the bytecode of the engine package `lib/partitor` as root (a file
+   that has no `.pyc`, or is newer than it). Checks that the user `partitor` can
+   read every file of the package; if not, it warns and prints the fix command.
+8. Links `partitor`, `partitor-init` and `partitor-install` in
    `/usr/local/sbin` to the scripts in `bin/`.
-8. Runs the sandbox self-test.
-9. SMB library: checks `/etc/partitor/smb.cred`, writes the mount and automount
+9. Runs the sandbox self-test.
+10. SMB library: checks `/etc/partitor/smb.cred`, writes the mount and automount
    units, enables the automount, and checks the library as the sandbox user.
 
 `--check` reports without changing anything (exit 1 on a difference).
@@ -121,6 +124,9 @@ sudo git fetch --tags
 sudo git checkout --detach <new tag>
 sudo bin/partitor-install
 ```
+
+The installer compiles the bytecode of the new `lib/partitor` (step 7), so run it
+after every checkout.
 
 Read `CHANGELOG.md` first, especially "Library layout" and BREAKING lines.
 After an engine update, `sudo partitor analyse --all` analyses every item again;

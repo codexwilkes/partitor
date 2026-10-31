@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.4.2. Section numbers are stable: the code cites
+Status: describes partitor 0.5.0-dev.1. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -861,6 +861,8 @@ the script and in `INSTALL.md`):
 | Settings | `--config FILE` is copied to `/etc/default/partitor`. |
 | Library folder (local mode) | `<library>`, `inbox/`, `library/` at 2770, owner and group `partitor`. |
 | venv `<repo>/venv` | Create if missing (root-owned, read-only for `partitor`). Reinstall the pinned packages when the `requirements.txt` hash changes. |
+| Bytecode of `lib/partitor` | Compile as root (`python -m compileall --invalidation-mode checked-hash`) when a `.py` file has no `.pyc` or is newer than it. The service user cannot write the read-only tree, so without the files Python compiles every module in memory at each start. `--check` reports a missing or old file. |
+| Package readability | As user `partitor`, every file of `lib/partitor` must be readable and every folder searchable. WARN with the fix command when not. |
 | Links | `partitor`, `partitor-init`, `partitor-install` in `/usr/local/sbin` -> `<repo>/bin/<name>`. |
 | Logo (optional) | Check `PARTITOR_LOGO` in the settings: WARN when the file is missing, lies where the sandbox cannot see it (`/home`, `/root`, `/run/user`, `/tmp`, `/var/tmp`) or cannot be read by user `partitor`. Never a FAIL: without the logo the engine builds as before. |
 | Self-test | `partitor --sandbox-check`: every line must be ok. |
@@ -878,14 +880,25 @@ lists what a run would change (exit 0).
 - The repository has no sample scores. Public tests use synthetic PDFs that the
   tests draw themselves. They cover the logic: staves, systems, ownership,
   layout, CLI, installer.
+- The engine tests are split by area: `tests/test_analysis.py`, `test_mapping.py`,
+  `test_bars.py`, `test_parallel.py`, `test_layout.py`, `test_render.py`,
+  `test_clef.py`, `test_library.py`, `test_cli.py`. Shared helpers (the engine
+  loader `pt`, the synthetic score and scan drawers, `mock_attr`, the logo
+  fixture) are in `tests/support.py`. A broken import of the engine stops the
+  run; only a missing third-party package skips the engine tests.
 - Corpus tests run the engine on real scores and compare staff, system and bar
   counts. They need your own PDFs and skip per missing file (`TestCorpus.need()`
-  in `tests/test_partitor.py`; the file list is the `CORPUS` table).
+  in `tests/test_analysis.py`; the file list is the `CORPUS` table there).
 - `tools/g0_golden.py` records and checks "golden" renders: page images at 100
   dpi and normalised text of 50 cases. Use it for a refactor: record before,
-  check after. Goldens depend on the package versions, so record and check in
-  the same environment.
-- `tools/m0_depmap.py` maps the dependencies between functions of the engine.
+  check after (`--tests tests/support.py`, the default). Goldens depend on the
+  package versions, so record and check in the same environment.
+- `tools/m0_depmap.py` maps the dependencies between functions of the engine
+  (one file, or a folder such as `lib/partitor`).
+- `tools/check-modules.py` checks the module structure of `lib/partitor` (§12.3).
+  `tools/bench-start.sh` measures the start-up time of the engine.
+- `tests/test_ci.py` fails when the number of discovered tests falls below
+  `MIN_TESTS`. Raise that number with every step that adds tests.
 - Layout defaults come from **printed** test pages, not from the screen.
 
 ---
@@ -893,3 +906,90 @@ lists what a run would change (exit 0).
 ## 11. Known limits
 
 See `KNOWN-LIMITS.md`.
+
+---
+
+## 12. Code map
+
+The engine is one script today, `lib/partitor-engine`. It moves in small steps into
+the package `lib/partitor/`, in 23 modules (releases `0.5.0-dev.1` to `0.5.0`).
+Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.1 only
+`lib/partitor/__init__.py` exists; it holds `VERSION`. A module that is not in
+`lib/partitor/` yet is a proposal in the tables below.
+
+### 12.1 Modules and import levels
+
+A module imports only from a **strictly lower** level. `tools/modules.txt` is the
+machine-readable list; `tools/check-modules.py` enforces it.
+
+| Lvl | Module | Owns |
+|---|---|---|
+| 0 | `console` | Output primitives, colours, counters, prompts, `Abort` |
+| 0 | `config` | Tunables, `TUNE`, layout and score keys, defaults, name helpers |
+| 0 | `model` | Data classes `Staff`, `PageResult`, `Strip`, `RestRun` |
+| 0 | `typography` | Fonts and text measure |
+| 0 | `mapping` | Staff label to part map |
+| 0 | `bars` | Bar numbers, bar marks, barline edits |
+| 1 | `vision` | Page render, tracking, dewarp, staff and system detect, OCR |
+| 1 | `clef` | Clef signature, notehead steps, ambitus |
+| 1 | `parallel` | `fork_map`, job and memory sizing |
+| 1 | `reflow` | Re-flow of strips |
+| 1 | `strips` | Strip build, group strips, bar marks, rehearsal boxes |
+| 2 | `ownership` | Ink ownership, safety gate, barline detect |
+| 2 | `lines` | Line fitting, labels, multi-bar rests, saved lines |
+| 3 | `analysis` | Page loop, preview |
+| 3 | `render` | Paper, packing, page plan, part drawing |
+| 4 | `library` | Item folder, ids, load and save, parts folder swap |
+| 5 | `build` | `pieces`, `detect`, `build`, run and report helpers |
+| 5 | `proof` | Proof PDF |
+| 6 | `cli_common` | Shared CLI helpers, `set` |
+| 7 | `cli_bars` | `bars` command |
+| 7 | `cli_parts` | `parts`, `groups`, ambitus menu |
+| 8 | `cli_items` | Item commands |
+| 9 | `cli_main` | Menu, `main`, sandbox check |
+
+### 12.2 Where a DESIGN section lives
+
+| DESIGN section | Module |
+|---|---|
+| §2, §2.1 naming, §3 settings | `library`, `config` |
+| §4.1 base pipeline | `analysis`, `build` |
+| §4.2 items 1, 3, 7 (barlines, numbers, pickups) | `bars` |
+| §4.2 item 2 (re-flow) | `reflow` |
+| §4.2 items 5, 8 (bar number place, rehearsal letters) | `strips` |
+| §4.2 item 9 (multi-bar rests) | `lines` |
+| §4.3 items 1, 6, 12 (gate, text ownership, system window) | `ownership` |
+| §4.3 items 2, 3, 5, 9, 10 (scan, plausibility, grouping, edges, conditioning) | `vision` |
+| §4.3 item 4 (per-system mapping) | `mapping` |
+| §4.3 item 13 (ambitus) | `clef` |
+| §4.3 items 7, 11 (multi-work, group outputs) | `build`, `strips` |
+| §4.4 parallel | `parallel` |
+| §5.1 to 5.4, 5.6 layout | `render` |
+| §5.5 typography | `typography`, `lines` |
+| §6 CLI | `cli_*` |
+| §8 security (sandbox check) | `cli_main` |
+
+This map comes from function names and headings. Check it when a module exists.
+
+### 12.3 Rules
+
+- **Levels.** No import of the same or a higher level, no cycle, also not inside a
+  function. Every module starts with `from __future__ import annotations` and the SPDX
+  line. `lib/partitor/__init__.py` has no imports: every start of the engine reads it.
+- **Shared state (R1).** A name that other modules change, and every name in
+  `tests/patchable.txt`, is used as `owner.NAME` (import the module, not the name).
+  `from owner import NAME` makes a copy: a test patch or a rebinding then changes the
+  owner and leaves the copy as it was.
+- **`global`.** `global NAME` is allowed only for a name that the same module assigns
+  or defines at top level. For a name of another module write `owner.NAME = value`.
+- **Size.** At most 1 100 definition lines per module. One module is exempt
+  (`ownership`: `analyse_page` is one function of 852 lines).
+- **Pickles (proposal, from the step that moves `Strip` and `RestRun`).** Saved `.lines`
+  files hold class paths (`__main__.Strip` today). The reader of saved lines will accept
+  the old path and the new ones (`partitor.*`), and will keep doing so, so a later rename
+  of a module does not break saved files.
+- **Version.** `VERSION` lives in `lib/partitor/__init__.py`. The file `VERSION` in the
+  repo root carries the same number for the wrapper and the installer; a test checks it.
+- **Checks.** `tools/check-modules.py --static` (also in `tools/check-repo.sh` and CI),
+  `--import` (each module alone in a fresh interpreter), `--affected MODULE` (the modules
+  that import it, and the test files to run).

@@ -90,7 +90,8 @@ set -euo pipefail
 
 RUN="${PARTITOR_SYSTEMD_RUN:-systemd-run}"
 ROOT="$(dirname "$(dirname "$(realpath -- "${BASH_SOURCE[0]}")")")"
-# one version for engine, wrapper and installer: the file VERSION of the repo
+# one version for engine, wrapper and installer: the file VERSION of the repo (the engine
+# reads the same number from lib/partitor/__init__.py; a test checks that both agree)
 WRAPPER_VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || true)"
 WRAPPER_VERSION="${WRAPPER_VERSION:-unknown}"
 PY="$ROOT/venv/bin/python3"

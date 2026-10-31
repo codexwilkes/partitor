@@ -27,6 +27,13 @@
 #   6. venv <repo>/venv (root-owned, read-only for partitor): created when
 #      missing; packages reinstalled when the sha256 of requirements.txt
 #      differs from the stamp in the venv.
+#   6a. Bytecode: `python -m compileall --invalidation-mode checked-hash` runs as
+#      root on <repo>/lib/partitor. The service user cannot write the read-only
+#      tree, so without the .pyc files Python compiles every module in memory at
+#      each start. Compiled when a .py file has no .pyc or is newer than it.
+#   6b. Package readability: as the service user, every file in <repo>/lib/partitor
+#      must be readable and every folder searchable. WARN with the fix command
+#      when not (an unreadable module stops every command at the first import).
 #   7. Links in /usr/local/sbin: partitor, partitor-init, partitor-install
 #      (each -> <repo>/bin/<name>).
 #   7a. Logo (optional, PARTITOR_LOGO in the config): WARN when the file is
@@ -42,6 +49,8 @@
 #      the same library check. NAS not reachable: WARN.
 #
 # CHANGELOG:
+#   0.5.0-dev.1 - Steps 6a (bytecode of lib/partitor, checked-hash, as root) and
+#           6b (WARN when the service user cannot read the package).
 #   0.4.2 - WARN when the service user cannot read PARTITOR_LOGO (step 7a).
 #   0.4.0 - Public release (renamed from `setup`, 1.0.1 in the private line;
 #           the version is now the version of the repo, file VERSION). BREAKING: PARTITOR_NAS is
@@ -253,6 +262,51 @@ if [[ -f "$REQ" && -x "$VENV/bin/python3" ]]; then
       say "venv packages installed"
     else
       bad "pip install failed"
+    fi
+  fi
+fi
+
+# 6a. bytecode of the package (lib/partitor), compiled as root. The tree is read-only for
+# the service user (ProtectSystem=strict), so Python cannot write __pycache__ at run
+# time. checked-hash: the .pyc is checked against the source at import, so a stale file
+# is never wrong, only slow. Compile when a .py has no .pyc or is newer than its .pyc.
+PKG="$ROOT/lib/partitor"
+if [[ ! -d "$PKG" ]]; then
+  bad "package folder missing: $PKG"
+elif [[ ! -x "$VENV/bin/python3" ]]; then
+  say "bytecode not compiled (venv missing)"
+else
+  stale=()
+  for f in "$PKG"/*.py; do
+    pyc=("$PKG/__pycache__/$(basename "$f" .py)".*.pyc)
+    if [[ ! -e "${pyc[0]}" || "$f" -nt "${pyc[0]}" ]]; then
+      stale+=("$(basename "$f")")
+    fi
+  done
+  if (( ${#stale[@]} == 0 )); then
+    ok "bytecode of lib/partitor is current"
+  elif (( CHECK )); then
+    needs "bytecode of lib/partitor missing or older than the source: ${stale[*]}"
+  elif "$VENV/bin/python3" -m compileall -q --invalidation-mode checked-hash "$PKG"; then
+    say "compiled bytecode of lib/partitor (${#stale[@]} file(s))"
+  else
+    bad "compileall failed for $PKG"
+  fi
+fi
+
+# 6b. the service user must read the package. WARN only, like the logo check below.
+if [[ -d "$PKG" ]]; then
+  if ! command -v "$RUNUSER" >/dev/null 2>&1; then
+    warn "package readability not checked ($RUNUSER not found)"
+  else
+    unreadable="$("$RUNUSER" -u "$SVC_USER" -- find "$PKG" \( \( -type f ! -readable \) -o \( -type d \( ! -readable -o ! -executable \) \) \) -print 2>&1)" && rc=0 || rc=$?
+    if (( rc == 0 )) && [[ -z "$unreadable" ]]; then
+      ok "package readable by $SVC_USER: lib/partitor"
+    else
+      warn "package not readable by $SVC_USER: lib/partitor (every command fails at the first import)"
+      [[ -n "$unreadable" ]] && sed -n '1,5p' <<<"$unreadable" | sed 's/^/  /'
+      echo "  Check: namei -l $PKG   (every folder needs x for others; every file needs r)"
+      echo "  Run: sudo chmod -R a+rX $PKG"
     fi
   fi
 fi
