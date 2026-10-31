@@ -7,4 +7,4 @@ script `lib/partitor-engine`; it moves here in small steps (docs/DESIGN.md
 §12). This file must stay free of imports: every start of the engine reads it.
 """
 
-VERSION = "0.5.0-dev.1"
+VERSION = "0.5.0-dev.2"

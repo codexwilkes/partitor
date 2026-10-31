@@ -54,9 +54,10 @@ For a refactor of the engine, record and check golden renders with
 
 ## Where does my change go
 
-The engine is one script today (`lib/partitor-engine`). It is moving, step by step, into
-the package `lib/partitor/` (`DESIGN.md` §12). Until a module exists, its code is in the
-script. The target modules and their import levels:
+The engine is mostly one script today (`lib/partitor-engine`). It is moving, step by step,
+into the package `lib/partitor/` (`DESIGN.md` §12). These modules exist now: `console`,
+`config`, `model`, `typography`, `mapping`, `bars`, `parallel`. Until another module
+exists, its code is in the script. The target modules and their import levels:
 
 | Lvl | Module | Put here |
 |---|---|---|
@@ -88,10 +89,11 @@ Rules (`tools/check-modules.py` checks them; CI runs it):
 
 - A module imports only from a **strictly lower** level, never in a cycle. Every module
   starts with `from __future__ import annotations` and the SPDX line.
-- **R1:** use state that other modules change, and every name in `tests/patchable.txt`,
+- **R1:** use state that other modules rebind, and every name in `tests/patchable.txt`,
   as `module.NAME`. Do not write `from module import NAME`: it makes a copy, and a test
-  patch or a rebinding then changes only the owner. `global NAME` is allowed only for a
-  name that the same module defines.
+  patch or a rebinding then changes only the owner. An object that is only changed in place
+  (a counter dict, a list) may be imported by name; both names are the same object.
+  `global NAME` is allowed only for a name that the same module defines.
 - **A new patchable name:** when a test replaces a name with `mock_attr` or an
   assignment on `pt`, add the name to `tests/patchable.txt` (one per line) in the same
   change, and make the readers use `module.NAME`.
@@ -108,6 +110,19 @@ python3 tools/check-modules.py --affected clef     # modules that import clef, a
 `--affected` prints the modules that import the module (also through other modules)
 and the test files of those modules and of the module itself (`tools/modules.txt`);
 `*` means all tests.
+
+To move code from the script into a module, use `tools/move-symbols.py` (temporary; the
+last step removes it). It moves the named top-level definitions and constants with the
+comment block above each, text unchanged, writes the module header and only the imports the
+code uses, and leaves a shim import in the script. It refuses a missing, duplicated or
+conditional name, and a dependency on a name that stays in the script or sits in the same or
+a higher level. `--check --pristine FILE` proves that the moved text equals the original plus
+the listed edits. Run it without `--apply` first: it prints the plan.
+
+Saved `.lines` files: the reader accepts the class paths of every earlier layout
+(`__main__`, `partitor.*`); do not narrow it. The fixture `tests/data/lines-0.4.2.lines`
+was written by the engine before the first move, and a test loads it. Binary fixtures in
+`tests/data/` carry no licence line (`tools/check-repo.sh` skips that folder for this check).
 
 ## Version
 

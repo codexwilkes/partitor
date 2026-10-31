@@ -24,8 +24,10 @@
 # page analysis (detect, build) and the rendering (build) (auto: CPUs - 1, at most 6, within
 # PARTITOR_MEMORY_MAX).
 #
-# Installed as /opt/partitor/bin/partitor-engine. Run it through
-# /usr/local/sbin/partitor, which starts it as user partitor in a systemd
+# Installed as lib/partitor-engine of the partitor folder, next to the package
+# lib/partitor/. The code moves from this file into that package in small steps
+# (docs/DESIGN.md §12); the names that moved are imported near the top of this file.
+# Run it through /usr/local/sbin/partitor, which starts it as user partitor in a systemd
 # sandbox. It refuses to run as root (PARTITOR_ALLOW_ROOT=1: tests only).
 # Runs in the venv /opt/partitor/venv; label OCR uses tesseract.
 #
@@ -150,6 +152,10 @@
 # =============================================================================
 #
 # CHANGELOG:
+#   0.5.0-dev.2 - Seven modules moved from this file to lib/partitor/: console, config,
+#           model, typography, mapping, bars, parallel. This file imports their names (shim
+#           imports) and reaches shared state as module.NAME. Saved .lines files of earlier
+#           engines still load. Output unchanged.
 #   0.5.0-dev.1 - Start of the modular split. VERSION moved to lib/partitor/__init__.py;
 #           the script imports it. No other change; output unchanged.
 #   0.4.2 - `new --jobs N|auto` (detect and build steps of the wizard). Output
@@ -414,201 +420,46 @@ import yaml
 # package importable when this script runs by path, also with python -I.
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from partitor import VERSION  # noqa: E402
+from partitor import config, console, parallel  # noqa: E402
 
-# ── Output primitives (CLI-STYLE-GUIDE §4, Python port) ─────────────────────
-# PARTITOR_COLOR=1 forces colour and progress lines when stdout is no terminal:
-# the wrapper runs the engine through a pipe (`systemd-run --pipe`) and sets it
-# when its own stdout is a terminal (0.3.0-dev.39). Anything else: colour only
-# on a terminal.
-_TTY = sys.stdout.isatty() or os.environ.get("PARTITOR_COLOR") == "1"
-RED, GRN, YLW, BLU, DIM, BOLD, RST = (
-    ("\033[0;31m", "\033[0;32m", "\033[0;33m", "\033[0;34m", "\033[2m",
-     "\033[1m", "\033[0m") if _TTY else ("",) * 7)
-_counts = {"pass": 0, "fail": 0, "warn": 0}
-_FAILURES: list[str] = []
-_WARNINGS: list[str] = []
-
-
-def _ok(msg: str) -> None:
-    _counts["pass"] += 1
-    print(f"  {GRN}✔{RST}  {msg}")
-
-
-def _fail(msg: str) -> None:
-    _counts["fail"] += 1
-    _FAILURES.append(msg)
-    print(f"  {RED}✘{RST}  {msg}")
-
-
-def _warn(msg: str) -> None:
-    _counts["warn"] += 1
-    _WARNINGS.append(msg)
-    print(f"  {YLW}⚠{RST}  {msg}")
-
-
-def _note(msg: str) -> None:
-    print(f"     {DIM}{msg}{RST}")
-
-
-def _skip(msg: str) -> None:
-    print(f"  ⊘  {msg}")
-
-
-def _head(msg: str) -> None:
-    print(f"\n{BOLD}{BLU}══ {msg}{RST}")
+# Shim imports of moved names (plan R5). Step M8 removes them.
+from partitor.console import (  # noqa: E402,F401
+    Abort, BLU, BOLD, DIM, GRN, RED, RST, YLW, _FAILURES, _WARNINGS, _counts, _die, _fail,
+    _head, _note, _ok, _progress, _progress_end, _reset_counts, _skip, _summary, _warn, ask,
+    yes,
+)
+from partitor.config import (  # noqa: E402,F401
+    AMB_SP, BAND_MARGIN, BARNUM_ZONE_SP, BRACKET_MAX_SP, BRACKET_ZONE_SP, CHAIN_SP, CLOSE_SP,
+    DEWARP_MIN_PX, DISCARD_NAMES, DUST_AREA_SP2, D_BARNUM, D_BRACKET, D_CONNECTOR, D_EDGE,
+    D_FOOTER, D_HEADER, D_LABEL, D_NOISE, D_NOMUSIC, EDGE_LEFT_SP, EDGE_RIGHT_SP,
+    FOOTER_TEXT_SP, GATE_CLASSES, GROUP_GAP_SP, HEADER_CLEAR_SP, LABEL_ABOVE_SP,
+    LAYOUT_DEFAULTS, LAYOUT_HELP, LINES_NEW, MAX_SKEW_DEG, NOISE_AREA_SP2, NOISE_WARN_FRAC,
+    OWN_DISCARD, OWN_HEADER_BASE, OWN_NONE, PAGE_FOOTER_SP, PAGE_HEADER_SP, PAPER_GUARD,
+    PART_LAYOUT_KEY, SCORE_FILE, SKIP_KEY, SP_MAX_PX, SP_MIN_PX, SYSTEM_CLEAR_SP,
+    SYSTEM_GAP_FACTOR, TEXT_ABOVE_FRAC, TEXT_REVIEW_FRAC, THIN_VERTICAL_SP, TRACK_BANDS,
+    composer_surname, file_part_name, make_slug, part_file_name, sha256, slugify,
+)
+from partitor.model import PageResult, RestRun, Staff, Strip  # noqa: E402,F401
+from partitor.typography import (  # noqa: E402,F401
+    FILL_COST, FONT_FILES, PAGE_COST, REPAGE_FILL, REST_TURN_MIN, SHORT_LAST, TURN_BAD,
+    TURN_HARD, TURN_MOVE, _FONTS, _font, font_dirs, put_text, text_len,
+)
+from partitor.mapping import (  # noqa: E402,F401
+    CONTINUO_RE, _NUMERALS, _clef_same, _subseq, assign_maps, build_reference, clefs_compatible,
+    label_match, map_system, norm_tokens,
+)
+from partitor.bars import (  # noqa: E402,F401
+    BAR_EDIT_RE, PICKUP_SHORT, SPLIT_PART, SPLIT_SUM, _boundaries, _flat_bars, _mark_sorted,
+    _movements, apply_mark_rules, assign_bars, bar_edits_by_system, bar_mismatches, bar_numbers,
+    edit_barlines, edit_bars, effective_systems, format_bar_edit, mark_bars, mark_items,
+    mismatch_text, number_bars, parse_bar_edit, propose_bar_rules, renumber, toggle_mark,
+)
+from partitor.parallel import (  # noqa: E402,F401
+    GIB, JOBS_MAX, MAIN_GB, PAGE_WORKER_GB, RENDER_WORKER_GB, _child_run, _describe_exit,
+    job_count, mem_available, parse_size, worker_peak_mb,
+)
 
 
-def _progress(msg: str) -> None:
-    """Self-overwriting single-line progress indicator (TTY only)."""
-    if _TTY:
-        print(f"\r  {DIM}·{RST}  {msg}\033[K", end="", flush=True)
-
-
-def _progress_end() -> None:
-    if _TTY:
-        print("\r\033[K", end="", flush=True)
-
-
-def _die(msg: str, hint: str = "") -> None:
-    print(f"\n{BOLD}{RED}ERROR:{RST} {msg}", file=sys.stderr)
-    if hint:
-        print(f"     {DIM}{hint}{RST}", file=sys.stderr)
-    sys.exit(1)
-
-
-def _reset_counts() -> None:
-    """Zero the counters (the library CLI runs several steps in one process)."""
-    for k in _counts:
-        _counts[k] = 0
-    _FAILURES.clear()
-    _WARNINGS.clear()
-
-
-def _summary(start: float) -> int:
-    ms = int((time.monotonic() - start) * 1000)
-    print(f"\n{BOLD}══ Summary{RST}")
-    print(f"  {GRN}PASS: {_counts['pass']}{RST}   {RED}FAIL: {_counts['fail']}{RST}"
-          f"   {YLW}WARN: {_counts['warn']}{RST}   (elapsed: {ms}ms)\n")
-    if _FAILURES:
-        print(f"{BOLD}{RED}Failed checks:{RST}")
-        for f in _FAILURES:
-            print(f"  {RED}✘{RST}  {f}")
-        print()
-    if _WARNINGS:
-        print(f"{BOLD}{YLW}Warnings:{RST}")
-        for w in _WARNINGS:
-            print(f"  {YLW}⚠{RST}  {w}")
-        print()
-    if _counts["fail"]:
-        print(f"{RED}{BOLD}NOT OK — {_counts['fail']} check(s) failed{RST}\n")
-        return 1
-    if _counts["warn"]:
-        print(f"{YLW}{BOLD}OK with {_counts['warn']} warning(s){RST}\n")
-    else:
-        print(f"{GRN}{BOLD}ALL OK{RST}\n")
-    return 0
-
-
-# =============================================================================
-# Analysis tunables (staff spaces unless stated)
-# =============================================================================
-BAND_MARGIN = 0.25        # staff band extends this far beyond outer lines
-CLOSE_SP = 1.0            # gap component this near a staff belongs to it
-CHAIN_SP = 1.0            # vertical reach for chaining (ledger stacks)
-TEXT_ABOVE_FRAC = 0.6     # text in the upper 60% of a gap: staff above
-TEXT_REVIEW_FRAC = 0.07   # |frac - TEXT_ABOVE_FRAC| below this: review
-PAGE_HEADER_SP = 6.0      # above first staff, farther than this: discard
-                          # (layout key page_header_sp overrides)
-PAGE_FOOTER_SP = 6.0      # below last staff, farther than this: discard
-FOOTER_TEXT_SP = 4.0      # nearer, from here: discard when the text is a footer
-THIN_VERTICAL_SP = 0.6    # multi-staff component narrower than this: barline
-BRACKET_MAX_SP = 6.0      # widest left bracket/brace
-MAX_SKEW_DEG = 3.0
-GROUP_GAP_SP = 1.5        # max horizontal gap inside one text line
-SP_MIN_PX, SP_MAX_PX = 10, 70   # plausible staff space at 400 dpi (scaled)
-TRACK_BANDS = 16          # vertical bands for staff tracking
-NOISE_AREA_SP2 = 0.03     # components smaller than this (sp^2): noise
-NOISE_WARN_FRAC = 0.005   # noise above this share of page ink: warning
-DEWARP_MIN_PX = 1.5       # straighten when a staff bends more than this
-LABEL_ABOVE_SP = 2.5      # label text this near above a staff start
-EDGE_LEFT_SP = 0.3        # system window: staff ink left of start - this
-EDGE_RIGHT_SP = 1.5       #   or right of the widest staff end + this is not
-BRACKET_ZONE_SP = 2.0     #   music: bracket (this near the start) or edge
-BARNUM_ZONE_SP = 4.5      # printed bar numbers: this far above the top line
-PAPER_GUARD = 230         # local ink must be darker than this (flattened)
-
-TUNE = {'page_header_sp': PAGE_HEADER_SP}   # set from layout / CLI
-
-# Owner codes in the per-pixel owner image. Staff owners are 0..n-1.
-OWN_NONE = -1             # must not remain after analysis
-OWN_DISCARD = -2          # unclassified discard: must not occur (gate)
-D_HEADER = -3             # page title / running header zone
-D_FOOTER = -4             # footer zone (page number, copyright)
-D_LABEL = -5              # instrument label (left of or above a staff)
-D_BRACKET = -6            # bracket / brace at the system start
-D_CONNECTOR = -7          # barline / bracket pixels inside a staff gap
-D_EDGE = -8               # page-edge artefact (border, spine, corner)
-D_NOISE = -9              # despeckled noise
-D_NOMUSIC = -10           # page without accepted staves
-D_BARNUM = -11            # printed bar number at a system start (replaced)
-DUST_AREA_SP2 = 0.15      # a lone header speck below this area (sp^2) is noise
-OWN_HEADER_BASE = 100000  # OWN_HEADER_BASE + global system index
-DISCARD_NAMES = {OWN_DISCARD: "unclassified", D_HEADER: "header",
-                 D_FOOTER: "footer", D_LABEL: "label", D_BRACKET: "bracket",
-                 D_CONNECTOR: "connector", D_EDGE: "edge", D_NOISE: "noise",
-                 D_NOMUSIC: "no-music", D_BARNUM: "bar-number"}
-# Classes that may hide a missed staff: checked by the safety gate.
-GATE_CLASSES = (OWN_DISCARD, D_HEADER, D_FOOTER, D_LABEL, D_EDGE, D_NOMUSIC)
-
-
-@dataclass
-class Staff:
-    page: int
-    idx: int              # index on page, top first
-    lines: list[float]    # 5 line centre rows (px)
-    x0: int
-    x1: int
-    system: int = -1      # global system index
-    label: str = ""       # OCR / text-layer label
-    clef: str = "?"       # clef signature: G, F, C3, C4, ... or ?
-    brace: int = -1       # bracket group id on the page
-    steps: tuple | None = None   # (lowest, highest, x low, x high, bar index low, bar index high)
-
-    @property
-    def top(self) -> float:
-        return self.lines[0]
-
-    @property
-    def bottom(self) -> float:
-        return self.lines[-1]
-
-
-@dataclass
-class PageResult:
-    page: int
-    shape: tuple[int, int]
-    sp: float                 # staff space incl. line (px)
-    thick: int                # staff line thickness (px)
-    skew: float               # degrees applied
-    dewarp: float             # max vertical correction (px)
-    staves: list[Staff]
-    systems: list[list[Staff]]
-    owner: np.ndarray         # int32 per pixel owner, OWN_NONE where white
-    review: list[tuple[int, int, int, int, str]] = field(default_factory=list)
-    gate: list[str] = field(default_factory=list)       # safety failures
-    gate_boxes: list[tuple[int, int, int, int]] = field(default_factory=list)
-    discard: dict[int, int] = field(default_factory=dict)
-    ink_px: int = 0
-    title: str = ""
-    composer: str = ""        # right-aligned text line under the title
-    music: bool = True
-    barlines: dict[int, list[int]] = field(default_factory=dict)   # system -> x
-    anchors: dict[int, list[tuple[int, int]]] = field(default_factory=dict)
-    num_boxes: dict[int, list[tuple[int, int, int, int]]] = field(default_factory=dict)
-    # system -> boxes of printed mid-line bar numbers (kept as ink)
-    restart: set[int] = field(default_factory=set)  # systems that start a movement
-    mensur: dict[int, list[int]] = field(default_factory=dict)  # system -> dotted bar x
-    repeats: dict[int, list[tuple[int, str]]] = field(default_factory=dict)
     # system -> [(barline index, 'end'|'start')]; index -1 = system start
 
 
@@ -1044,61 +895,6 @@ def text_in_rect(page: pymupdf.Page, rect_px: tuple[int, int, int, int],
     return " ".join(w[4] for w in sorted(words, key=lambda w: (w[5], w[6], w[0])))
 
 
-_NUMERALS = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "1": 1, "2": 2,
-             "3": 3, "4": 4, "5": 5}
-
-
-def norm_tokens(text: str) -> list[str]:
-    t = re.sub(r"[^\w\s]", " ", text.lower())
-    return [x for x in t.split() if x]
-
-
-def label_match(label: str, name: str) -> float:
-    """label_match -> 0..1 similarity of a printed label and a part name.
-
-    Numbers (I/II/III, 1/2/3) must agree when both have one. A short label
-    (T1, A, B) matches by first letter plus number."""
-    lt, nt = norm_tokens(label), norm_tokens(name)
-    if not lt or not nt:
-        return 0.0
-    # continuo names are one part: Continuo, Basso continuo, Organo, B.C.
-    # (Biber: "Continuo" on later systems, "Organo BC" on page 1)
-    if CONTINUO_RE.search(label) and CONTINUO_RE.search(name):
-        return 1.0
-    ln = {_NUMERALS[x] for x in lt if x in _NUMERALS}
-    nn = {_NUMERALS[x] for x in nt if x in _NUMERALS}
-    m = re.fullmatch(r"([a-z]+)(\d)", lt[0])
-    if m:                                   # "t1" -> letter t, number 1
-        ln.add(int(m.group(2)))
-        lt = [m.group(1)] + lt[1:]
-    if ln and nn and ln != nn:
-        return 0.0
-    if len(lt[0]) <= 2 and nt[0].startswith(lt[0]):
-        return 0.9 if (ln == nn) else 0.6
-    words = [x for x in lt if x not in _NUMERALS]
-    names = [x for x in nt if x not in _NUMERALS]
-    if not words or not names:
-        return 0.0
-    best = max(difflib.SequenceMatcher(None, a, b).ratio()
-               for a in words for b in names)
-    # an abbreviation: its letters in order in a name word with the same
-    # first letter ("Vla" Viola, "Cornet" Cornetto), or the end of a
-    # compound ("Pos" in "Altposaune"; numbers or the staff order decide)
-    for a in words:
-        for b in names:
-            if len(a) >= 2 and a[0] == b[0] and _subseq(a, b):
-                best = max(best, 0.8)
-            elif len(a) >= 3 and a in b and not b.startswith(a):
-                best = max(best, 0.7)
-    return best if (ln == nn or not ln or not nn) else best * 0.8
-
-
-def _subseq(a: str, b: str) -> bool:
-    """True when the letters of a stand in b in the same order."""
-    it = iter(b)
-    return all(ch in it for ch in a)
-
-
 def looks_like_text(widths: list[int], height: float) -> bool:
     """A text line is several glyphs (3+ components), none much wider than
     the line is high (4x); a scan's page edge or a rule is one long
@@ -1316,8 +1112,6 @@ def order_pitches(a: tuple[int, int], b: tuple[int, int]) -> tuple[tuple[int, in
     return (a, b) if a <= b else (b, a)
 
 
-CONTINUO_RE = re.compile(r"continuo|\bb\.?\s*c\.?\b|organ|cembalo|harpsichord|"
-                         r"theorb|lute|basso\s+generale", re.IGNORECASE)
 AMBITUS_FROM = ("auto", "on", "operator", "off")
 
 
@@ -2329,7 +2123,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
         ia, da, ib, db = dists_box(gy0, gy1 - 1)
         own = None
         if ia is None:                   # above first staff
-            own = (D_HEADER if db > TUNE["page_header_sp"]
+            own = (D_HEADER if db > config.TUNE["page_header_sp"]
                    else OWN_HEADER_BASE + staves[ib].system)
         elif ib is None:                                 # below last staff
             own = D_FOOTER if da > PAGE_FOOTER_SP else ia
@@ -3028,970 +2822,6 @@ def check_page(res: PageResult) -> None:
         f"discard={disc}px  review={len(res.review)}")
 
 
-def sha256(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-# =============================================================================
-# Parallel work (0.3.0-dev.33)
-# =============================================================================
-# A build spends most of its time on two loops that do not depend on each
-# other: the analysis of each page (OCR, staves, ownership) and the rendering
-# of each part. fork_map runs such a loop in forked child processes (no
-# threads, no pickled inputs: a child sees the parent's memory as it was at the
-# fork). Results come back in order, with the text each child printed.
-# jobs = 1 runs the loop in this process, as before.
-PAGE_WORKER_GB = 1.5      # estimate: peak memory of one page analysis (400 dpi)
-RENDER_WORKER_GB = 1.0    # estimate: peak memory of rendering one part
-MAIN_GB = 2.0             # estimate: the parent (all strips of the piece, 70 pages)
-JOBS_MAX = 6              # auto never starts more children than this
-GIB = 1 << 30
-
-
-def parse_size(text: str) -> int | None:
-    """parse_size '8G' | '1500M' | '123456' -> bytes; None for '', infinity or
-    anything else (systemd notation, K M G T are powers of 1024)."""
-    m = re.fullmatch(r"\s*(\d+)\s*([KMGT]?)B?\s*", str(text or ""), re.I)
-    if not m:
-        return None
-    return int(m.group(1)) * (1024 ** ("", "K", "M", "G", "T").index(m.group(2).upper()))
-
-
-def mem_available() -> int:
-    """mem_available -> bytes of memory the machine can still give (MemAvailable)."""
-    try:
-        for line in Path("/proc/meminfo").read_text().splitlines():
-            if line.startswith("MemAvailable:"):
-                return int(line.split()[1]) * 1024
-    except (OSError, ValueError, IndexError):
-        pass
-    return 4 * GIB
-
-
-def job_count(requested, worker_gb: float, items: int) -> int:
-    """job_count -> number of children to run at once, 1..items.
-
-    requested: --jobs, else PARTITOR_JOBS, else auto. A number is taken as
-    it is (the operator knows the machine). auto: one core stays free, at most
-    JOBS_MAX, and the memory cap of the run (PARTITOR_MEMORY_MAX, set by the
-    wrapper; else 80 % of what the machine has free) less MAIN_GB must hold
-    every child at worker_gb."""
-    if items <= 1:
-        return 1
-    req = str(requested if requested is not None
-              else os.environ.get("PARTITOR_JOBS", "auto")).strip().lower()
-    if req not in ("", "auto"):
-        try:
-            return max(1, min(int(req), items))
-        except ValueError:
-            _warn(f"jobs:  '{req}' is not a number or auto; using auto")
-    cpus = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
-    cap = parse_size(os.environ.get("PARTITOR_MEMORY_MAX", ""))
-    if cap is None:
-        cap = int(mem_available() * 0.8)
-    by_mem = int((cap - MAIN_GB * GIB) // (worker_gb * GIB))
-    return max(1, min(items, cpus - 1, JOBS_MAX, by_mem))
-
-
-def worker_peak_mb() -> int:
-    """worker_peak_mb -> peak memory (MB) of the largest child that ended so far."""
-    return int(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024)
-
-
-def _describe_exit(status: int) -> str:
-    if os.WIFSIGNALED(status):
-        sig = os.WTERMSIG(status)
-        known = {int(x): x.name for x in signal.Signals}
-        return f"killed by {known.get(sig, sig)}" + (
-            " (out of memory? see PARTITOR_MEMORY_MAX)" if sig == signal.SIGKILL else "")
-    return f"exit code {os.WEXITSTATUS(status)}"
-
-
-def _child_run(fn, item, path: str) -> None:
-    """In the child: run fn(item) with its output captured, write the result to path."""
-    global _TTY
-    _TTY = False                     # no self-overwriting progress lines in captured text
-    _reset_counts()
-    buf = io.StringIO()
-    try:
-        with contextlib.redirect_stdout(buf):
-            payload = ("ok", fn(item))
-    except SystemExit as e:
-        payload = ("exit", e.code)
-    except BaseException:            # noqa: BLE001
-        payload = ("error", traceback.format_exc())
-    out = (payload, buf.getvalue(), dict(_counts), list(_FAILURES), list(_WARNINGS))
-    try:
-        blob = pickle.dumps(out, protocol=pickle.HIGHEST_PROTOCOL)
-    except Exception:                # noqa: BLE001  (a result that cannot be pickled)
-        blob = pickle.dumps((("error", traceback.format_exc()), buf.getvalue(),
-                             dict(_counts), list(_FAILURES), list(_WARNINGS)))
-    with open(path + ".tmp", "wb") as f:
-        f.write(blob)
-    os.replace(path + ".tmp", path)
-
-
-def fork_map(fn, items, jobs: int):
-    """fork_map -> generator of fn(item) for each item, in order.
-
-    jobs <= 1 (or one item): fn runs in this process. Else up to `jobs` forked
-    children run fn at once. Each child's printed text and check counts are
-    replayed here when its result is yielded, so the output keeps the order
-    of the items. A child that raises makes this raise RuntimeError with its
-    traceback; one that calls _die ends this run the same way; one that is
-    killed (out of memory) raises RuntimeError and the others are stopped.
-    Close the generator (contextlib.closing) when you stop early."""
-    items = list(items)
-    if jobs <= 1 or len(items) <= 1:
-        for it in items:
-            yield fn(it)
-        return
-    tmp = tempfile.mkdtemp(prefix="partitor-")
-    running: dict[int, int] = {}          # pid -> item index
-    ended: dict[int, int] = {}            # item index -> wait status
-    nxt = ready = 0
-    # OpenCV's thread pool does not survive a fork: a child that meets a pool
-    # its parent had started waits for ever (seen: setNumThreads in the child,
-    # a menu session that analysed before it built). So the parent stops the
-    # pool here, before any fork, and starts it again at the end; the children
-    # work with one thread each.
-    threads = cv2.getNumThreads()
-    cv2.setNumThreads(1)
-    try:
-        sys.stdout.flush()
-        sys.stderr.flush()
-        while ready < len(items):
-            while nxt < len(items) and len(running) < jobs:
-                path = os.path.join(tmp, f"{nxt}.pkl")
-                try:
-                    pid = os.fork()
-                except OSError:
-                    if not running:
-                        raise
-                    break                  # no process free: wait for one to end
-                if pid == 0:               # child
-                    code = 1
-                    try:
-                        _child_run(fn, items[nxt], path)
-                        code = 0
-                    finally:
-                        os._exit(code)
-                running[pid] = nxt
-                nxt += 1
-            if ready not in ended:
-                pid, status = os.wait()
-                idx = running.pop(pid, None)
-                if idx is not None:
-                    ended[idx] = status
-                continue
-            status = ended.pop(ready)
-            path = os.path.join(tmp, f"{ready}.pkl")
-            if not os.path.exists(path):
-                raise RuntimeError(f"worker for item {ready + 1} of {len(items)} died: "
-                                   f"{_describe_exit(status)}")
-            with open(path, "rb") as f:
-                payload, text, counts, fails, warns = pickle.load(f)
-            os.unlink(path)
-            sys.stdout.write(text)
-            for k_, v_ in counts.items():
-                _counts[k_] += v_
-            _FAILURES.extend(fails)
-            _WARNINGS.extend(warns)
-            kind, val = payload
-            if kind == "exit":
-                raise SystemExit(val)
-            if kind == "error":
-                raise RuntimeError(f"worker for item {ready + 1} of {len(items)} failed:\n{val}")
-            ready += 1
-            yield val
-    finally:
-        for pid in list(running):
-            try:
-                os.kill(pid, signal.SIGKILL)
-                os.waitpid(pid, 0)
-            except OSError:
-                pass
-        shutil.rmtree(tmp, ignore_errors=True)
-        cv2.setNumThreads(threads)
-
-
-# =============================================================================
-# Part mapping (per system)
-# =============================================================================
-def build_reference(sysrecs: list[dict], parts: list[str]) -> tuple[list[str], list[str], dict]:
-    """build_reference -> (slot names, slot clefs, reference system record).
-
-    The reference is the system with the most printed labels, then the
-    most staves, then the first. Slot names come
-    from --parts (one per staff; a repeated name = a two-staff part), else
-    from its labels (a repeated label gets a number: two parts); an
-    unlabeled staff in the same brace as a labeled one takes that name
-    (a two-staff part); else "Staff N"."""
-    # the system with the most printed labels (page 1 names every part),
-    # then the most staves: a stray system with an extra staff (Biber p53,
-    # small systems joined) no longer names the parts (0.3.0-dev.21)
-    ref = max(sysrecs, key=lambda r: (sum(1 for x in r["labels"] if x.strip()),
-                                      len(r["staves"]), -sysrecs.index(r)))
-    n = len(ref["staves"])
-    if parts and len(parts) == n:
-        names = list(parts)
-    else:
-        names = [lbl.strip() for lbl in ref["labels"]]
-        # Two staves with the same printed label (e.g. "Basso Trombone" and
-        # "[Basso] Trombone") are two parts: number them.
-        seen: dict[str, int] = {}
-        for nm in names:
-            if nm:
-                seen[nm] = seen.get(nm, 0) + 1
-        count: dict[str, int] = {}
-        for i, nm in enumerate(names):
-            if nm and seen[nm] > 1:
-                count[nm] = count.get(nm, 0) + 1
-                names[i] = f"{nm} {count[nm]}"
-        for i, nm in enumerate(names):
-            if not nm and ref["braces"][i] >= 0:
-                for j, other in enumerate(names):
-                    if other and ref["braces"][j] == ref["braces"][i]:
-                        names[i] = other
-                        break
-        names = [nm if nm else f"Staff {i + 1}" for i, nm in enumerate(names)]
-    return names, list(ref["clefs"]), ref
-
-
-def map_system(rec: dict, slots: list[str], slot_clefs: list[str],
-               prev: list[int] | None, slot_braces: list[int] | None = None
-               ) -> tuple[list[int], float, float]:
-    """map_system -> (slot index per staff, best cost, second-best cost).
-
-    Tries every ordered subset of the reference slots (a reduced system
-    keeps score order). Cost per staff: label mismatch 2.0 (no label 0.3
-    plus 0.3 per position away from bottom alignment, at most 0.9:
-    continuo and bass sit at the bottom), clefs a hint (below), same
-    slot as the previous system -0.2; a part in the previous system -0.4
-    (also when the staff count changes; 0.3.0-dev.12); clef of another
-    family +0.8, another line of the same clef +0.3 (clefs are often
-    misread); a braced pair on slots not braced in the reference +1.0, the
-    reverse +0.2 (braces are often missed); when the reference's lowest
-    part is a continuo, a bottom staff on another part +1.0 and the
-    continuo on a higher staff +1.0 (0.3.0-dev.21)."""
-    n, m = len(rec["staves"]), len(slots)
-    if n > m:
-        return [], float("inf"), float("inf")
-    # the continuo (Continuo, Basso continuo, Organo, B.C.) is the lowest
-    # staff of a system (operator request 2026-10-25): the bottom staff takes it,
-    # no other staff does
-    cont = m - 1 if CONTINUO_RE.search(slots[-1] or "") else None
-    costs = []
-    for combo in itertools.combinations(range(m), n):
-        c = 0.0
-        if cont is not None:
-            if combo[-1] != cont:
-                c += 1.0
-            if cont in combo[:-1]:
-                c += 1.0
-        for k, j in enumerate(combo):
-            lbl = rec["labels"][k]
-            if lbl:
-                c += 0.0 if label_match(lbl, slots[j]) >= 0.7 else 2.0
-            else:
-                # bottom alignment, capped: in a short system it outweighed
-                # the labels below (Biber p46: violins above "Vla I")
-                c += 0.3 + min(0.9, 0.3 * abs((n - 1 - k) - (m - 1 - j)))
-            ck, cj = rec["clefs"][k], slot_clefs[j]
-            if not _clef_same(ck, cj):
-                # another clef family (G / C / F) weighs more than another
-                # line of the same clef (often a misread)
-                c += 0.8 if ck[:1] != cj[:1] else 0.3
-            if prev is not None:
-                if len(prev) == n and prev[k] == j:
-                    c -= 0.2
-                if j in prev:           # the part goes on from the system before
-                    c -= 0.4
-        # braces: two staves in one brace (keyboard, continuo) map to two
-        # slots in one brace of the reference, and the reverse (Schein Nun
-        # p3.s1: misread clefs took the braced continuo for two trombones)
-        rb = rec.get("braces") or []
-        if slot_braces and len(rb) == n:
-            for k in range(n - 1):
-                br = rb[k] >= 0 and rb[k] == rb[k + 1]
-                j1, j2 = combo[k], combo[k + 1]
-                bs = slot_braces[j1] >= 0 and slot_braces[j1] == slot_braces[j2]
-                if br and not bs:
-                    c += 1.0            # a brace found is a strong sign
-                elif bs and not br:
-                    c += 0.2            # a brace missed is common
-        costs.append((c, combo))
-    costs.sort(key=lambda t: t[0])
-    best = costs[0]
-    second = costs[1][0] if len(costs) > 1 else float("inf")
-    return list(best[1]), best[0], second
-
-
-def _clef_same(x: str, y: str) -> bool:
-    """Same clef for the mapping: '?' is any; G2 and G8 are one (the 8 is
-    often missed; Maria p3.s1 G2 after G8 asked again)."""
-    g = {"G2", "G8"}
-    return x == "?" or y == "?" or x == y or (x in g and y in g)
-
-
-def clefs_compatible(a: list[str], b: list[str]) -> bool:
-    """True when no staff has two different, both-read clefs ('?' = any)."""
-    return len(a) == len(b) and all(_clef_same(x, y) for x, y in zip(a, b))
-
-
-def assign_maps(sysrecs: list[dict], parts: list[str]) -> tuple[list[str], list[dict]]:
-    """assign_maps -> (part names in score order, system entries for the
-    layout). Uncertain systems get map '?' entries plus `suggest`."""
-    slots, slot_clefs, ref = build_reference(sysrecs, parts)
-    out = []
-    prev = None
-    prev_rec: dict | None = None
-    prev_certain = False
-    for rec in sysrecs:
-        n = len(rec["staves"])
-        entry = {"id": rec["id"], "staves": n}
-        same_as_prev = (prev_rec is not None and prev_certain and prev is not None
-                        and len(prev_rec["staves"]) == n
-                        and clefs_compatible(rec["clefs"], prev_rec["clefs"])
-                        and not any(rec["labels"]))
-        if rec is ref:
-            idx = list(range(n))
-            entry["map"] = [slots[j] for j in idx]
-            entry["why"] = "reference"
-        elif same_as_prev:
-            # continuity: same staff count, compatible clefs, no new labels
-            # (editions print a label when the part on a staff changes)
-            idx = list(prev)
-            entry["map"] = [slots[j] for j in idx]
-            entry["why"] = "same as previous system"
-        else:
-            idx, best, second = map_system(rec, slots, slot_clefs, prev,
-                                           ref.get("braces"))
-            if not idx:
-                entry["map"] = ["?"] * n
-                entry["why"] = f"more staves than the reference ({len(slots)})"
-                idx = None
-            else:
-                names = [slots[j] for j in idx]
-                labelled = [k for k, lb in enumerate(rec["labels"]) if lb]
-                all_match = bool(labelled) and all(
-                    label_match(rec["labels"][k], names[k]) >= 0.7 for k in labelled)
-                certain = (n == len(slots)) or (second - best >= 1.0) or \
-                          (all_match and second - best >= 0.25)
-                # the same parts as the certain system before (one clef
-                # misread breaks "same as previous"; Schein Nun p3, p6-p7)
-                goes_on = (not certain and prev_certain and prev is not None
-                           and idx == list(prev) and second - best >= 0.3)
-                if certain or goes_on:
-                    entry["map"] = names
-                    entry["why"] = ("continues previous system" if goes_on else
-                                    "labels/clefs" if any(rec["labels"]) else "clefs/order")
-                else:
-                    entry["map"] = ["?"] * n
-                    entry["suggest"] = names
-                    entry["why"] = f"uncertain (cost {best:.1f} vs {second:.1f})"
-        if rec["labels"] and any(rec["labels"]):
-            entry["labels"] = rec["labels"]
-        entry["clefs"] = rec["clefs"]
-        out.append(entry)
-        prev = idx
-        prev_rec = rec
-        prev_certain = idx is not None and "?" not in entry["map"]
-    return list(dict.fromkeys(slots)), out
-
-
-# =============================================================================
-# Bar numbers
-# =============================================================================
-def assign_bars(sysrecs: list[dict]) -> tuple[list[int], list[str], int]:
-    """assign_bars -> (first bar number per system, ids of systems whose
-    number differs from the plain count, number of printed numbers used).
-
-    Count: a system with m barlines (after its start) holds m bars (a bar
-    cut by the line break keeps its number). Numbering restarts at 1 at a
-    movement start. Printed numbers (anchors: bars before it in its
-    system, value) are trusted (misreads are filtered at detection): a
-    system starts at its first anchor's value minus the bars before it;
-    otherwise the count continues from the last anchor. An anchor more than
-    3 bars away from the count needs a second anchor that agrees. A first
-    anchor 1-3 bars below the count means a pickup bar: the systems before
-    it count back from it (movement start = bar 0)."""
-    changed: list[str] = []
-    used = 0
-    segs: list[list[int]] = []
-    for i, r in enumerate(sysrecs):
-        if not segs or r.get("restart"):
-            segs.append([i])
-        else:
-            segs[-1].append(i)
-    out = [0] * len(sysrecs)
-    for seg in segs:
-        nb = [sysrecs[i].get("nbars", 0) for i in seg]
-        anc = [sorted((a[0], a[1]) for a in sysrecs[i].get("anchors", [])) for i in seg]
-        # starts implied by each anchor, in order (system pos, start value)
-        implied = [(k, n - before) for k in range(len(seg)) for before, n in anc[k]]
-        used += len(implied)
-        starts: list[int | None] = [None] * len(seg)
-        proj: int = 1                       # next start from the count
-        plain = [1 + sum(nb[:k]) for k in range(len(seg))]
-        first_k = None
-        for k in range(len(seg)):
-            cand = None
-            for j, (kk, sv) in enumerate(implied):
-                if kk != k:
-                    continue
-                ok = abs(sv - proj) <= 3 or any(
-                    sv2 == sv + sum(nb[k:kk2]) for kk2, sv2 in implied[j + 1:])
-                if ok:
-                    cand = sv
-                    break
-            if cand is not None:
-                starts[k] = cand
-                first_k = k if first_k is None else first_k
-            else:
-                starts[k] = proj
-            # end of this system: from its last trusted anchor, else count
-            end = starts[k] + nb[k]
-            for before, n in anc[k][::-1]:
-                if abs((n - before) - starts[k]) <= 3:
-                    end = n - before + nb[k]
-                    break
-            proj = end
-        # a first printed number 1-3 bars below the count means a pickup
-        # bar: count back from it to the movement start (bar 0)
-        if first_k is not None and -3 <= starts[first_k] - plain[first_k] < 0:
-            for k in range(first_k - 1, -1, -1):
-                starts[k] = starts[k + 1] - nb[k]
-            starts[0] = max(0, min(1, starts[0]))
-        for k, i in enumerate(seg):
-            out[i] = int(starts[k])
-            if out[i] != plain[k]:
-                changed.append(sysrecs[i]["id"])
-    return out, changed, used
-
-
-PICKUP_SHORT = 0.4    # a first bar this many bars short is a pickup
-SPLIT_PART = 0.85     # each half of a split bar is at most this of a bar
-SPLIT_SUM = 1.35      # ... and both halves together at most this
-
-
-def _movements(systems: list[dict]) -> list[list[int]]:
-    segs: list[list[int]] = []
-    for i, r in enumerate(systems):
-        if not segs or r.get("restart"):
-            segs.append([i])
-        else:
-            segs[-1].append(i)
-    return segs
-
-
-def _flat_bars(systems: list[dict], seg: list[int]) -> list[tuple[int, int]]:
-    """Bars of one movement in order: (system index, bar index in system)."""
-    return [(k, i) for k in seg for i in range(int(systems[k].get("bars", 0) or 0))]
-
-
-def _boundaries(systems: list[dict], seg: list[int], flat: list[tuple[int, int]]) -> list[int]:
-    """Flat indices of the bars that follow a repeat sign (end or start)."""
-    pos = {fb: b for b, fb in enumerate(flat)}
-    out = set()
-    for k in seg:
-        nb = int(systems[k].get("bars", 0) or 0)
-        for idx, _kind in systems[k].get("repeats") or []:
-            j = int(idx) + 1                      # bar after the repeat barline
-            if j < nb:
-                b = pos.get((k, j))
-            else:                                 # first bar of the next system
-                nxt = [kk for kk in seg if kk > k]
-                b = pos.get((nxt[0], 0)) if nxt else None
-            if b is not None and 0 < b < len(flat):
-                out.add(b)
-    return sorted(out)
-
-
-def propose_bar_rules(systems: list[dict]) -> dict:
-    """propose_bar_rules -> {'pickup': [movement-first system ids],
-    'split': ['<system id>:<bar index>' of the bar that completes the bar
-    before a repeat]} from bar widths (DESIGN.md §4.2 item 7). A first bar
-    whose music is PICKUP_SHORT of a bar or more narrower than usual is a
-    pickup; two short bars around a repeat are one bar."""
-    rules: dict = {"pickup": [], "split": [], "fix": {}}
-    all_int = [w for r in systems for w in (r.get("widths") or [])[1:]]
-    if not all_int:
-        return rules
-    for seg in _movements(systems):
-        flat = _flat_bars(systems, seg)
-        if not flat:
-            continue
-        m_seg = float(np.median([w for k in seg for w in (systems[k].get("widths") or [])[1:]]
-                                or all_int))
-
-        def own(k: int) -> float | None:
-            inner = (systems[k].get("widths") or [])[1:]
-            return float(np.median(inner)) if inner else None
-
-        def typical(k: int) -> float:
-            """A full bar in line k. Lines are justified, so spacing differs
-            per line: the line's own median from 3 inner bars; with 1-2 the
-            mean (geometric) of the line's and the movement's median, so one
-            unusually wide bar does not decide alone."""
-            inner = (systems[k].get("widths") or [])[1:]
-            if len(inner) >= 3:
-                return float(np.median(inner))
-            return float(np.sqrt(own(k) * m_seg)) if inner else m_seg
-
-        # clef + key (+ time) width: first bar minus the line's own median
-        # bar, over the lines that do not start the movement
-        def pre_of(ks) -> list[float]:
-            return [systems[k]["widths"][0] - own(k) for k in ks
-                    if systems[k].get("widths") and own(k) is not None]
-        pre = pre_of(seg[1:]) or pre_of([k for k in range(len(systems)) if k not in seg[:1]])
-        if not pre:
-            continue
-        prefix = max(0.0, float(np.median(pre)))
-
-        def content(k: int, i: int) -> float:
-            w = (systems[k].get("widths") or [])[i]
-            return ((w - prefix) if i == 0 else w) / typical(k)
-
-        k0 = seg[0]
-        if systems[k0].get("widths") and content(k0, 0) <= 1.0 - PICKUP_SHORT:
-            rules["pickup"].append(systems[k0]["id"])
-        for b in _boundaries(systems, seg, flat):
-            before, after = content(*flat[b - 1]), content(*flat[b])
-            if before <= SPLIT_PART and after <= SPLIT_PART and before + after <= SPLIT_SUM:
-                k, i = flat[b]
-                rules["split"].append(f"{systems[k]['id']}:{i}")
-    return rules
-
-
-def number_bars(systems: list[dict], rules: dict | None) -> tuple[list[int], dict, str]:
-    """number_bars -> (first bar number per system, rehearsal marks
-    {system id: [[bar index, letter], ...]}, anchor scheme).
-
-    Without rules: assign_bars (plain count, printed numbers). With rules:
-    a pickup is bar 0; the bar that completes a split bar keeps the number
-    of the bar before it; endings count on (each printed bar its own
-    number). Printed numbers that follow the plain count ('naive' source)
-    are converted; numbers that already follow these rules ('standard')
-    are used as they are. `fix` {system id: n} sets a system's first bar;
-    the systems after it in the movement follow. Marks: A, B, ... per
-    movement at the first full bar after each repeat."""
-    rules = rules or {}
-    pick = set(rules.get("pickup") or [])
-    split = set(rules.get("split") or [])
-    fix = {str(k): int(v) for k, v in (rules.get("fix") or {}).items()}
-    marks: dict[str, list[list]] = {}
-    scheme = "none"
-    if not pick and not split:
-        recs = [{**e, "nbars": int(e.get("bars", e.get("nbars", 0)) or 0),
-                 "anchors": [(int(x[0]), int(x[1])) for x in e.get("anchors") or []]}
-                for e in systems]
-        starts = assign_bars(recs)[0]
-    else:
-        starts = [0] * len(systems)
-        cn = cs = 0
-        per_seg = []
-        for seg in _movements(systems):
-            flat = _flat_bars(systems, seg)
-            off, o = [], 1 if systems[seg[0]]["id"] in pick else 0
-            for b, (k, i) in enumerate(flat):
-                if b > 0 and f"{systems[k]['id']}:{i}" in split:
-                    o += 1
-                off.append(o)
-            first = {k: next((b for b, (kk, _) in enumerate(flat) if kk == k), None) for k in seg}
-            anc = []
-            for k in seg:
-                for a in systems[k].get("anchors") or []:
-                    b = (first[k] or 0) + int(a[0])
-                    if first[k] is not None and b < len(flat):
-                        anc.append((b, int(a[1])))
-                        cn += int(a[1]) == b + 1
-                        cs += int(a[1]) == b + 1 - off[b]
-            per_seg.append((seg, flat, off, first, anc))
-        scheme = "standard" if cs > cn else "naive"
-        for seg, flat, off, first, anc in per_seg:
-            num = [b + 1 - off[b] for b in range(len(flat))]
-            # printed numbers resync the count from their system on
-            shifts = []
-            for b, n in sorted(anc):
-                want = n if scheme == "standard" else n - off[b]
-                shifts.append((flat[b][0], want - num[b]))
-            for k in seg:
-                if first[k] is None:
-                    starts[k] = starts[k - 1] if k else 0
-                    continue
-                sh = 0
-                for kk, d in shifts:
-                    if kk <= k and abs(d) <= 3:
-                        sh = d
-                starts[k] = num[first[k]] + sh
-            # rehearsal letters
-            letter = 0
-            used = set()
-            for b in _boundaries(systems, seg, flat):
-                k, i = flat[b]
-                if f"{systems[k]['id']}:{i}" in split:
-                    b += 1
-                if b >= len(flat) or b in used:
-                    continue
-                used.add(b)
-                k, i = flat[b]
-                marks.setdefault(systems[k]["id"], []).append([i, chr(ord("A") + letter % 26)])
-                letter += 1
-    if fix:
-        for seg in _movements(systems):
-            delta = 0
-            for k in seg:
-                sid = systems[k]["id"]
-                if sid in fix:
-                    delta = fix[sid] - starts[k]
-                starts[k] += delta
-    if not pick and not split:
-        for seg in _movements(systems):        # letters without bar rules
-            flat = _flat_bars(systems, seg)
-            for n_, b in enumerate(_boundaries(systems, seg, flat)):
-                k, i = flat[b]
-                marks.setdefault(systems[k]["id"], []).append([i, chr(ord("A") + n_ % 26)])
-    return [int(x) for x in starts], marks, scheme
-
-
-def bar_numbers(systems: list[dict], starts: list[int], rules: dict | None
-                ) -> list[list[int]]:
-    """Number of every bar of every system: the system's first bar number,
-    +1 per bar, except a bar that completes a split bar (keeps the number
-    of the bar before it). Used by re-flow for the new line starts."""
-    split = set((rules or {}).get("split") or [])
-    out = []
-    for e, st in zip(systems, starts):
-        nums, n = [], int(st)
-        for i in range(int(e.get("bars", 0) or 0)):
-            if i > 0 and f"{e['id']}:{i}" not in split:
-                n += 1
-            nums.append(n)
-        out.append(nums)
-    return out
-
-
-def mark_items(items) -> tuple[set[int], set[tuple[str, int]]]:
-    """mark_items -> (bar numbers, {(system id, bar index)}) of a marks_add /
-    marks_drop list. An entry is a bar number (12) or '<system id>:<bar
-    index>' ('p8.s1:0': that very bar, index from 0); unreadable entries
-    are left out."""
-    nums: set[int] = set()
-    spots: set[tuple[str, int]] = set()
-    for x in items or []:
-        if isinstance(x, int):
-            nums.add(x)
-            continue
-        t = str(x).strip()
-        if t.lstrip("-").isdigit():
-            nums.add(int(t))
-        elif ":" in t and t.rsplit(":", 1)[1].isdigit():
-            spots.add((t.rsplit(":", 1)[0], int(t.rsplit(":", 1)[1])))
-    return nums, spots
-
-
-def apply_mark_rules(systems: list[dict], marks: dict, nums: list[list[int]],
-                     rules: dict | None) -> dict:
-    """apply_mark_rules -> marks with the operator's changes: bar_rules
-    marks_add (a bar number: a mark at the first bar with that number; or
-    '<system id>:<bar index>': a mark at that bar, for a number two bars
-    share) and marks_drop (the same forms: no mark there). All marks of a
-    movement are then lettered A, B, ... in bar order, so a mark added
-    between two others moves the letters after it on."""
-    add_n, add_p = mark_items((rules or {}).get("marks_add"))
-    drop_n, drop_p = mark_items((rules or {}).get("marks_drop"))
-    if not (add_n or add_p or drop_n or drop_p):
-        return marks
-    pos: set[tuple[int, int]] = set()
-    for k, e in enumerate(systems):
-        for i, _ in marks.get(e["id"]) or []:
-            if i < len(nums[k]) and nums[k][i] not in drop_n and (e["id"], int(i)) not in drop_p:
-                pos.add((k, int(i)))
-    for b in sorted(add_n):
-        hit = next(((k, i) for k in range(len(systems))
-                    for i, n in enumerate(nums[k]) if n == b), None)
-        if hit is not None:
-            pos.add(hit)
-    index = {e["id"]: k for k, e in enumerate(systems)}
-    for sid, i in sorted(add_p):
-        k = index.get(sid)
-        if k is not None and i < len(nums[k]):
-            pos.add((k, i))
-    out: dict[str, list[list]] = {}
-    for seg in _movements(systems):
-        for n_, (k, i) in enumerate(sorted(p for p in pos if p[0] in seg)):
-            out.setdefault(systems[k]["id"], []).append([i, chr(ord("A") + n_ % 26)])
-    return out
-
-
-def mark_bars(systems: list[dict]) -> list[int]:
-    """mark_bars -> bar numbers that carry a rehearsal mark (after renumber)."""
-    return [int(e["bar_nums"][m[0]]) for e in systems for m in e.get("marks") or []
-            if m[0] < len(e.get("bar_nums") or [])]
-
-
-def _mark_sorted(items: list) -> list:
-    """Bar numbers first (ascending), then 'id:index' entries, for the yaml."""
-    return sorted(items, key=lambda x: (isinstance(x, str), x if isinstance(x, str) else int(x)))
-
-
-def toggle_mark(rules: dict, systems: list[dict], bar) -> str:
-    """toggle_mark -> 'added' or 'removed': a mark at bar on or off in
-    rules (marks_add / marks_drop). bar: a bar number, or a tuple (system
-    id, bar index from 0) for one bar of two that share a number.
-    systems: renumbered with rules. ValueError when there is no such bar."""
-    add = list(rules.get("marks_add") or [])
-    drop = list(rules.get("marks_drop") or [])
-    if isinstance(bar, tuple):
-        sid, i = bar
-        key = f"{sid}:{i}"
-        e = next((e for e in systems if e["id"] == sid), None)
-        if e is None or not 0 <= i < len(e.get("bar_nums") or []):
-            raise ValueError(f"no bar {i + 1} in {sid}")
-        if any(m[0] == i for m in e.get("marks") or []):
-            if key in add:
-                add.remove(key)
-            else:
-                drop.append(key)
-            done = "removed"
-        else:
-            if key in drop:
-                drop.remove(key)
-            else:
-                add.append(key)
-            done = "added"
-    else:
-        if bar in mark_bars(systems):
-            if bar in add:
-                add.remove(bar)
-            else:
-                drop.append(bar)
-            done = "removed"
-        else:
-            if not any(bar in (e.get("bar_nums") or []) for e in systems):
-                raise ValueError(f"no bar {bar}")
-            if bar in drop:
-                drop.remove(bar)
-            else:
-                add.append(bar)
-            done = "added"
-    rules["marks_add"], rules["marks_drop"] = _mark_sorted(add), _mark_sorted(drop)
-    for k in ("marks_add", "marks_drop"):
-        if not rules[k]:
-            rules.pop(k)
-    return done
-
-
-# ── Bar edits: the operator corrects a misread barline (bar_rules.bar_edits) ─
-# One string per edit, applied in order to the detected barlines of a line:
-#   "<system id>:j<N>/<R>"        join bar N with the next one (a false barline)
-#   "<system id>:a<N>@<P>/<R>"    add a barline in bar N at P % of its width
-#                                 (a missed barline)
-# N counts the bars of the line from 1 as they stand when the edit is made;
-# R is the number of bars detected in the line when the edit was made. An
-# edit whose R no longer fits (the line was detected again, the engine
-# changed) is skipped with a warning: it would mend a bar that is right.
-BAR_EDIT_RE = re.compile(r"^(?P<sid>[^:]+):(?P<op>[ja])(?P<n>\d+)(?:@(?P<pct>\d+))?/(?P<raw>\d+)$")
-
-
-def parse_bar_edit(text: str) -> dict | None:
-    """parse_bar_edit 'p4.s1:j1/3' -> {sid, op, n, pct, raw, text}, or None."""
-    m = BAR_EDIT_RE.match(str(text).strip())
-    if not m:
-        return None
-    pct = int(m.group("pct")) if m.group("pct") else None
-    if (m.group("op") == "a") != (pct is not None):
-        return None
-    return {"sid": m.group("sid"), "op": m.group("op"), "n": int(m.group("n")),
-            "pct": pct, "raw": int(m.group("raw")), "text": str(text).strip()}
-
-
-def format_bar_edit(sid: str, op: str, n: int, raw: int, pct: int | None = None) -> str:
-    return f"{sid}:{op}{n}" + (f"@{pct}" if op == "a" else "") + f"/{raw}"
-
-
-def bar_edits_by_system(rules: dict | None) -> dict[str, list[dict]]:
-    """bar_edits_by_system -> {system id: [edit, ...]} in order; unreadable
-    strings are left out."""
-    out: dict[str, list[dict]] = {}
-    for t in (rules or {}).get("bar_edits") or []:
-        ed = parse_bar_edit(t)
-        if ed:
-            out.setdefault(ed["sid"], []).append(ed)
-    return out
-
-
-def edit_bars(e: dict, edits: list[dict]) -> tuple[dict, list[str]]:
-    """edit_bars -> (copy of the system entry with its bars, widths,
-    anchors and repeats edited, notes of edits not applied)."""
-    out = dict(e)
-    notes: list[str] = []
-    if not edits:
-        return out, notes
-    raw = int(e.get("bars", e.get("nbars", 0)) or 0)
-    widths = [float(w) for w in e.get("widths") or []]
-    if len(widths) != raw:
-        widths = []
-    anchors = [(int(a[0]), int(a[1])) for a in e.get("anchors") or []]
-    repeats = [(int(r[0]), r[1]) for r in e.get("repeats") or []]
-    nb = raw
-    for ed in edits:
-        if ed["raw"] != raw:
-            notes.append(f"{e.get('id')}: edit {ed['text']} not applied: the line has {raw} "
-                         f"bar(s) now, it had {ed['raw']}")
-            continue
-        n = ed["n"]
-        if ed["op"] == "j":
-            if not 1 <= n <= nb - 1:
-                notes.append(f"{e.get('id')}: edit {ed['text']} not applied: no bar {n} "
-                             f"with a bar after it")
-                continue
-            d = n - 1                                   # the barline between bar n, n+1
-            if widths:
-                widths[d:d + 2] = [widths[d] + widths[d + 1]]
-            anchors = [(b if b <= d else b - 1, v) for b, v in anchors]
-            stub = [(-1, k) for x, k in repeats if x == d == 0 and k == "start"]
-            repeats = sorted([(x if x < d else x - 1, k) for x, k in repeats if x != d] + stub)
-            nb -= 1
-        else:
-            if not 1 <= n <= nb or not 5 <= ed["pct"] <= 95:
-                notes.append(f"{e.get('id')}: edit {ed['text']} not applied: no bar {n}, "
-                             "or a place outside 5-95 %")
-                continue
-            b, pc = n - 1, ed["pct"] / 100.0
-            if widths:
-                w = widths[b]
-                widths[b:b + 1] = [w * pc, w * (1 - pc)]
-            anchors = [(bb if bb <= b else bb + 1, v) for bb, v in anchors]
-            repeats = [(x if x < b else x + 1, k) for x, k in repeats]
-            nb += 1
-    out["bars"] = nb
-    if "nbars" in out:
-        out["nbars"] = nb
-    if widths or "widths" in e:
-        out["widths"] = [round(w, 2) for w in widths] if widths else list(e.get("widths") or [])
-    if e.get("anchors") is not None:
-        out["anchors"] = [[b, v] for b, v in anchors]
-    if e.get("repeats") is not None:
-        out["repeats"] = [[x, k] for x, k in repeats]
-    return out, notes
-
-
-def effective_systems(systems: list[dict], rules: dict | None,
-                      notes: list[str] | None = None) -> list[dict]:
-    """effective_systems -> the systems with the operator's bar edits applied
-    (copies; the stored detection stays as detected)."""
-    by = bar_edits_by_system(rules)
-    if not by:
-        return list(systems)
-    out = []
-    for e in systems:
-        ne, nt = edit_bars(e, by.get(e["id"], []))
-        out.append(ne)
-        if notes is not None:
-            notes.extend(nt)
-    return out
-
-
-def edit_barlines(edits: list[dict], barlines: list[int], x0: int,
-                  repeats: list | None = None, mensur: list | None = None
-                  ) -> tuple[list[int], list, list, list[str]]:
-    """edit_barlines -> (barlines, repeats, mensur, notes) of one system
-    with the same edits as edit_bars applied to the detected positions.
-    x0: where the system's staves start (the left edge of bar 1)."""
-    bl = [int(x) for x in barlines]
-    rp = [(int(r[0]), r[1]) for r in repeats or []]
-    mn = [int(x) for x in mensur or []]
-    notes: list[str] = []
-    raw = len(bl)
-    for ed in edits:
-        if ed["raw"] != raw:
-            notes.append(f"{ed['sid']}: edit {ed['text']} not applied: the line has {raw} "
-                         f"bar(s) now, it had {ed['raw']}")
-            continue
-        n = ed["n"]
-        if ed["op"] == "j":
-            if not 1 <= n <= len(bl) - 1:
-                continue
-            d = n - 1
-            x = bl.pop(d)
-            mn = [m for m in mn if m != x]
-            stub = [(-1, k) for i, k in rp if i == d == 0 and k == "start"]
-            rp = sorted([(i if i < d else i - 1, k) for i, k in rp if i != d] + stub)
-        else:
-            if not 1 <= n <= len(bl) or not 5 <= ed["pct"] <= 95:
-                continue
-            b = n - 1
-            left = bl[b - 1] if b > 0 else int(x0)
-            bl.insert(b, int(round(left + ed["pct"] / 100.0 * (bl[b] - left))))
-            rp = [(i if i < b else i + 1, k) for i, k in rp]
-    return bl, [[i, k] for i, k in rp], mn, notes
-
-
-def bar_mismatches(systems: list[dict], rules: dict | None) -> list[dict]:
-    """bar_mismatches -> the places where the printed bar numbers of the
-    source disagree with the count of barlines: [{id, prev, counted,
-    printed, key}], one per change of the difference. systems: effective.
-    Movements with a pickup or split bar rule are left out (their numbers
-    differ from the count on purpose). Answers already given
-    (bar_rules.bars_ack, the key of each) are left out."""
-    rules = rules or {}
-    pick = set(rules.get("pickup") or [])
-    split = {str(k).split(":")[0] for k in rules.get("split") or []}
-    recs = [{**e, "nbars": int(e.get("bars", e.get("nbars", 0)) or 0),
-             "anchors": [(int(x[0]), int(x[1])) for x in e.get("anchors") or []]}
-            for e in systems]
-    ack = set(rules.get("bars_ack") or [])
-    out: list[dict] = []
-    starts = assign_bars(recs)[0] if recs else []
-    for seg in _movements(systems):
-        if any(systems[k]["id"] in pick or systems[k]["id"] in split for k in seg):
-            continue
-        plain, delta = 1, 0
-        for j, k in enumerate(seg):
-            d = int(starts[k]) - plain
-            if d != delta:
-                m = {"id": systems[k]["id"], "prev": systems[seg[j - 1]]["id"] if j else None,
-                     "counted": plain, "printed": int(starts[k])}
-                m["key"] = f"{m['id']}:{m['counted']}:{m['printed']}"
-                if m["key"] not in ack:
-                    out.append(m)
-                delta = d
-            plain += recs[k]["nbars"]
-    return out
-
-
-def mismatch_text(m: dict) -> str:
-    where = f" (after {m['prev']})" if m.get("prev") else ""
-    return (f"{m['id']}{where}: the barlines count bar {m['counted']}, the printed "
-            f"numbers of the source say bar {m['printed']}")
-
-
-def renumber(lay: dict) -> str:
-    """Set `bar` and `marks` of every system in a layout from its stored
-    widths, repeats, anchors and `bar_rules` (with the bar edits applied).
-    Returns the anchor scheme."""
-    systems = lay.get("systems") or []
-    eff = effective_systems(systems, lay.get("bar_rules"))
-    starts, marks, scheme = number_bars(eff, lay.get("bar_rules"))
-    nums = bar_numbers(eff, starts, lay.get("bar_rules"))
-    marks = apply_mark_rules(eff, marks, nums, lay.get("bar_rules"))
-    for e, b, bn in zip(systems, starts, nums):
-        e["bar"] = b
-        e["bar_nums"] = bn
-        m = marks.get(e["id"])
-        if m:
-            e["marks"] = m
-        else:
-            e.pop("marks", None)
-    return scheme
-
-
 # =============================================================================
 # Preview
 # =============================================================================
@@ -4049,141 +2879,6 @@ def write_preview_index(pdir: Path, items: list[str], pdfname: str) -> Path:
         "discarded (light grey = noise / page edge). Red box = check by eye. "
         "Red band = safety gate failure.</p>" + "".join(items), encoding="utf-8")
     return idx
-
-
-# =============================================================================
-# Layout file
-# =============================================================================
-LAYOUT_HELP = """\
-# partitor layout file. Edit, then run: partitor build <score.pdf>
-# page_header_sp: text above a page's first staff farther than this (staff
-#   spaces) is discarded (page title, running header); nearer text (movement
-#   title) is copied to every part. Change it, then run detect --force.
-# systems[].map: part per staff, top first. A part name twice = a two-staff
-#   part. '-' drops a staff. '?' must be replaced before build; `suggest`
-#   holds the best guess (copy it to `map` if it is right).
-# systems[].bar: number of the first bar of the system (counted from the
-#   barlines, checked against printed numbers). Computed: to correct it,
-#   use bar_rules (below), not this value.
-# layout: settings for build; command-line options override them. Keys left
-#   out take the built-in default, so new defaults reach old layouts. Keys
-#   (default; build option):
-#   paper: letter | a4 | ledger (letter; --paper). ledger = 17 x 11 in
-#     landscape, no large-print copy; the staff is chosen
-#     as large as possible first (pages and page turns follow)
-#   gap: staff spaces between staves, the widest leading (10; --gap)
-#   gap_min: smallest leading to save a page turn (7; --min-gap)
-#   clearance: least space between ink of two lines, sp (1; --clearance)
-#   scale: largest size, 1 = source size (none: up to max_staff_mm; --scale)
-#   max_staff_mm: largest staff height (8; --max-staff-mm)
-#   turns: any | rest (any; per part; `repage` sets rest). rest = a page turn
-#     falls only beside a multi-bar rest line (the player rests); a turn
-#     elsewhere is a warning, except a movement start when no rest is near (a
-#     note: it may be attacca). any = also at a movement start or a letter.
-#   breaks: per part, bar numbers after which a page ends (none; `set ID
-#     "Trombones:breaks=45,60"`, `+45` add, `-45` drop, `none`). A line must
-#     end at the bar; lines are never cut.
-#   group_gap: space between the staves of a group score line, or of a part on
-#     two staves, bottom line to top line, staff spaces (source: the distance
-#     of the source score; 1-40; `set ID "Trombones:group_gap=5"`)
-#   reflow: off | on (experimental, on hold; for a larger staff use
-#     paper ledger); on = new lines cut at barlines (clef and key copied),
-#     for a staff up to max_staff_mm when the source line width keeps it
-#     small; more pages (a group: at most 1.5 x the pages without re-flow
-#     when pages=auto). The CLI offers it (off; --reflow)
-#   rests: compress | keep; compress = empty staves become multi-bar rests
-#     (compress; --rests)
-#   title_page: auto | off; auto = a title page for 3+ pages of music
-#     printed double-sided (auto; --title-page)
-#   logo: on | off; the logo (PARTITOR_LOGO) on the first page and the back page
-#     (on; `set ID logo=off`)
-#   min_staff_mm: smallest staff height (5; --min-staff-mm)
-#   page_count: force this many pages (none; --page-count)
-#   margin_top, margin_bottom, margin_side: mm (15, 15, 15; --margin-top,
-#     --margin-bottom, --margin-side)
-#   gutter: mm added at the spine in double-sided print and taken from
-#     the outer margin (5; --gutter)
-#   duplex: auto | on | off; auto = double-sided when over 2 pages
-#     (auto; --duplex)
-#   bar_numbers: start | none (start; --bar-numbers)
-#   bar_raise: least height of a bar number baseline above the staff, sp;
-#     a number also clears the clef by 0.5 sp (1; --bar-raise)
-#   bar_size: bar number size, sp (2; --bar-size)
-#   ink: normal | darker (normal; --ink)
-#   large: on | off; on = also a large-print copy per part: Letter -> 11x17
-#     with crop marks at the cut line, A4 -> A3 (on; --large)
-#   small_mm: below this staff height (held by the source line width) the
-#     CLI offers re-flow (6.5), when reflow_offer is on
-#   reflow_offer: on | off; off = no re-flow question after a build and no
-#     small-print note (off: re-flow is on hold; `set ID reflow_offer=on`)
-#   parts: {part or group: {key: value}}: layout of one part over the
-#     values above (pages, gap, scale, reflow, ...); set with
-#     partitor set <id> "Continuo:pages=4" or expand/contract <id> <part>
-# skip: parts not extracted (no PDF); they stay in parts and in the maps.
-# groups: {name: [parts]}: group scores; the staves of the parts printed
-#   together, joined by a bracket, one more PDF per group.
-# bar_rules: pickup (movement-first system ids: first bar is bar 0), split
-#   ('<system id>:<bar index>': that bar completes the bar before it and
-#   keeps its number), fix ({system id: first bar}); bar and marks
-#   (rehearsal letters) of every system follow from them at build.
-#   marks_add / marks_drop: with / without a rehearsal mark: a bar number
-#   (the first bar with that number) or '<system id>:<bar index>' (that bar,
-#   index from 0, for a number two bars share); added to / taken from the
-#   marks found after repeats; the marks of a movement are lettered A, B,
-#   ... in bar order. A split may stand at any bar (a bar cut by a line
-#   break, a repeat sign or a change of mensuration).
-#   bar_edits: mend a misread barline, one string per edit, applied in order
-#   to the detected barlines of a line. "<system id>:j<N>/<R>" joins bar N
-#   with the next (a false barline); "<system id>:a<N>@<P>/<R>" adds a
-#   barline in bar N at P % of its width (a missed barline). R = bars
-#   detected in the line when the edit was made (a join of a clef stub keeps
-#   its repeat start, stored as repeats [-1, start]); an edit is skipped (and
-#   warned) when the line has another number of bars after a new analysis.
-#   Set with partitor bars <id> (j, a, u). bars_ack: printed bar numbers
-#   the operator kept where they differ from the barline count (k).
-#   bar_rules_status: proposed (by detect) or confirmed (by the CLI).
-"""
-
-
-# =============================================================================
-# Strips
-# =============================================================================
-@dataclass
-class Strip:
-    img: np.ndarray       # bool ink, cropped
-    staff_x0: int         # x of staff start inside img
-    staff_top: int        # row of first staff line inside img
-    staff_bottom: int     # row of last staff line inside img
-    sp: float
-    hdr: np.ndarray       # bool, header part of img (same shape)
-    bar_no: int | None = None   # number printed at the line start
-    bar_raise: float = 1.0      # least baseline height above the staff, sp
-    bar_size: float = 2.0       # number size, sp
-    marks: list = field(default_factory=list)   # [(x in img, letter)] rehearsal marks
-    movement: bool = False      # starts a movement (extra space above)
-    bracket: bool = False       # group score: draw a bracket at the left
-    bars_x: list = field(default_factory=list)   # barline x in img (re-flow)
-    bar_nums: list = field(default_factory=list) # number of each bar
-    ends_at_bar: bool = False   # the line ends at a barline (re-flow may cut it)
-    bars_why: str = ""          # why a group line has no barline to cut at (report)
-    end_gap_sp: float = -1.0    # staff end minus last barline, in sp (-1: no barline)
-    num_mask: np.ndarray | None = None  # ink of printed mid-line bar numbers (same shape)
-    rest_label: tuple | None = None     # (x centre in img, text): multi-bar rest count
-    rest_src: tuple | None = None       # (src, cw, RestRun): to rebuild at another width
-    indent: int = 0             # px left of the staff start kept free (first line, labels)
-    name_label: str | None = None       # full part name in the indent (small caps)
-    staff_labels: list = field(default_factory=list)  # [(name, top row, bottom row)] group staves
-    ambitus_marks: list = field(default_factory=list)  # [(x left, bottom-line row, clef, lo, hi, lo alt, hi alt)]
-
-
-@dataclass
-class RestRun:
-    """Bars of a part in systems where the source prints no staff for it
-    (the part rests). Becomes a multi-bar rest line (make_rest_strip)."""
-    bars: int
-    first: int | None            # number of the first bar (None: unknown)
-    movement: bool = False       # the run starts a movement
-    header: tuple | None = None  # (bool img, dx from staff start, gap above staff), movement title
 
 
 def make_strip(res: PageResult, st_idx: list[int], header_owner: int,
@@ -5340,23 +4035,10 @@ def fill_rests(items: list, opts: dict) -> list[Strip]:
 # (width, height) in pt, as the sheet is printed. ledger = 17 x 11 in,
 # landscape (0.3.0-dev.35): the same height as Letter, 2.2 x the line width.
 PAPER = {"a4": (595.28, 841.89), "letter": (612.0, 792.0), "ledger": (1224.0, 792.0)}
-# Layout defaults (layout.yaml `layout:`; build options override). gap and
-# gap_min in staff spaces between one staff's bottom line and the next
-# staff's top line. Starting values, to be set from printed test pages.
-LAYOUT_DEFAULTS = {"paper": "letter", "scale": None, "gap": 10.0, "gap_min": 7.0,
-                   "clearance": 1.0, "page_count": None, "min_staff_mm": 5.0,
-                   "ink": "normal", "bar_numbers": "start",
-                   "margin_top": 15.0, "margin_bottom": 15.0, "margin_side": 15.0,
-                   "gutter": 5.0, "duplex": "auto",
-                   "bar_raise": 1.0, "bar_size": 2.0, "large": "on", "logo": "on",
-                   "title_page": "auto", "reflow": "off", "rests": "compress", "max_staff_mm": 8.0,
-                   "small_mm": 6.5, "group_gap": None, "reflow_offer": "off",
-                   "turns": "any", "breaks": None}
 MARGIN = 42.5        # pt (15 mm), default margin (tests)
 MIN_MARGIN_MM = 5.0  # no margin below this (printer edge)
 TITLE_BAND = 85.0    # pt, page 1
 RUN_HEAD = 22.0      # pt, later pages
-HEADER_CLEAR_SP = 2.5  # min clearance above header ink (staff spaces)
 
 
 def _profiles_cached(s: Strip, nbins: int) -> tuple:
@@ -5366,9 +4048,7 @@ def _profiles_cached(s: Strip, nbins: int) -> tuple:
 
 
 GROUP_REFLOW_PAGES = 1.5  # group re-flow, pages=auto: page budget / pages without re-flow
-SYSTEM_GAP_FACTOR = 1.5   # group score: gap between systems / gap between its staves
 SYSTEM_GAP_LAST = 2.0     # the same on a last page with room to spare
-SYSTEM_CLEAR_SP = 3.0     # group score: least ink distance between systems (sp)
 
 
 def pitches(strips: list[Strip], opts: dict) -> list[float]:
@@ -5526,7 +4206,7 @@ def choose_layout(strips: list[Strip], dpi: int, opts: dict
                     return sc, float(g), n
         sc, g = scales[-1], gaps[-1]
         return sc, float(g), npages(sc, g)
-    if opts["paper"] in SIZE_FIRST:
+    if opts["paper"] in config.SIZE_FIRST:
         # ledger (0.3.0-dev.36; operator request 2026-10-27): the staff is as large as
         # the page width and max_staff_mm allow; pages and turns follow
         sc = scales[0]
@@ -5635,64 +4315,6 @@ def large_copy(src: Path, paper: str) -> Path:
 
 
 LAST_RENDER: dict = {}      # content pages and title page of the last render_part
-
-# ── Typography (DESIGN.md §5.5): EB Garamond (OFL), embedded ──────────────
-FONT_FILES = {"regular": ("EBGaramond-Regular.ttf", "tiro"),
-              "italic": ("EBGaramond-Italic.ttf", "tiit"),
-              "bold": ("EBGaramond-SemiBold.ttf", "tibo"),
-              # Bravura (SMuFL, OFL): time-signature digits for multi-bar
-              # rest counts, as engravers set them
-              "music": ("Bravura.otf", "tibo")}
-_FONTS: dict[str, tuple[str, str | None, object]] = {}
-
-
-def font_dirs() -> list[Path]:
-    """Where the fonts are: PARTITOR_FONTS, share/fonts of the repo this
-    script belongs to (clone, tests), /opt/partitor/fonts, the fonts/ folder
-    next to this script."""
-    out = []
-    if os.environ.get("PARTITOR_FONTS"):
-        out.append(Path(os.environ["PARTITOR_FONTS"]))
-    here = Path(__file__).resolve().parent
-    out += [here.parent / "share" / "fonts", Path("/opt/partitor/fonts"), here / "fonts"]
-    return out
-
-
-def _font(kind: str) -> tuple[str, str | None, object]:
-    """_font -> (fontname for insert_text, fontfile or None, measurer).
-    Falls back to the built-in Times when the TTF is not found."""
-    if kind not in _FONTS:
-        fname, base = FONT_FILES[kind]
-        path = next((d / fname for d in font_dirs() if (d / fname).is_file()), None)
-        if path is not None:
-            _FONTS[kind] = (f"pt-{kind}", str(path), pymupdf.Font(fontfile=str(path)))
-        else:
-            _FONTS[kind] = (base, None, pymupdf.Font(base))
-    return _FONTS[kind]
-
-
-def text_len(text: str, kind: str, size: float) -> float:
-    return _font(kind)[2].text_length(text, fontsize=size)
-
-
-def put_text(page: pymupdf.Page, xy: tuple[float, float], text: str, kind: str,
-             size: float) -> None:
-    name, file, _ = _font(kind)
-    if file:
-        page.insert_text(xy, text, fontsize=size, fontname=name, fontfile=file)
-    else:
-        page.insert_text(xy, text, fontsize=size, fontname=name)
-
-
-TURN_BAD = 100.0        # a page turn that does not fall at a section boundary
-PAGE_COST = 30.0        # each page of music
-SHORT_LAST = 50.0       # last page with fewer than MIN_LAST_LINES lines
-FILL_COST = 10.0        # unfilled share of a page (squared), pages before the last
-# turns=rest (0.3.0-dev.37, `repage`): the player turns only while resting.
-TURN_HARD = 1000.0      # a turn while playing (always worse than any other cost)
-TURN_MOVE = 150.0       # turns=rest: a turn at a movement start, no rest (not always attacca)
-REPAGE_FILL = 40.0      # unfilled share of a page (squared); medium weight
-REST_TURN_MIN = 2       # a rest turn: a multi-bar rest of at least this many bars
 
 
 def rest_turn(strips: list[Strip], j: int) -> bool:
@@ -5890,7 +4512,6 @@ def layout_pages(strips: list[Strip], dpi: int, opts: dict
 
 
 AMB_HEAD = 0.8         # ambitus notehead size, share of a normal head (cue size)
-AMB_SP = 3.4            # ambitus staff space, pt (staff 13.6 pt = 4.8 mm high)
 CLEF_LINE = {"G": 2, "C": 3, "F": 4}
 
 
@@ -6201,14 +4822,13 @@ def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
 # a gzip pickle read by a restricted unpickler (numpy arrays and the Strip and
 # RestRun classes only). LINES_FORMAT changes with the fields of Strip.
 LINES_FORMAT = 1
-LINES_NEW = "lines.new"
 _NP_OK = {"_reconstruct", "ndarray", "dtype", "scalar", "_frombuffer"}
 
 
 class _LinesUnpickler(pickle.Unpickler):
     def find_class(self, module: str, name: str):
-        if name in ("Strip", "RestRun") and module in ("__main__", "partitor", "pt",
-                                                         __name__):
+        if name in ("Strip", "RestRun") and (module in ("__main__", "partitor", "pt", __name__)
+                                             or module.startswith("partitor.")):
             return {"Strip": Strip, "RestRun": RestRun}[name]
         if module.split(".")[0] == "numpy" and name in _NP_OK:
             return super().find_class(module, name)
@@ -6293,12 +4913,6 @@ def workdir(pdf: Path, out: str | None, pages: str | None = None) -> Path:
     return pdf.with_suffix(".partitor")
 
 
-def file_part_name(name: str) -> str:
-    """Part name -> file-safe ASCII (hyphens, no spaces)."""
-    s = re.sub(r"[^\w\s-]", "", name, flags=re.ASCII).strip()
-    return re.sub(r"[\s_]+", "-", s) or "part"
-
-
 def cmd_pieces(a: argparse.Namespace) -> int:
     """List the pieces of a PDF: runs of music pages; a page with a title
     starts a new piece. Analysis at 200 dpi, no label OCR (titles are read
@@ -6361,7 +4975,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
     if _TESS["path"] is None:
         _warn("ocr:  tesseract not found; staff labels are not read")
         _note("Fix: apt install tesseract-ocr")
-    TUNE["page_header_sp"] = a.page_header_sp
+    config.TUNE["page_header_sp"] = a.page_header_sp
     _head(f"Analysis: {pdf.name}  (dpi {a.dpi}, pages {pages[0] + 1}-{pages[-1] + 1})")
     sysrecs: list[dict] = []
     items: list[str] = []
@@ -6392,7 +5006,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
             res, recs = analyse_one(d_, pno, a.dpi, 0)
             return page_out(res, recs)
 
-        results = fork_map(page_task, pages, jobs)
+        results = parallel.fork_map(page_task, pages, jobs)
     try:
         for k_, pno in enumerate(pages):
             if jobs > 1:
@@ -6497,7 +5111,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
             "subtitle": a.subtitle,
             "composer": a.composer or (composers[0] if composers else ""),
             "parts": names,
-            "page_header_sp": TUNE["page_header_sp"],
+            "page_header_sp": config.TUNE["page_header_sp"],
             "bar_rules": bar_rules,
             "bar_rules_status": "proposed",
             "systems": entries,
@@ -6591,7 +5205,7 @@ def cmd_build(a: argparse.Namespace) -> int:
 
     _head("Analysis")
     dpi = int(lay["dpi"])
-    TUNE["page_header_sp"] = float(lay.get("page_header_sp", PAGE_HEADER_SP))
+    config.TUNE["page_header_sp"] = float(lay.get("page_header_sp", PAGE_HEADER_SP))
     doc = pymupdf.open(pdf)
     pages = parse_pages(lay.get("pages"), doc.page_count)
     expect = {s["id"]: s["staves"] for s in lay["systems"]}
@@ -6798,7 +5412,7 @@ def cmd_build(a: argparse.Namespace) -> int:
 
     # same analysis as detect, OCR included: printed bar numbers and
     # bracketed labels must be removed in build exactly as in detect
-    outs = fork_map(page_task, todo, jobs)
+    outs = parallel.fork_map(page_task, todo, jobs)
     try:
         for k_, pno in enumerate(pages):
             if pno in todo_set:
@@ -6970,7 +5584,7 @@ def cmd_build(a: argparse.Namespace) -> int:
         _, name_, strips_, num_, extra_ = emits[i]
         return emit(name_, strips_, num_, extra_)
 
-    results = fork_map(render_task, range(len(emits)), rjobs)
+    results = parallel.fork_map(render_task, range(len(emits)), rjobs)
     try:
         for st_ in steps:
             if st_[0] == "skip":
@@ -7001,14 +5615,12 @@ LIBRARY_DEFAULT = "/var/lib/partitor/library"
 # item id: YYYY-MM-NNNN (year and month of the extraction, serial in the
 # year); items of 0.3.0-dev.6 and before: YYYY-NNN (still found)
 ITEM_RE = re.compile(r"^(\d{4})-(?:(\d{2})-(\d{4})|(\d{3}))(?:-|$)")
-SCORE_FILE = "score.yaml"     # item files are <id>-score.yaml, <id>-source.pdf, <id>-proof.pdf
 ITEM_HELP = """\
 # partitor score.yaml — written by the partitor CLI. Change it with
 #   partitor set <id> key=value   (or the item menu), not by hand.
 #   Edits are saved, not built: `pending` lists them; partitor rebuild <id>
 #   builds. composer: full name (page 1); composer_short: interior pages.
 """
-SIZE_FIRST = {"ledger"}   # paper where the largest staff comes before fewest page turns
 PAPER_NEXT = {"letter": "a4", "a4": "ledger", "ledger": "letter"}   # menu `a`
 SET_KEYS = {          # set key -> (layout key or None for metadata, parser)
     "title": (None, str), "subtitle": (None, str), "composer": (None, str),
@@ -7032,7 +5644,6 @@ SET_KEYS = {          # set key -> (layout key or None for metadata, parser)
     "turns": ("turns", ("any", "rest")), "breaks": ("breaks", "breaks"),
 }
 GAP_MAX = 14.0        # expand never sets a wider gap (sp)
-PART_LAYOUT_KEY = "parts"   # layout.parts: {part or group: {layout key: value}}
 PART_SET_KEYS = {"pages", "gap", "min_gap", "scale", "min_staff_mm", "max_staff_mm", "group_gap",
                  "reflow", "title_page", "bar_raise", "bar_size", "ink", "turns", "breaks"}
 REPAGE_KEYS = ("turns", "breaks", "duplex", "title_page")   # `repage` applies these without a rebuild
@@ -7073,41 +5684,8 @@ def part_layout(data: dict, part: str | None) -> dict:
     return {**LAYOUT_DEFAULTS, **lay}
 
 
-class Abort(Exception):
-    """Operator stopped a wizard (q, Ctrl-C or end of input)."""
-
-
 def library_root() -> Path:
     return Path(os.environ.get("PARTITOR_LIBRARY", LIBRARY_DEFAULT))
-
-
-def slugify(text: str, limit: int = 60) -> str:
-    """slugify -> lowercase ASCII words joined by hyphens. German letters
-    as German writes them without accents (Schütz -> schuetz, gegrüßet ->
-    gegruesset; 0.3.0-dev.20: "gegruet" lost the ß); other accents
-    dropped (é -> e). Cut at a word boundary within limit characters."""
-    t = re.sub(r"['\u2019`]", "", text)          # Vat'r -> vatr
-    for a_, b_ in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("Ä", "Ae"), ("Ö", "Oe"),
-                   ("Ü", "Ue"), ("ß", "ss")):
-        t = t.replace(a_, b_)
-    t = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode("ascii")
-    words = re.findall(r"[a-z0-9]+", t.lower())
-    out = ""
-    for w in words:
-        nxt = f"{out}-{w}" if out else w
-        if len(nxt) > limit:
-            break
-        out = nxt
-    return out or (words[0][:limit] if words else "")
-
-
-def make_slug(composer: str, title: str) -> str:
-    """make_slug -> <composer-surname>-<short-title> (DESIGN.md §2.1). A
-    leading number with a dot ("23. Komm ...") is dropped from the title."""
-    sur = slugify(composer.split()[-1]) if composer.split() else ""
-    t = re.sub(r"^\s*\d+\s*[.)]\s*", "", title)
-    short = slugify(t, 40)
-    return "-".join(x for x in (sur, short) if x) or "untitled"
 
 
 def item_dirs(lib: Path) -> list[Path]:
@@ -7190,13 +5768,6 @@ def score_name(item: Path) -> str:
     return item_file(item, SCORE_FILE).name
 
 
-def composer_surname(composer: str) -> str:
-    """Short composer name for interior pages: the last word ('Johann
-    Hermann Schein' -> 'Schein'; 'J.S. Bach' -> 'Bach')."""
-    words = re.findall(r"[^\s.]+(?:-[^\s.]+)*", composer.strip())
-    return words[-1] if words else ""
-
-
 def piece_tag(composer: str, title: str) -> str:
     """piece_tag -> 'Schein-Maria': composer surname and the first word of
     the title (leading number dropped), ASCII, case kept."""
@@ -7206,13 +5777,6 @@ def piece_tag(composer: str, title: str) -> str:
     t = re.sub(r"^\s*\d+\s*[.)]\s*", "", title)
     word = re.findall(r"[A-Za-z0-9]+", fold(t))[:1]
     return "-".join(sur + word) or "piece"
-
-
-def part_file_name(num: int, part: str, tail: str) -> str:
-    """Part PDF name: '07-bass-trombone-Schein-Maria--2026-10-0001.pdf':
-    part number (2 digits, so 10+ parts sort), part, piece, id; the
-    player finds the part first."""
-    return f"{num:02d}-{slugify(part)}{tail}.pdf"
 
 
 def load_item(item: Path) -> dict:
@@ -7309,25 +5873,6 @@ def item_line(item: Path, data: dict) -> str:
     else:
         bits.append(item_status(data))
     return " · ".join(str(x) for x in bits)
-
-
-def ask(prompt: str, default: str = "") -> str:
-    """ask -> the answer, or default on Enter. q stops (Abort)."""
-    shown = f" [{default}]" if default else ""
-    try:
-        ans = input(f"  {prompt}{shown}: ").strip()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        raise Abort()
-    if ans.lower() == "q":
-        raise Abort()
-    return ans or default
-
-
-def yes(prompt: str, default: bool = True) -> bool:
-    d = "Y/n" if default else "y/N"
-    ans = ask(f"{prompt} [{d}]").lower()
-    return default if not ans else ans.startswith("y")
 
 
 PROOF_H = 1400        # preview page height (px), set by preview_page
@@ -7924,7 +6469,6 @@ def choose_maps(item: Path) -> bool:
 
 
 PART_OPS = re.compile(r"^\s*(\d+)\s*(?:(\+)\s*(\d+)|=\s*(.+?))\s*$")
-SKIP_KEY = "skip"     # score.yaml: part names not extracted (kept in the list)
 
 
 def apply_part_ops(data: dict, line: str) -> str:

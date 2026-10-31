@@ -26,6 +26,7 @@ import test_analysis  # noqa: E402  (TestSystemWindow.make_pdf; the module, not 
 from support import (  # noqa: E402,F401
     SP,
     SRC,
+    config,
     flow_line,
     make_score_pdf,
     mock_attr,
@@ -823,12 +824,19 @@ class TestGroupGapAndSizeFirst(unittest.TestCase):
         smax = pt.fit_scale(strips, 400, opts)
         sc, _, n = pt.choose_layout(strips, 400, opts)
         self.assertAlmostEqual(sc, smax, places=6)
-        saved = pt.SIZE_FIRST
+        class Asked(set):                                   # call assertion: choose_layout
+            asked = 0                                       # reads config.SIZE_FIRST
+
+            def __contains__(self, item):
+                Asked.asked += 1
+                return super().__contains__(item)
+        saved = config.SIZE_FIRST
         try:
-            pt.SIZE_FIRST = set()                           # the page-turn rule first
+            config.SIZE_FIRST = Asked()                     # the page-turn rule first
             sc2, _, n2 = pt.choose_layout(strips, 400, opts)
         finally:
-            pt.SIZE_FIRST = saved
+            config.SIZE_FIRST = saved
+        self.assertGreater(Asked.asked, 0)
         self.assertLess(sc2, smax)                           # it gave staff size for turns
         self.assertLessEqual(pt.turns(n2), pt.turns(n))
         lt = {**pt.LAYOUT_DEFAULTS}                          # Letter keeps its rule

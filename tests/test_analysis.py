@@ -31,11 +31,13 @@ sys.path.insert(0, HERE)
 from support import (  # noqa: E402,F401
     SP,
     SRC,
+    config,
     cv2,
     make_score_pdf,
     mock_attr,
     needs_deps,
     np,
+    parallel,
     pt,
     pymupdf,
     rasterize,
@@ -430,9 +432,22 @@ class TestDetectParallel(unittest.TestCase):
     def test_one_job_uses_no_workers(self):
         def no_fork(*a, **k):
             raise AssertionError("fork_map called with one job")
-        with mock_attr(pt, "fork_map", no_fork):
+        with mock_attr(parallel, "fork_map", no_fork):
             rc, _, _ = self.detect("1", "one")
         self.assertEqual(rc, 0)
+
+    def test_two_jobs_reach_the_pool_through_the_parallel_module(self):
+        # the call assertion of the patch above: fork_map is read as parallel.fork_map,
+        # so a fake in that module is called (a copy of the name would never be)
+        real, calls = parallel.fork_map, []
+
+        def spy(fn, items, jobs):
+            calls.append(jobs)
+            return real(fn, items, jobs)
+        with mock_attr(parallel, "fork_map", spy):
+            rc, _, _ = self.detect("2", "spy")
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [2])
 
     def test_jobs_from_the_environment(self):
         old = os.environ.get("PARTITOR_JOBS")

@@ -24,6 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from support import (  # noqa: E402,F401
+    LIB,
     SRC,
     make_score_pdf,
     needs_deps,
@@ -766,7 +767,7 @@ class TestRepage(unittest.TestCase):
         code = ("import importlib.machinery as m, importlib.util as u, sys;"
                 "l = m.SourceFileLoader('pm', sys.argv[1]);"
                 "s = u.spec_from_loader('pm', l); mod = u.module_from_spec(s); sys.modules['pm'] = mod;"
-                "l.exec_module(mod); print(repr(mod.BOLD), mod._TTY)")
+                "l.exec_module(mod); print(repr(mod.BOLD), mod.console._TTY)")
         for val, want in (("1", ("'\\x1b[1m'", "True")), ("0", ("''", "False")), (None, ("''", "False"))):
             env = {k: v for k, v in os.environ.items() if k != "PARTITOR_COLOR"}
             if val is not None:
@@ -776,7 +777,117 @@ class TestRepage(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(r.stdout.split(), list(want), f"PARTITOR_COLOR={val}")
 
+    def test_console_alone_gives_colour_by_environment(self):
+        # the module owns the colours; it does not need the script (import-time state)
+        code = ("import sys; sys.path.insert(0, sys.argv[1]); import partitor.console as c;"
+                "print(repr(c.BOLD), c._TTY)")
+        for val, want in (("1", ("'\\x1b[1m'", "True")), ("0", ("''", "False"))):
+            env = {k: v for k, v in os.environ.items() if k != "PARTITOR_COLOR"}
+            env["PARTITOR_COLOR"] = val
+            r = subprocess.run([sys.executable, "-I", "-c", code, LIB], env=env,
+                               capture_output=True, text=True, stdin=subprocess.DEVNULL)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(r.stdout.split(), list(want), f"PARTITOR_COLOR={val}")
+
     def test_repage_without_lines_asks_for_a_build(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValueError):
                 pt.load_lines(Path(tmp, "none.lines"))
+
+
+@needs_deps
+class TestFonts(unittest.TestCase):
+    """font_dirs moved to lib/partitor/typography.py: the search path must not change."""
+
+    def test_font_dirs_keep_the_order_and_list_the_repo_fonts(self):
+        root = Path(HERE).parent
+        old = os.environ.pop("PARTITOR_FONTS", None)
+        try:
+            dirs = pt.font_dirs()
+        finally:
+            if old is not None:
+                os.environ["PARTITOR_FONTS"] = old
+        self.assertEqual(dirs, [root / "share" / "fonts", Path("/opt/partitor/fonts"),
+                                root / "lib" / "fonts"])
+        self.assertTrue((root / "share" / "fonts" / "EBGaramond-Regular.ttf").is_file())
+
+    def test_environment_folder_comes_first(self):
+        old = os.environ.get("PARTITOR_FONTS")
+        os.environ["PARTITOR_FONTS"] = "/tmp/fonts-example"
+        try:
+            self.assertEqual(pt.font_dirs()[0], Path("/tmp/fonts-example"))
+        finally:
+            if old is None:
+                os.environ.pop("PARTITOR_FONTS", None)
+            else:
+                os.environ["PARTITOR_FONTS"] = old
+
+    def test_every_font_kind_loads_from_the_repo_not_the_fallback(self):
+        # the fallback (built-in Times, file None) would change every drawn page
+        root = Path(HERE).parent
+        for kind in pt.FONT_FILES:
+            with self.subTest(kind=kind):
+                name, path, _ = pt._font(kind)
+                self.assertIsNotNone(path, f"{kind}: font file not found, fallback used")
+                self.assertEqual(Path(path).parent, root / "share" / "fonts")
+
+
+@needs_deps
+class TestLinesFileCompatibility(unittest.TestCase):
+    """Saved lines (.lines) pickle Strip and RestRun. After the move they live in
+    partitor.model; files of earlier engines say __main__. Both must load."""
+
+    FIXTURE = Path(HERE, "data", "lines-0.4.2.lines")
+
+    def test_a_file_written_before_the_move_loads(self):
+        import gzip
+        with gzip.open(self.FIXTURE, "rb") as fh:
+            self.assertIn(b"__main__", fh.read())            # the fixture holds the old path
+        d = pt.load_lines(self.FIXTURE)
+        self.assertEqual(d["format"], pt.LINES_FORMAT)
+        self.assertEqual(d["name"], "A")
+        self.assertTrue(d["strips"])
+        for st in d["strips"]:
+            self.assertIs(type(st), pt.Strip)
+            self.assertEqual(st.__class__.__module__, "partitor.model")
+
+    def test_a_new_file_names_the_model_module_and_loads(self):
+        import gzip
+        st = [pt.Strip(np.zeros((10, 30), bool), 0, 2, 6, 2.0, np.zeros((10, 30), bool))]
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp, "x.lines")
+            pt.save_lines(f, "Alto", 400, {}, {"paper": "letter"}, st)
+            with gzip.open(f, "rb") as fh:
+                raw = fh.read()
+            self.assertIn(b"partitor.model", raw)
+            self.assertNotIn(b"__main__", raw)
+            self.assertIs(type(pt.load_lines(f)["strips"][0]), pt.Strip)
+
+    def test_reader_accepts_old_and_package_paths_for_the_two_classes_only(self):
+        import pickle
+        u = pt._LinesUnpickler(io.BytesIO(b""))
+        for module in ("__main__", "partitor", "pt", "partitor.model", "partitor.later"):
+            for name, cls in (("Strip", pt.Strip), ("RestRun", pt.RestRun)):
+                with self.subTest(module=module, name=name):
+                    self.assertIs(u.find_class(module, name), cls)
+        for module, name in (("os", "system"), ("builtins", "eval"), ("partitor.model", "PageResult"),
+                             ("partitor.model", "Staff"), ("partitorx.model", "Strip"),
+                             ("evil.partitor", "Strip"), ("subprocess", "run")):
+            with self.subTest(module=module, name=name):
+                with self.assertRaises(pickle.UnpicklingError):
+                    u.find_class(module, name)
+
+    def test_os_system_in_a_lines_file_is_refused(self):
+        import gzip
+        import pickle
+
+        class Evil:
+            def __reduce__(self):
+                return (os.system, ("true",))
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp, "bad.lines")
+            with gzip.open(f, "wb") as g:
+                pickle.dump({"format": pt.LINES_FORMAT, "x": Evil()}, g)
+            with self.assertRaises(ValueError) as cm:
+                pt.load_lines(f)
+            self.assertIn("not allowed in a lines file", str(cm.exception))

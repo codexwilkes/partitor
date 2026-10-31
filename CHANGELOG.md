@@ -6,6 +6,47 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+
+
+
+
+
+## 0.5.0-dev.2 — 2026-10-31
+
+First move of engine code (plan: `docs/DESIGN.md` §12). Seven modules leave the engine
+script and go to the package `lib/partitor/`. No behaviour change: the output is the same
+(50 golden cases checked with `tools/g0_golden.py`); saved `.lines` files of earlier
+versions still load.
+
+### Added
+
+- Modules `console`, `config`, `model`, `typography`, `mapping`, `bars` and `parallel` in
+  `lib/partitor/` (about 1 120 definition lines). The script imports their names, so
+  commands, options and output stay as they were.
+- `tools/move-symbols.py`: moves named top-level code from the script to a module, text
+  unchanged, with a check that proves it. It is temporary and goes away in the last step.
+- `tests/data/lines-0.4.2.lines`: a saved-lines file written before the move; a test loads
+  it. `tools/check-repo.sh` skips the licence-line check for binary fixtures in
+  `tests/data/`.
+- 40 new tests: 504 are found now (464 before). They cover the move tool, the font search
+  path, the progress-line switch in a worker, the colour setting of the console module,
+  saved-lines compatibility, results that workers return, and that every module imports
+  alone.
+
+### Changed
+
+- The reader of saved lines (`.lines`) also accepts class paths below `partitor.`. Files
+  written from now on name `partitor.model.Strip`; an older engine that reads one asks for
+  a rebuild of the part. `LINES_FORMAT` stays 1.
+- Tests that replace `fork_map` or `SIZE_FIRST` now replace the name in its module
+  (`parallel`, `config`) and check that the replacement was called. `tests/test_docs.py`
+  reads the script and all package files as engine text, closes the files it opens, and
+  skips the one line of the NAS guide that names its example vendor instead of naming that
+  vendor in the test.
+- Docs: `docs/DESIGN.md` §12 and `CONTRIBUTING.md` list the modules that exist, the
+  exact rule for shared state, the reader of saved lines and the move tool. The header of
+  `lib/partitor-engine` names the right install path and the package.
+
 ## 0.5.0-dev.1 — 2026-10-31
 
 Start of the modular split of the engine (plan: `docs/DESIGN.md` §12). This step moves

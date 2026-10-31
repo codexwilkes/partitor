@@ -6,7 +6,8 @@
 # Repo gate (CI and before a release). Fails when the tracked files hold:
 #   - a score or scan: *.pdf, *.jpg, *.jpeg, *.tif, *.tiff (copyright; no samples ship)
 #   - a private network address (RFC 1918) or a *.invalid host
-#   - a file without an SPDX line (bin/, lib/, tests/, tools/; lib/ includes lib/partitor/)
+#   - a file without an SPDX line (bin/, lib/, tests/, tools/; lib/ includes lib/partitor/;
+#     the binary fixtures in tests/data/ are the one exception)
 #   - a broken module structure (tools/check-modules.py --static)
 # A private token list is checked by the maintainer, not here (it is itself personal).
 # Usage: tools/check-repo.sh   (run from anywhere inside the repo)
@@ -25,8 +26,10 @@ while IFS= read -r f; do
   fi
 done < <(files)
 while IFS= read -r f; do
-  case "$f" in bin/*|lib/*|tests/*|tools/*)
-    head -n 6 "$f" | grep -q 'SPDX-License-Identifier: AGPL-3.0-or-later' || bad "no SPDX line: $f" ;;
+  case "$f" in
+    tests/data/*) continue ;;                 # binary fixtures cannot hold a licence line
+    bin/*|lib/*|tests/*|tools/*)
+      head -n 6 "$f" | grep -q 'SPDX-License-Identifier: AGPL-3.0-or-later' || bad "no SPDX line: $f" ;;
   esac
 done < <(files)
 if ! python3 tools/check-modules.py --static; then

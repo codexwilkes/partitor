@@ -23,7 +23,7 @@ WF = os.path.join(ROOT, ".github", "workflows", "ci.yml")
 
 # Discovered tests (skipped ones count) at the last step. Raise it with every step that adds
 # tests; never lower it (CONTRIBUTING.md: the number of tests must not fall).
-MIN_TESTS = 464
+MIN_TESTS = 504
 
 
 def text(*parts):
@@ -80,6 +80,12 @@ class TestWorkflow(unittest.TestCase):
         steps = " ".join(str(st.get("run", "")) for st in self.wf["jobs"]["gate"]["steps"])
         self.assertIn("tools/check-modules.py --static", steps)
         self.assertIn("check-modules.py --static", text("tools", "check-repo.sh"))
+
+    def test_repo_gate_skips_the_licence_line_for_binary_fixtures_only(self):
+        gate = text("tools", "check-repo.sh")
+        self.assertIn("tests/data/*) continue", gate)
+        self.assertEqual(gate.count("continue ;;"), 2)       # LICENSE/fonts and tests/data: no more
+        self.assertTrue(os.path.isfile(os.path.join(ROOT, "tests", "data", "lines-0.4.2.lines")))
 
     def test_wheels_only(self):
         self.assertGreaterEqual(text(".github", "workflows", "ci.yml").count("--only-binary=:all:"), 2)

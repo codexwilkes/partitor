@@ -34,7 +34,15 @@ def tests_source():
     return "\n".join(read("tests", n) for n in names)
 
 
-ENGINE = read("lib", "partitor-engine")
+def engine_sources():
+    """The engine as text: the script and every module of lib/partitor, in name order.
+    Each text is one file (python needs that for ast: `from __future__` must come first)."""
+    pkg = os.path.join(ROOT, "lib", "partitor")
+    names = sorted(n for n in os.listdir(pkg) if n.endswith(".py"))
+    return [read("lib", "partitor-engine")] + [read("lib", "partitor", n) for n in names]
+
+
+ENGINE = "\n".join(engine_sources())
 WRAPPER = read("bin", "partitor")
 INSTALLER = read("bin", "partitor-install")
 DESIGN = read("docs", "DESIGN.md")
@@ -42,11 +50,11 @@ DESIGN = read("docs", "DESIGN.md")
 
 def literal_dict(name):
     """The dict assigned to NAME in the engine, with literal values only."""
-    tree = ast.parse(ENGINE)
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
-                isinstance(t, ast.Name) and t.id == name for t in node.targets):
-            return node.value
+    for text in engine_sources():
+        for node in ast.parse(text).body:
+            if isinstance(node, ast.Assign) and any(
+                    isinstance(t, ast.Name) and t.id == name for t in node.targets):
+                return node.value
     raise AssertionError(f"{name} not found in the engine")
 
 
@@ -64,13 +72,14 @@ class TestDocFiles(unittest.TestCase):
         for p in doc_files():
             if p.endswith(".md"):
                 with self.subTest(file=os.path.basename(p)):
-                    self.assertIn("SPDX-License-Identifier: AGPL-3.0-or-later",
-                                  open(p, encoding="utf-8").read(400))
+                    with open(p, encoding="utf-8") as fh:
+                        self.assertIn("SPDX-License-Identifier: AGPL-3.0-or-later", fh.read(400))
 
     def test_referenced_documents_exist(self):
         names = set(os.listdir(DOCS)) | set(os.listdir(ROOT))
         for p in doc_files():
-            text = open(p, encoding="utf-8").read()
+            with open(p, encoding="utf-8") as fh:
+                text = fh.read()
             for ref in set(re.findall(r"\b([A-Z][A-Z0-9-]+\.md|operator-flow\.html)\b", text)):
                 with self.subTest(file=os.path.basename(p), ref=ref):
                     self.assertIn(ref, names)
@@ -83,11 +92,13 @@ class TestDocFiles(unittest.TestCase):
         with open(os.environ["PARTITOR_SCRUB_TOKENS"], encoding="utf-8") as f:
             pats = [re.compile(x.strip(), re.I) for x in f if x.strip()]
         for p in doc_files():
-            text = open(p, encoding="utf-8").read().replace("codexwilkes", "")
+            with open(p, encoding="utf-8") as fh:
+                text = fh.read().replace("codexwilkes", "")
+            if os.path.basename(p) == "STORAGE-SMB.md":
+                # the NAS guide names one vendor as its worked example, on the line that
+                # introduces it; every other line is checked
+                text = "\n".join(ln for ln in text.splitlines() if "The example is" not in ln)
             for pat in pats:
-                # the vendor name is the worked example of the NAS guide
-                if os.path.basename(p) == "STORAGE-SMB.md" and pat.search("Synology"):
-                    continue
                 with self.subTest(file=os.path.basename(p), pattern=pat.pattern):
                     self.assertIsNone(pat.search(text))
 
@@ -95,7 +106,8 @@ class TestDocFiles(unittest.TestCase):
         pat = re.compile(r"\b(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)\b")
         for p in doc_files():
             with self.subTest(file=os.path.basename(p)):
-                self.assertIsNone(pat.search(open(p, encoding="utf-8").read()))
+                with open(p, encoding="utf-8") as fh:
+                    self.assertIsNone(pat.search(fh.read()))
 
 
 class TestVersionInDocs(unittest.TestCase):
@@ -139,6 +151,23 @@ class TestCodeMap(unittest.TestCase):
 
     def test_contributing_module_table_matches_modules_txt(self):
         self.assertEqual(self.table(read("CONTRIBUTING.md")), self.listed())
+
+
+class TestEngineSources(unittest.TestCase):
+    def test_every_package_file_is_read_as_engine_text(self):
+        pkg = os.path.join(ROOT, "lib", "partitor")
+        files = [n for n in os.listdir(pkg) if n.endswith(".py")]
+        self.assertGreater(len(files), 1)
+        sources = engine_sources()
+        self.assertEqual(len(sources), 1 + len(files))
+        for n in files:
+            with self.subTest(module=n):
+                self.assertIn(read("lib", "partitor", n), sources)
+        self.assertEqual(ENGINE, "\n".join(sources))
+
+    def test_a_dict_in_a_module_is_found(self):
+        # the layout keys live in a module, not in the script
+        self.assertTrue(literal_dict("SET_KEYS") is not None)
 
 
 class TestDesignSections(unittest.TestCase):
@@ -212,7 +241,9 @@ class TestSettingsDocs(unittest.TestCase):
     def test_documented_keys_exist_in_code(self):
         code = ENGINE + WRAPPER + INSTALLER + tests_source()
         for p in doc_files():
-            for key in set(re.findall(r"\bPARTITOR_[A-Z_]+\b", open(p, encoding="utf-8").read())):
+            with open(p, encoding="utf-8") as fh:
+                keys = set(re.findall(r"\bPARTITOR_[A-Z_]+\b", fh.read()))
+            for key in keys:
                 with self.subTest(file=os.path.basename(p), key=key):
                     self.assertTrue(key in code, key)
 

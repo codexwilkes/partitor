@@ -21,9 +21,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from support import (  # noqa: E402,F401
+    console,
     cv2,
+    mock_attr,
     needs_deps,
     np,
+    parallel,
     pt,
     setUpModule,
     tearDownModule,
@@ -100,7 +103,7 @@ class TestForkMap(unittest.TestCase):
     def run_map(self, fn, items, jobs):
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            out = list(pt.fork_map(fn, items, jobs))
+            out = list(parallel.fork_map(fn, items, jobs))
         return out, buf.getvalue()
 
     def setUp(self):
@@ -183,13 +186,50 @@ class TestForkMap(unittest.TestCase):
         self.assertIn("killed by SIGKILL", str(cm.exception))
         self.assertIn("PARTITOR_MEMORY_MAX", str(cm.exception))
 
+    def test_a_worker_turns_progress_lines_off_in_the_console_module(self):
+        # _child_run rebinds _TTY. Written as `console._TTY = False` it reaches the module
+        # that console functions read; a `global _TTY` in this module would make a new
+        # variable and change nothing. The parent keeps its own value.
+        with mock_attr(console, "_TTY", True):
+            out, _ = self.run_map(lambda i: console._TTY, range(2), 2)
+            self.assertEqual(out, [False, False])
+            self.assertTrue(console._TTY)
+
+    def test_reset_counts_keeps_the_objects_that_other_modules_hold(self):
+        # parallel and the script hold the console objects by name: reset in place only
+        before = (id(console._counts), id(console._FAILURES), id(console._WARNINGS))
+        with contextlib.redirect_stdout(io.StringIO()):
+            console._fail("x")
+            console._warn("y")
+        console._reset_counts()
+        self.assertEqual((id(console._counts), id(console._FAILURES), id(console._WARNINGS)),
+                         before)
+        self.assertEqual((console._counts["fail"], console._FAILURES, console._WARNINGS),
+                         (0, [], []))
+        self.assertIs(parallel._counts, console._counts)
+        self.assertIs(parallel._FAILURES, console._FAILURES)
+
+    def test_workers_return_page_results_and_strips(self):
+        img = np.zeros((8, 40), bool)
+        strip = pt.Strip(img, 0, 1, 5, 2.0, img.copy())
+        staff = pt.Staff(0, 0, [1, 2, 3, 4, 5], 0, 39)
+        res = pt.PageResult(0, img.shape, 2.0, 1, 0.0, 0.0, [staff], [[staff]],
+                            np.full(img.shape, -1, np.int32))
+        out, _ = self.run_map(lambda i: (res, strip, pt.RestRun(3, 1))[i], range(3), 2)
+        self.assertIs(type(out[0]), pt.PageResult)
+        self.assertIs(type(out[1]), pt.Strip)
+        self.assertIs(type(out[2]), pt.RestRun)
+        self.assertEqual(out[0].staves[0].lines, [1, 2, 3, 4, 5])
+        self.assertTrue((out[1].img == img).all())
+        self.assertEqual(type(out[1]).__module__, "partitor.model")
+
     def test_closing_early_stops_the_workers_and_cleans_up(self):
         def tmp_dirs():
             return {d for d in os.listdir(tempfile.gettempdir()) if d.startswith("partitor-")}
         before = tmp_dirs()
         t = time.monotonic()
         with contextlib.redirect_stdout(io.StringIO()):
-            gen = pt.fork_map(lambda i: i if i == 0 else (time.sleep(30), i)[1], range(3), 2)
+            gen = parallel.fork_map(lambda i: i if i == 0 else (time.sleep(30), i)[1], range(3), 2)
             self.assertEqual(next(gen), 0)
             gen.close()                      # item 1 still sleeps: its worker is stopped
         self.assertLess(time.monotonic() - t, 5)

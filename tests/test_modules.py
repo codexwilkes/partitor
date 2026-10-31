@@ -246,6 +246,26 @@ class TestRealRepo(unittest.TestCase):
         self.assertEqual(len(rows), 23)
         self.assertEqual(sorted({int(r[0]) for r in rows}), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 
+    def test_every_existing_module_imports_alone(self):
+        """A fresh interpreter, no other module loaded first: a hidden import order fails here."""
+        try:
+            import cv2, numpy, pymupdf, yaml  # noqa: E401,F401
+        except ImportError:
+            self.skipTest("the venv packages are not installed")
+        lib = os.path.join(ROOT, "lib")
+        with open(os.path.join(ROOT, "tools", "modules.txt"), encoding="utf-8") as fh:
+            listed = [ln.split()[1] for ln in fh if ln.strip() and not ln.startswith("#")]
+        present = [m for m in listed if os.path.isfile(os.path.join(lib, "partitor", m + ".py"))]
+        for m in ("console", "config", "model", "typography", "mapping", "bars", "parallel"):
+            self.assertIn(m, present)              # moved in step M1
+        for m in present:
+            with self.subTest(module=m):
+                code = f"import sys; sys.path.insert(0, {lib!r}); import partitor.{m}"
+                r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True,
+                                   text=True, stdin=subprocess.DEVNULL)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stdout, "")             # importing prints nothing
+
 
 if __name__ == "__main__":
     unittest.main()

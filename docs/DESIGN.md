@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.5.0-dev.1. Section numbers are stable: the code cites
+Status: describes partitor 0.5.0-dev.2. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -911,10 +911,11 @@ See `KNOWN-LIMITS.md`.
 
 ## 12. Code map
 
-The engine is one script today, `lib/partitor-engine`. It moves in small steps into
+The engine is mostly one script today, `lib/partitor-engine`. It moves in small steps into
 the package `lib/partitor/`, in 23 modules (releases `0.5.0-dev.1` to `0.5.0`).
-Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.1 only
-`lib/partitor/__init__.py` exists; it holds `VERSION`. A module that is not in
+Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.2
+these modules exist: `console`, `config`, `model`, `typography`, `mapping`, `bars`,
+`parallel`; the script imports their names until the last step. A module that is not in
 `lib/partitor/` yet is a proposal in the tables below.
 
 ### 12.1 Modules and import levels
@@ -976,18 +977,27 @@ This map comes from function names and headings. Check it when a module exists.
 - **Levels.** No import of the same or a higher level, no cycle, also not inside a
   function. Every module starts with `from __future__ import annotations` and the SPDX
   line. `lib/partitor/__init__.py` has no imports: every start of the engine reads it.
-- **Shared state (R1).** A name that other modules change, and every name in
+- **Shared state (R1).** A name that other modules rebind, and every name in
   `tests/patchable.txt`, is used as `owner.NAME` (import the module, not the name).
   `from owner import NAME` makes a copy: a test patch or a rebinding then changes the
-  owner and leaves the copy as it was.
+  owner and leaves the copy as it was. Today these are `console._TTY` (rebound in a
+  worker), `config.TUNE`, `config.SIZE_FIRST` and `parallel.fork_map`. An object that
+  is changed in place and never rebound (`console._counts`, `_FAILURES`, `_WARNINGS`) may
+  be imported by name: both names are the same object. `console._reset_counts` keeps it so.
 - **`global`.** `global NAME` is allowed only for a name that the same module assigns
   or defines at top level. For a name of another module write `owner.NAME = value`.
 - **Size.** At most 1 100 definition lines per module. One module is exempt
   (`ownership`: `analyse_page` is one function of 852 lines).
-- **Pickles (proposal, from the step that moves `Strip` and `RestRun`).** Saved `.lines`
-  files hold class paths (`__main__.Strip` today). The reader of saved lines will accept
-  the old path and the new ones (`partitor.*`), and will keep doing so, so a later rename
-  of a module does not break saved files.
+- **Pickles.** Saved `.lines` files hold class paths. Files of 0.4.2 say `__main__.Strip`;
+  files written since 0.5.0-dev.2 say `partitor.model.Strip`. The reader (`_LinesUnpickler`)
+  accepts `__main__`, `partitor`, `pt` and every `partitor.*` path for `Strip` and `RestRun`
+  only, and will keep doing so, so a later rename of a module does not break saved files.
+  An older engine that reads a new file stops with an unpickling error, which `load_lines`
+  turns into "rebuild the part". `LINES_FORMAT` stays 1.
+- **Fonts.** `typography.font_dirs` computes the repo folders from its own file
+  (`lib/partitor/typography.py`): the order is `PARTITOR_FONTS`, `share/fonts` of the repo,
+  `/opt/partitor/fonts`, `lib/fonts`. A test lists them, because a wrong depth falls back to
+  the built-in Times without a message.
 - **Version.** `VERSION` lives in `lib/partitor/__init__.py`. The file `VERSION` in the
   repo root carries the same number for the wrapper and the installer; a test checks it.
 - **Checks.** `tools/check-modules.py --static` (also in `tools/check-repo.sh` and CI),
