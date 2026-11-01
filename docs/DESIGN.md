@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.7.0. Section numbers are stable: the code cites
+Status: describes partitor 0.7.1. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -1068,11 +1068,13 @@ of analysing it. The cache holds the result **before** the operator's bar edits;
 applies those edits to every result, read or new.
 
 - **Key.** SHA-256 of: the PDF content hash, page number, dpi, OCR on or off, the system base
-  (always 0 with the cache), `TUNE["page_header_sp"]`, `ANALYSIS_CACHE_FORMAT`, `VERSION`, a
+  (always 0 with the cache), `TUNE["page_header_sp"]`, `ANALYSIS_CACHE_FORMAT`, a
   hash of the source of every module that `ownership` reaches by relative imports
-  (so a code change without a version change cannot give a stale hit), the versions of cv2,
+  (so a code change cannot give a stale hit, with or without a new release number), the
+  versions of cv2,
   numpy and pymupdf, and the tesseract path, its version line and `TESSDATA_PREFIX`. The
-  analysis reads no other setting (`PARTITOR_*` variables do not reach it).
+  analysis reads no other setting (`PARTITOR_*` variables do not reach it). The release number
+  is not in the key: a release that leaves the analysis code alone keeps the entries (0.7.1).
 - **Format.** `ANALYSIS_CACHE_FORMAT` (1) is part of the key and of the file. The reader
   (`_CacheUnpickler`) accepts `Staff`, `PageResult`, numpy array reconstruction and a few
   builtins, and nothing else.

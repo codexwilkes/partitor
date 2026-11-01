@@ -6,6 +6,17 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.7.1 — 2026-11-01
+
+The page-analysis cache survives releases that do not touch the analysis. No change in output.
+
+- The program version is no longer part of the cache key. The key already holds a hash of the
+  analysis source, the cv2, numpy and pymupdf versions and the tesseract version, so a change
+  to anything that can alter the result still gives a new analysis. A release that changes
+  only other code, or only documents, keeps the entries.
+- The first run after this update analyses again (the key text changed once); later releases
+  do not.
+
 ## 0.7.0 — 2026-11-01
 
 A rebuild no longer analyses the pages again when nothing that affects the result has changed.

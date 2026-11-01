@@ -124,12 +124,28 @@ class TestStageCache(unittest.TestCase):
         self.assertNotEqual(self.cache.key(0, 0), other.key(0, 0))
 
     # ── environment_id: what it holds ──────────────────────────────────────
-    def test_environment_holds_version_and_format(self):
+    def test_environment_holds_the_format(self):
         env = stagecache.environment_id()
-        self.assertIn(f"partitor={pt.VERSION}", env)
         self.assertIn(f"format={stagecache.ANALYSIS_CACHE_FORMAT}", env)
         with mock_attr(stagecache, "ANALYSIS_CACHE_FORMAT", 99):
             self.assertNotEqual(env, stagecache.environment_id())
+
+    def test_a_new_program_version_alone_keeps_the_key(self):
+        # 0.7.1: the analysis source hash decides, not the release number
+        env = stagecache.environment_id()
+        key = stagecache.StageCache(self.dir, "a" * 64, 200, False, env).key(0, 0)
+        with mock_attr(stagecache, "VERSION", "99.0.0"):
+            env2 = stagecache.environment_id()
+            self.assertEqual(env, env2)
+            self.assertEqual(key, stagecache.StageCache(self.dir, "a" * 64, 200, False,
+                                                        env2).key(0, 0))
+        self.assertNotIn("partitor=", env)
+
+    def test_an_entry_of_another_version_is_still_read(self):
+        # the file records the version that wrote it; the reader does not compare it
+        self.cache.put(0, 0, self.res)
+        with mock_attr(stagecache, "VERSION", "99.0.0"):
+            self.assertTrue(same_result(self.res, self.cache.get(0, 0)))
 
     def test_environment_changes_with_each_library_version(self):
         env = stagecache.environment_id()

@@ -89,14 +89,15 @@ def tesseract_id() -> str:
 
 
 def environment_id() -> str:
-    """environment_id -> versions of what can change pixels or text."""
+    """environment_id -> what can change pixels or text: the format, the analysis
+    source and the versions of the libraries and of tesseract. Not the release
+    number: a release that leaves the analysis code alone keeps the cache."""
     import cv2
     import numpy
     import pymupdf
-    return "|".join([f"format={ANALYSIS_CACHE_FORMAT}", f"partitor={VERSION}",
-                     f"src={source_hash()}", f"cv2={cv2.__version__}",
-                     f"numpy={numpy.__version__}", f"pymupdf={pymupdf.version[0]}",
-                     f"tesseract={tesseract_id()}"])
+    return "|".join([f"format={ANALYSIS_CACHE_FORMAT}", f"src={source_hash()}",
+                     f"cv2={cv2.__version__}", f"numpy={numpy.__version__}",
+                     f"pymupdf={pymupdf.version[0]}", f"tesseract={tesseract_id()}"])
 
 
 class StageCache:
