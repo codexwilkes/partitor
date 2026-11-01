@@ -30,6 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from support import (  # noqa: E402,F401
+    LIB,
     SP,
     SRC,
     analysis,
@@ -41,6 +42,7 @@ from support import (  # noqa: E402,F401
     mock_attr,
     needs_deps,
     np,
+    package_holders,
     parallel,
     pt,
     pymupdf,
@@ -344,19 +346,22 @@ class TestSafetyGate(unittest.TestCase):
 
 @needs_deps
 class TestOcrState(unittest.TestCase):
-    """_TESS lives in `vision` (step M2): the script reaches it as `vision._TESS` (rule R1)."""
+    """_TESS lives in `vision` (step M2): the other modules reach it as `vision._TESS` (rule R1)."""
 
     def test_state_holds_only_the_path(self):
         # The key "warned" was never read or written; it is gone.
         self.assertEqual(set(vision._TESS), {"path"})
 
-    def test_script_reads_it_through_the_owner(self):
-        # cmd_detect reads it; since step M6 that code is in build, not in the script
-        build_text = Path(SRC).with_name("partitor").joinpath("build.py").read_text(encoding="utf-8")
-        self.assertIn('vision._TESS["path"]', build_text)
-        for text in (Path(SRC).read_text(encoding="utf-8"), build_text):
+    def test_other_modules_read_it_through_the_owner(self):
+        # cmd_detect reads it (since step M6 in build); no other file has a bare name or a shim
+        pkg = Path(SRC).with_name("partitor")
+        self.assertIn('vision._TESS["path"]', (pkg / "build.py").read_text(encoding="utf-8"))
+        for path in [Path(SRC)] + sorted(pkg.glob("*.py")):
+            if path.name == "vision.py":
+                continue
+            text = path.read_text(encoding="utf-8")
             code = "\n".join(ln for ln in text.split("\n") if not ln.lstrip().startswith("#"))
-            self.assertIsNone(re.search(r"(?<!vision\.)\b_TESS\b", code))   # no bare name, no shim
+            self.assertIsNone(re.search(r"(?<!vision\.)\b_TESS\b", code), path.name)
 
     def test_detect_sees_a_change_of_the_owner_state(self):
         tmp = tempfile.mkdtemp(prefix="tess-")
@@ -549,9 +554,9 @@ class TestDetectParallel(unittest.TestCase):
         with open(log, encoding="utf-8") as fh:
             return sorted(int(x) for x in fh.read().split())
 
-    def test_analyse_one_has_no_shim_in_the_script(self):
-        # R1: a patched name is read as analysis.analyse_one; the script keeps no copy
-        self.assertFalse(hasattr(pt, "analyse_one"))
+    def test_analyse_one_is_held_by_the_analysis_module_only(self):
+        # R1: a patched name is read as analysis.analyse_one; no other module keeps a copy
+        self.assertEqual(package_holders("analyse_one"), ["partitor.analysis"])
         self.assertTrue(callable(analysis.analyse_one))
 
     def test_one_job_reaches_analyse_one_through_the_analysis_module(self):
@@ -715,9 +720,10 @@ class TestCorpus(unittest.TestCase):
 
     def test_peak_memory_one_page_at_a_time(self):
         self.need("komm.pdf")
-        code = ("import resource,sys;from importlib.machinery import SourceFileLoader as L;"
-                f"m=L('p',{SRC!r}).load_module();from pathlib import Path;"
-                f"[None for _ in m.iter_pages(Path({os.path.join(CORPUS_DIR, 'komm.pdf')!r}),400,"
+        code = ("import resource,sys;"
+                f"sys.path.insert(0,{LIB!r});"
+                "from partitor.cli_main import main;from partitor.analysis import iter_pages;"
+                f"from pathlib import Path;[None for _ in iter_pages(Path({os.path.join(CORPUS_DIR, 'komm.pdf')!r}),400,"
                 "list(range(19)))];"
                 "print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss//1024)")
         r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)

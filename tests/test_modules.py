@@ -269,6 +269,8 @@ class TestRealRepo(unittest.TestCase):
             self.assertIn(m, present)              # moved in step M6
         for m in ("cli_common", "cli_bars", "cli_parts", "cli_items"):
             self.assertIn(m, present)              # moved in step M7
+        self.assertIn("cli_main", present)         # moved in step M8
+        self.assertEqual(len(present), len(listed))    # all 23 modules of the plan exist
         for m in present:
             with self.subTest(module=m):
                 code = f"import sys; sys.path.insert(0, {lib!r}); import partitor.{m}"
@@ -429,10 +431,11 @@ class TestRealRepo(unittest.TestCase):
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.level:
                     self.assertFalse({a.name for a in node.names} & patched, m)
-        # the readers: the script (main, until step M8) and cli_items (cmd_new, offer_reflow)
+        # the readers: cli_items (cmd_new, offer_reflow) and cli_main (the command table of main)
         reads = set()
         for path in (os.path.join(ROOT, "lib", "partitor-engine"),
-                     os.path.join(ROOT, "lib", "partitor", "cli_items.py")):
+                     os.path.join(ROOT, "lib", "partitor", "cli_items.py"),
+                     os.path.join(ROOT, "lib", "partitor", "cli_main.py")):
             with open(path, encoding="utf-8") as fh:
                 tree = ast.parse(fh.read())
             for node in ast.walk(tree):
@@ -467,7 +470,7 @@ class TestRealRepo(unittest.TestCase):
 
     def test_m7_cmd_rebuild_is_read_as_a_cli_items_name(self):
         """cmd_rebuild is patched by tests: cli_items defines it, no module imports it by name,
-        the script has no shim and reads cli_items.cmd_rebuild (menu r and the command table)."""
+        the script has no shim; cli_main reads cli_items.cmd_rebuild (menu r and the command table)."""
         import ast
         with open(os.path.join(ROOT, "tests", "patchable.txt"), encoding="utf-8") as fh:
             patched = {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
@@ -478,18 +481,61 @@ class TestRealRepo(unittest.TestCase):
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.level:
                     self.assertFalse({a.name for a in node.names} & patched, m)
-        with open(os.path.join(ROOT, "lib", "partitor-engine"), encoding="utf-8") as fh:
-            script = ast.parse(fh.read())
         reads = 0
-        for node in ast.walk(script):
-            if isinstance(node, ast.ImportFrom):
-                self.assertNotIn("cmd_rebuild", {a.name for a in node.names})      # no shim
-            if isinstance(node, ast.Name):
-                self.assertNotEqual(node.id, "cmd_rebuild")                         # no bare read
-            if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
-                    and node.value.id == "cli_items" and node.attr == "cmd_rebuild"):
-                reads += 1
+        for name in ("partitor-engine", os.path.join("partitor", "cli_main.py")):
+            with open(os.path.join(ROOT, "lib", name), encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom):
+                    self.assertNotIn("cmd_rebuild", {a.name for a in node.names})  # no shim
+                if isinstance(node, ast.Name):
+                    self.assertNotEqual(node.id, "cmd_rebuild")                     # no bare read
+                if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+                        and node.value.id == "cli_items" and node.attr == "cmd_rebuild"):
+                    reads += 1
         self.assertEqual(reads, 2)
+
+    def test_m8_cli_main_is_level_9_and_reads_the_r1_names_through_modules(self):
+        """cli_main (9) imports lower modules only and has no `global`. Its command table is built
+        per call and reads build.cmd_build and cli_items.cmd_rebuild as module attributes."""
+        import ast
+        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
+                 "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
+                 "lines": 2, "ownership": 2, "analysis": 3, "render": 3, "library": 4,
+                 "build": 5, "proof": 5, "cli_common": 6, "cli_bars": 7, "cli_parts": 7,
+                 "cli_items": 8, "cli_main": 9}
+        with open(os.path.join(ROOT, "lib", "partitor", "cli_main.py"), encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        reads = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level:
+                got = {node.module} if node.module else {a.name for a in node.names}
+                for g in got:
+                    if g != "VERSION":
+                        self.assertLess(level[g], level["cli_main"], f"cli_main imports {g}")
+            self.assertNotIsInstance(node, ast.Global)
+            if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+                reads.add((node.value.id, node.attr))
+        self.assertLessEqual({("build", "cmd_build"), ("cli_items", "cmd_rebuild")}, reads)
+
+    def test_m8_the_script_is_a_thin_launcher(self):
+        """lib/partitor-engine defines nothing: it puts lib/ on the path and starts cli_main.main.
+        python -m partitor (__main__.py) starts the same function."""
+        import ast
+        with open(os.path.join(ROOT, "lib", "partitor-engine"), encoding="utf-8") as fh:
+            text = fh.read()
+        tree = ast.parse(text)
+        self.assertEqual([n for n in tree.body
+                          if isinstance(n, (ast.FunctionDef, ast.ClassDef, ast.Assign))], [])
+        imported = {(n.module or "", a.name) for n in tree.body if isinstance(n, ast.ImportFrom)
+                    for a in n.names}
+        self.assertEqual(imported, {("partitor.cli_main", "main")})
+        self.assertEqual({a.name for n in tree.body if isinstance(n, ast.Import) for a in n.names},
+                         {"os", "sys"})
+        self.assertLess(len(tree.body), 8)
+        self.assertIn("sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))", text)
+        with open(os.path.join(ROOT, "lib", "partitor", "__main__.py"), encoding="utf-8") as fh:
+            self.assertIn("from partitor.cli_main import main", fh.read())
 
     def test_check_margins_lives_in_config_and_render_does_not_keep_it(self):
         """O7: check_margins and MIN_MARGIN_MM belong to config; library reads them from there."""

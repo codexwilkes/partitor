@@ -29,4 +29,4 @@
 7 cli_bars    test_cli.py,test_library.py,test_bars.py
 7 cli_parts   test_cli.py,test_library.py,test_clef.py,test_render.py
 8 cli_items   test_cli.py,test_library.py,test_layout.py,test_render.py
-9 cli_main    test_cli.py,test_library.py
+9 cli_main    test_cli.py,test_library.py,test_support.py,test_render.py

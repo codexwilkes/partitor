@@ -32,6 +32,7 @@ from support import (  # noqa: E402,F401
     make_score_pdf,
     needs_deps,
     np,
+    package_holders,
     pt,
     pymupdf,
     setUpModule,
@@ -900,12 +901,12 @@ class TestLibrary(unittest.TestCase):
 class TestBuildModule(unittest.TestCase):
     """build owns run_build and cmd_build (R1 names, no shim) and the LAST_BUILD list."""
 
-    def test_patched_names_have_no_shim_and_other_names_do(self):
-        self.assertFalse(hasattr(pt, "run_build"))
-        self.assertFalse(hasattr(pt, "cmd_build"))
+    def test_patched_names_are_held_by_the_build_module_only(self):
+        self.assertEqual(package_holders("run_build"), ["partitor.build"])    # no copy anywhere
+        self.assertEqual(package_holders("cmd_build"), ["partitor.build"])
         self.assertEqual(build.run_build.__module__, "partitor.build")
         self.assertEqual(build.cmd_build.__module__, "partitor.build")
-        self.assertIs(pt.run_detect, build.run_detect)         # not patched: a shim by name
+        self.assertIs(pt.run_detect, build.run_detect)         # the view finds it on its owner
         self.assertIs(pt.annotate_proof, sys.modules["partitor.proof"].annotate_proof)
 
     def test_last_build_is_one_list_changed_in_place(self):
@@ -967,7 +968,7 @@ class TestCliModules(unittest.TestCase):
         for name in self.RING:
             with self.subTest(name=name):
                 self.assertEqual(getattr(common, name).__module__, "partitor.cli_common")
-                self.assertIs(getattr(pt, name), getattr(common, name))        # a shim by name
+                self.assertIs(getattr(pt, name), getattr(common, name))        # the view finds it
         for mod in ("cli_bars", "cli_parts", "cli_items"):
             m = sys.modules["partitor." + mod]
             for name in self.RING:
@@ -975,8 +976,8 @@ class TestCliModules(unittest.TestCase):
                 if name in vars(m):
                     self.assertIs(vars(m)[name], getattr(common, name))        # imported, not copied
 
-    def test_cmd_rebuild_has_no_shim_and_main_dispatches_to_cli_items(self):
-        self.assertFalse(hasattr(pt, "cmd_rebuild"))
+    def test_cmd_rebuild_is_held_by_cli_items_only_and_main_dispatches_to_it(self):
+        self.assertEqual(package_holders("cmd_rebuild"), ["partitor.cli_items"])
         self.assertEqual(cli_items.cmd_rebuild.__module__, "partitor.cli_items")
         if os.geteuid() == 0:
             self.skipTest("the engine refuses root")

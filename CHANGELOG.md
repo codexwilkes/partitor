@@ -6,6 +6,41 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.5.0 — 2026-10-31
+
+The engine is now the package `lib/partitor/`, in 23 modules with a fixed import order
+(plan: `docs/DESIGN.md` §12). `lib/partitor-engine` is a launcher. Same commands, same
+options, same output, same sandbox: 50 golden cases checked with `tools/g0_golden.py`.
+
+### Added
+
+- Module `cli_main` (the menu, `main` and the sandbox check; level 9; about 300 definition
+  lines): the last module of the split.
+- `python -m partitor` (with `PYTHONPATH=lib`) starts the same function as the launcher.
+- `docs/HISTORY-ENGINE.md`: the development history of the engine, newest first. It was the
+  header comment of `lib/partitor-engine`; the text is unchanged except one reference to a
+  note that is not in this repository.
+- 6 new tests: 521 are found now (see Removed). They cover the launcher (it defines nothing
+  and starts `cli_main.main`), `python -m partitor` and equal `--help` text, the levels and
+  the module reads of `cli_main`, and the test view `pt` (a write reaches the owner module,
+  a name that no module defines is refused, no name is defined twice).
+
+### Changed
+
+- `lib/partitor-engine` shrank from about 9 800 lines (0.4.2) to 163: the usage text and about
+  6 lines of code. The shim imports of the moved names are gone.
+- The test view `pt` is now built from the package modules instead of loading the script.
+  Tests that read the script as text or loaded it as a module read the package instead.
+- Docs: `docs/DESIGN.md` §12, `CONTRIBUTING.md` and the README tag example describe the final
+  layout.
+
+### Removed
+
+- `tools/move-symbols.py` and its 25 tests (`tests/test_move_symbols.py`): the tool moved code
+  from the script into modules and has no use now. The minimum test count (`MIN_TESTS`) falls
+  once, from 540 to 521: the 25 tests of the tool leave and 6 new tests join. It only rises
+  from here.
+
 ## 0.5.0-dev.8 — 2026-10-31
 
 Seventh move of engine code (plan: `docs/DESIGN.md` §12). Four modules leave the engine

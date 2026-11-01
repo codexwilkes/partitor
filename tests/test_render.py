@@ -11,6 +11,7 @@ Shared helpers: tests/support.py.
 """
 import argparse
 import contextlib
+import dataclasses
 import io
 import os
 import re
@@ -560,11 +561,11 @@ class TestRepage(unittest.TestCase):
         img = np.zeros((h, 400), bool)
         s = pt.Strip(img, 0, 100, 180, 10.0, np.zeros_like(img), movement=movement)
         if rest:
-            s = pt.dc_replace(s, rest_src=(None, 0, pt.RestRun(rest, bars[0])))
+            s = dataclasses.replace(s, rest_src=(None, 0, pt.RestRun(rest, bars[0])))
         else:
-            s = pt.dc_replace(s, bar_nums=list(range(bars[0], bars[1] + 1)), bar_no=bars[0])
+            s = dataclasses.replace(s, bar_nums=list(range(bars[0], bars[1] + 1)), bar_no=bars[0])
         if mark:
-            s = pt.dc_replace(s, marks=[(0, "A")])
+            s = dataclasses.replace(s, marks=[(0, "A")])
         return s
 
     def music(self, n=40, rests=()):
@@ -759,7 +760,7 @@ class TestRepage(unittest.TestCase):
         self.assertGreater(bad, 0)                    # letters give no place to turn
 
     def test_wrapper_lists_every_library_command(self):
-        eng = Path(SRC).read_text()
+        eng = (Path(SRC).parent / "partitor" / "cli_main.py").read_text()
         cmds = set(re.findall(r'"(\w+)": [\w.]*cmd_\w+', eng.split("cmds = {", 1)[1].split("}", 1)[0]))
         run = (Path(SRC).parent.parent / "bin" / "partitor").read_text()
         line = next(ln for ln in run.splitlines() if "needs_lib=1 ;;" in ln and "|" in ln)
@@ -768,15 +769,14 @@ class TestRepage(unittest.TestCase):
             self.assertIn(c, listed, f"bin/partitor does not list {c}")
 
     def test_partitor_color_gives_colour_without_a_terminal(self):
-        code = ("import importlib.machinery as m, importlib.util as u, sys;"
-                "l = m.SourceFileLoader('pm', sys.argv[1]);"
-                "s = u.spec_from_loader('pm', l); mod = u.module_from_spec(s); sys.modules['pm'] = mod;"
-                "l.exec_module(mod); print(repr(mod.BOLD), mod.console._TTY)")
+        code = ("import sys; sys.path.insert(0, sys.argv[1]);"
+                "import partitor.cli_main as m, partitor.console as c;"
+                "print(repr(m.BOLD), c._TTY)")
         for val, want in (("1", ("'\\x1b[1m'", "True")), ("0", ("''", "False")), (None, ("''", "False"))):
             env = {k: v for k, v in os.environ.items() if k != "PARTITOR_COLOR"}
             if val is not None:
                 env["PARTITOR_COLOR"] = val
-            r = subprocess.run([sys.executable, "-I", "-c", code, SRC], env=env,
+            r = subprocess.run([sys.executable, "-I", "-c", code, LIB], env=env,
                                capture_output=True, text=True, stdin=subprocess.DEVNULL)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(r.stdout.split(), list(want), f"PARTITOR_COLOR={val}")
@@ -918,20 +918,23 @@ class TestRenderAndLinesModules(unittest.TestCase):
         (_, y0), (_, y1) = pages[0]
         return y1 - y0
 
-    def test_system_gap_last_is_read_in_render_and_the_script_has_no_copy(self):
-        """A patch of render.SYSTEM_GAP_LAST changes the plan (the fake is in force); a name set on the
-        script would change nothing, so the script keeps no SYSTEM_GAP_LAST."""
-        self.assertFalse(hasattr(pt, "SYSTEM_GAP_LAST"))
+    def test_system_gap_last_is_read_in_render_and_the_view_writes_to_it(self):
+        """A patch of render.SYSTEM_GAP_LAST changes the plan (the fake is in force). The test
+        view `pt` writes to the owner, so the same patch through `pt` has the same effect; a
+        name that no module defines is refused (a typo cannot make a dead patch)."""
         spread = self.system_height()
         with mock_attr(render, "SYSTEM_GAP_LAST", pt.SYSTEM_GAP_FACTOR):
             self.assertEqual(render.SYSTEM_GAP_LAST, pt.SYSTEM_GAP_FACTOR)
             plain = self.system_height()
         self.assertGreater(spread, plain)
-        pt.SYSTEM_GAP_LAST = pt.SYSTEM_GAP_FACTOR        # a stray name on the script: no effect
-        try:
-            self.assertEqual(self.system_height(), spread)
-        finally:
-            del pt.SYSTEM_GAP_LAST
+        old = render.SYSTEM_GAP_LAST
+        with mock_attr(pt, "SYSTEM_GAP_LAST", pt.SYSTEM_GAP_FACTOR):
+            self.assertEqual(render.SYSTEM_GAP_LAST, pt.SYSTEM_GAP_FACTOR)    # reached the owner
+            self.assertEqual(self.system_height(), plain)
+        self.assertEqual(render.SYSTEM_GAP_LAST, old)
+        self.assertEqual(self.system_height(), spread)
+        with self.assertRaises(AttributeError):
+            pt.SYSTEM_GAP_LAST_TYPO = 1
         self.assertEqual(self.system_height(), spread)
 
     def test_last_render_is_state_of_render_and_changed_in_place(self):

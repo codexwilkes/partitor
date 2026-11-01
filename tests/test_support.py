@@ -48,9 +48,12 @@ class TestLoader(unittest.TestCase):
     def test_import_error_of_the_engine_itself_is_not_caught(self):
         with tempfile.TemporaryDirectory() as tmp:
             os.makedirs(os.path.join(tmp, "tests"))
-            os.makedirs(os.path.join(tmp, "lib"))
+            pkg = os.path.join(tmp, "lib", "partitor")
+            os.makedirs(pkg)
             shutil.copy(os.path.join(HERE, "support.py"), os.path.join(tmp, "tests", "support.py"))
-            with open(os.path.join(tmp, "lib", "partitor-engine"), "w", encoding="utf-8") as fh:
+            with open(os.path.join(pkg, "__init__.py"), "w", encoding="utf-8") as fh:
+                fh.write('VERSION = "0"\n')
+            with open(os.path.join(pkg, "console.py"), "w", encoding="utf-8") as fh:
                 fh.write('raise ImportError("engine import is broken")\n')
             code = f"import sys; sys.path.insert(0, {os.path.join(tmp, 'tests')!r}); import support"
             r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True)
@@ -66,6 +69,33 @@ class TestLoader(unittest.TestCase):
 
     def test_tests_dir_is_on_sys_path(self):
         self.assertIn(HERE, sys.path)
+
+
+class TestPtView(unittest.TestCase):
+    """`pt` is a view over the package: a read finds the owner module, a write goes to it."""
+
+    @needs_deps
+    def test_read_and_write_reach_the_owner_module(self):
+        pt = support.pt
+        self.assertIs(pt.load_item, importlib.import_module("partitor.library").load_item)
+        self.assertEqual(pt.main.__module__, "partitor.cli_main")
+        self.assertEqual(pt.Strip.__module__, "partitor.model")
+        old = support.build.cmd_build
+        with support.mock_attr(pt, "cmd_build", lambda ns: 9):
+            self.assertEqual(support.build.cmd_build(None), 9)          # the owner was patched
+        self.assertIs(support.build.cmd_build, old)                       # and restored there
+        for name in ("no_such_name", "cmd_build_typo"):
+            with self.assertRaises(AttributeError):
+                setattr(pt, name, 1)                                      # no dead patch by typo
+            with self.assertRaises(AttributeError):
+                getattr(pt, name)
+        with self.assertRaises(AttributeError):
+            del pt.cmd_build
+
+    @needs_deps
+    def test_no_name_is_defined_in_two_modules(self):
+        owners = object.__getattribute__(support.pt, "_owners")
+        self.assertEqual({k: v for k, v in owners.items() if len(v) > 1}, {})
 
 
 class TestMockAttr(unittest.TestCase):
@@ -129,6 +159,27 @@ class TestEngineStart(unittest.TestCase):
             r = self.run_engine(link, "--version")
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertEqual(r.stdout.strip(), f"partitor {version()}")
+
+    def test_python_dash_m_partitor_starts_the_same_entry(self):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("PYTHON")}
+        env["PYTHONPATH"] = os.path.join(ROOT, "lib")
+        r = subprocess.run([sys.executable, "-m", "partitor", "--version"], capture_output=True,
+                           text=True, env=env, stdin=subprocess.DEVNULL, cwd=tempfile.gettempdir())
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), f"partitor {version()}")
+
+    def test_help_text_is_the_same_for_the_launcher_and_python_dash_m(self):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("PYTHON")}
+        env["PYTHONPATH"] = os.path.join(ROOT, "lib")
+        for args in (["--help"], ["rebuild", "--help"], ["detect", "--help"]):
+            with self.subTest(args=args):
+                a = self.run_engine(self.ENGINE, *args)
+                b = subprocess.run([sys.executable, "-m", "partitor", *args], capture_output=True,
+                                   text=True, env=env, stdin=subprocess.DEVNULL,
+                                   cwd=tempfile.gettempdir())
+                self.assertEqual(a.returncode, 0, a.stderr)
+                self.assertEqual(a.stdout, b.stdout)
+                self.assertIn("usage: partitor", a.stdout)
 
     @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root can write everywhere")
     def test_read_only_tree_starts(self):

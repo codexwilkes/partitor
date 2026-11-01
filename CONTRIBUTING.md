@@ -54,13 +54,9 @@ For a refactor of the engine, record and check golden renders with
 
 ## Where does my change go
 
-The engine is mostly one script today (`lib/partitor-engine`). It is moving, step by step,
-into the package `lib/partitor/` (`DESIGN.md` §12). These 22 modules exist now: `console`,
-`config`, `model`, `typography`, `mapping`, `bars`, `parallel`, `vision`, `clef`, `strips`,
-`reflow`, `ownership`, `lines`, `analysis`, `render`, `library`, `build`, `proof`,
-`cli_common`, `cli_bars`, `cli_parts`, `cli_items`.
-Until another module exists, its code is in the script. The target modules and their import
-levels:
+The engine is the package `lib/partitor/` (`DESIGN.md` §12); `lib/partitor-engine` is only the
+launcher that starts `partitor.cli_main.main`. A change goes into the module that owns the
+name. The 23 modules and their import levels:
 
 | Lvl | Module | Put here |
 |---|---|---|
@@ -113,15 +109,6 @@ python3 tools/check-modules.py --affected clef     # modules that import clef, a
 `--affected` prints the modules that import the module (also through other modules)
 and the test files of those modules and of the module itself (`tools/modules.txt`);
 `*` means all tests.
-
-To move code from the script into a module, use `tools/move-symbols.py` (temporary; the
-last step removes it). It moves the named top-level definitions and constants with the
-comment block above each, text unchanged, writes the module header and only the imports the
-code uses, and leaves a shim import in the script. It refuses a missing, duplicated or
-conditional name, and a dependency on a name that stays in the script or sits in the same or
-a higher level. `--check --pristine FILE` proves that the moved text equals the original plus
-the listed edits; FILE may be the script of the last release (modules of earlier steps count
-as existing). Run it without `--apply` first: it prints the plan.
 
 Saved `.lines` files: the reader accepts the class paths of every earlier layout
 (`__main__`, `partitor.*`); do not narrow it. The fixture `tests/data/lines-0.4.2.lines`

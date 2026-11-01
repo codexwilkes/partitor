@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.5.0-dev.8. Section numbers are stable: the code cites
+Status: describes partitor 0.5.0. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -911,14 +911,11 @@ See `KNOWN-LIMITS.md`.
 
 ## 12. Code map
 
-The engine is mostly one script today, `lib/partitor-engine`. It moves in small steps into
-the package `lib/partitor/`, in 23 modules (releases `0.5.0-dev.1` to `0.5.0`).
-Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.8
-these 22 modules exist: `console`, `config`, `model`, `typography`, `mapping`, `bars`,
-`parallel`, `vision`, `clef`, `strips`, `reflow`, `ownership`, `lines`, `analysis`,
-`render`, `library`, `build`, `proof`, `cli_common`, `cli_bars`, `cli_parts`, `cli_items`; the script
-imports their names until the last step (except the names of R1, below). A module that is not in
-`lib/partitor/` yet is a proposal in the tables below.
+The engine is the package `lib/partitor/`, in 23 modules (the split took the releases
+`0.5.0-dev.1` to `0.5.0`). `lib/partitor-engine` is a launcher: it puts `lib/` on the path and
+starts `partitor.cli_main.main`; `python -m partitor` starts the same function. Every step of
+the split kept the output identical (`tools/g0_golden.py check`). The development history of the
+engine is in `HISTORY-ENGINE.md`. The tables below are the map of the code.
 
 ### 12.1 Modules and import levels
 
@@ -984,12 +981,12 @@ This map comes from function names and headings. Check it when a module exists.
   `from owner import NAME` makes a copy: a test patch or a rebinding then changes the
   owner and leaves the copy as it was. Today these are `console._TTY` (rebound in a
   worker), `config.TUNE`, `config.SIZE_FIRST`, `parallel.fork_map`, `analysis.analyse_one`
-  (patched by tests; the script has no copy and reads `analysis.analyse_one`),
+  (patched by tests; no other file has a copy and reads `analysis.analyse_one`),
   `render.SYSTEM_GAP_LAST` (patched by tests; `plan_pages` reads it in `render`, the script
   has no copy), `build.run_build` and `build.cmd_build` (patched by tests; their readers use
   `build.run_build` and `build.cmd_build`, also the command table of `main`, and
-  the script has no copy), `cli_items.cmd_rebuild` (patched by tests; menu `r` and the
-  command table of `main` read `cli_items.cmd_rebuild`, the script has no copy) and `vision._TESS` (the
+  no other file has a copy), `cli_items.cmd_rebuild` (patched by tests; menu `r` and the
+  command table of `main` read `cli_items.cmd_rebuild`, no other file has a copy) and `vision._TESS` (the
   path of the tesseract program; nothing rebinds it, but the plan names the owner, so the
   script reads `vision._TESS["path"]`). An object that is changed in place and never
   rebound (`console._counts`, `_FAILURES`, `_WARNINGS`, `clef.CLEF_LAST`, `clef._CLEF_TPL`,
@@ -1018,6 +1015,15 @@ This map comes from function names and headings. Check it when a module exists.
   the built-in Times without a message.
 - **Version.** `VERSION` lives in `lib/partitor/__init__.py`. The file `VERSION` in the
   repo root carries the same number for the wrapper and the installer; a test checks it.
+- **Entry point.** `lib/partitor-engine` defines nothing: it puts its own folder on the path
+  (`sys.path.insert` from `os.path.realpath(__file__)`, so `python3 -I` and a start through a
+  symlink work) and calls `partitor.cli_main.main`. `python -m partitor` (`__main__.py`, with
+  `PYTHONPATH=lib`) calls the same function. `bin/partitor`, the sandbox and the file name are
+  unchanged.
+- **Tests.** `tests/support.py` exports `pt`, a view over the package: a read finds the module
+  that defines the name, a write goes to that module (so a patch through `pt` reaches the only
+  place that reads the name), and a name that no module defines raises `AttributeError`.
+  Tests that patch use the owner module (`build.cmd_build`, `cli_items.cmd_rebuild`).
 - **Checks.** `tools/check-modules.py --static` (also in `tools/check-repo.sh` and CI),
   `--import` (each module alone in a fresh interpreter), `--affected MODULE` (the modules
   that import it, and the test files to run).

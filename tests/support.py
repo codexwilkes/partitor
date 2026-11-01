@@ -18,12 +18,11 @@ Run a test file by its path or with `unittest discover -s tests`; both find
 this module, because tests/ is put on sys.path.
 """
 import contextlib
-import importlib.machinery
-import importlib.util
 import os
 import shutil
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
@@ -43,22 +42,75 @@ except ImportError:          # system python without the venv packages
     cv2 = np = pymupdf = yaml = None
     HAVE_DEPS = False
 
-pt = analysis = clef = config = console = lines = parallel = render = vision = None
+pt = analysis = build = clef = cli_items = config = console = lines = parallel = render = vision = None
+
+
+class _View(types.ModuleType):
+    """`pt`: one object over the whole package (plan 5.2). A read finds the module that
+    defines the name; a write goes to that module, so `mock_attr(pt, NAME, fake)` and
+    `pt.NAME = fake` patch the owner, the only place the code reads the name from (R1).
+    A name that no module defines raises AttributeError (a typo would make a dead patch).
+    The table is built from the source of the modules; a name defined in two modules is
+    refused when it is used."""
+
+    def __init__(self, owners):
+        super().__init__("partitor_view")
+        object.__setattr__(self, "_owners", owners)
+
+    def _owner(self, name):
+        found = object.__getattribute__(self, "_owners").get(name, [])
+        if len(found) != 1:
+            raise AttributeError(f"{'no module defines' if not found else 'several modules define'}"
+                                 f" {name!r}: {found}")
+        return found[0]
+
+    def __getattr__(self, name):             # only when the normal lookup fails
+        return getattr(self._owner(name), name)
+
+    def __setattr__(self, name, value):
+        setattr(self._owner(name), name, value)
+
+    def __delattr__(self, name):
+        raise AttributeError("pt: delete the name on its module, not on the view")
+
+
+def _package_view():
+    """Import every module of lib/partitor and return the view over them."""
+    import ast
+    import importlib
+    pkg = os.path.join(LIB, "partitor")
+    names = sorted(f[:-3] for f in os.listdir(pkg) if f.endswith(".py") and f != "__main__.py")
+    owners = {}
+    for n in names:
+        mod = importlib.import_module("partitor" if n == "__init__" else f"partitor.{n}")
+        with open(os.path.join(pkg, n + ".py"), encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        for node in tree.body:
+            for sub in ast.walk(node) if isinstance(node, (ast.If, ast.Try)) else [node]:
+                if isinstance(sub, (ast.FunctionDef, ast.ClassDef)):
+                    bound = [sub.name]
+                elif isinstance(sub, ast.Assign):
+                    bound = [t.id for t in sub.targets if isinstance(t, ast.Name)]
+                elif isinstance(sub, ast.AnnAssign) and isinstance(sub.target, ast.Name):
+                    bound = [sub.target.id]
+                else:
+                    continue
+                for name in bound:
+                    if not name.startswith("__") and mod not in owners.setdefault(name, []):
+                        owners[name].append(mod)
+    return _View(owners)
+
+
+def package_holders(name):
+    """The package modules whose namespace holds NAME. One entry (the owner) means that no
+    module keeps a copy made by `from x import NAME` (rule R1). Needs the modules imported."""
+    return sorted(k for k, m in sys.modules.items() if k.startswith("partitor.") and name in vars(m))
+
+
 if HAVE_DEPS:
     if LIB not in sys.path:
-        sys.path.insert(0, LIB)          # the loader does not run the file as a script
-    pt = sys.modules.get("partitor_mod")  # one engine object per process
-    if pt is None:
-        _loader = importlib.machinery.SourceFileLoader("partitor_mod", SRC)
-        _spec = importlib.util.spec_from_loader("partitor_mod", _loader)
-        pt = importlib.util.module_from_spec(_spec)
-        sys.modules["partitor_mod"] = pt      # dataclasses look the module up
-        try:
-            _loader.exec_module(pt)           # an import error here must show
-        except BaseException:
-            sys.modules.pop("partitor_mod", None)
-            raise
-    # The same objects the script uses: the package is imported once per process.
+        sys.path.insert(0, LIB)              # the launcher does this for the engine itself
+    pt = _package_view()                     # an import error of a module must show here
     from partitor import analysis, build, clef, cli_items, config, console, lines, parallel, render, vision  # noqa: E402,F401
 
 needs_deps = unittest.skipUnless(HAVE_DEPS, "partitor venv packages not installed")
