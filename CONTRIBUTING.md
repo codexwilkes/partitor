@@ -55,9 +55,10 @@ For a refactor of the engine, record and check golden renders with
 ## Where does my change go
 
 The engine is mostly one script today (`lib/partitor-engine`). It is moving, step by step,
-into the package `lib/partitor/` (`DESIGN.md` §12). These 18 modules exist now: `console`,
+into the package `lib/partitor/` (`DESIGN.md` §12). These 22 modules exist now: `console`,
 `config`, `model`, `typography`, `mapping`, `bars`, `parallel`, `vision`, `clef`, `strips`,
-`reflow`, `ownership`, `lines`, `analysis`, `render`, `library`, `build`, `proof`.
+`reflow`, `ownership`, `lines`, `analysis`, `render`, `library`, `build`, `proof`,
+`cli_common`, `cli_bars`, `cli_parts`, `cli_items`.
 Until another module exists, its code is in the script. The target modules and their import
 levels:
 

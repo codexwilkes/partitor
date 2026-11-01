@@ -6,6 +6,38 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.5.0-dev.8 — 2026-10-31
+
+Seventh move of engine code (plan: `docs/DESIGN.md` §12). Four modules leave the engine
+script and go to the package `lib/partitor/`. No behaviour change: the output is the same
+(50 golden cases checked with `tools/g0_golden.py`).
+
+### Added
+
+- Modules `cli_common` (the shared CLI helpers and the `set` command; level 6), `cli_bars`
+  (the `bars` command) and `cli_parts` (the `parts` and `groups` commands, the ambitus menu;
+  both level 7), and `cli_items` (the item commands; level 8) in `lib/partitor/`, about
+  1 350 definition lines in all. The six CLI helpers that call each other in a ring
+  (`saved`, `_item_or_die`, `_lib_or_die`, `cmd_set`, `_cmd_step`, `bar_summary`) are
+  together in `cli_common`. The script imports the names, so commands, options and output
+  stay as they were.
+- `cmd_rebuild` is patched by tests, so it has no shim in the script: menu `r` and the
+  command table of `main` read `cli_items.cmd_rebuild`.
+- 5 new tests: 540 are found now (535 before). They cover the levels and the imports of the
+  four modules (no `global`, no import between `cli_bars` and `cli_parts`), that
+  `cmd_rebuild` has no shim and is not imported by name, that `main` and menu `r` call the
+  `cmd_rebuild` of `cli_items` (a fake is called), and that the ring helpers are the
+  objects of `cli_common`.
+
+### Changed
+
+- Tests that replaced `cmd_rebuild` on the script now replace it on `cli_items`.
+- The test of the `partitor-init` hint reads the package modules too, because the hint
+  moved with the CLI. The test that the wrapper lists every library command accepts a
+  command table entry of the form `module.cmd_name`.
+- `tools/modules.txt` maps the four modules to the test files that use their names.
+- Docs: `docs/DESIGN.md` §12 and `CONTRIBUTING.md` list the 22 modules that exist.
+
 ## 0.5.0-dev.7 — 2026-10-31
 
 Sixth move of engine code (plan: `docs/DESIGN.md` §12). Two modules leave the engine

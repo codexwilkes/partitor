@@ -25,8 +25,8 @@
 4 library     test_library.py,test_analysis.py,test_bars.py,test_clef.py,test_layout.py,test_parallel.py,test_render.py
 5 build       test_library.py,test_analysis.py,test_layout.py,test_mapping.py,test_render.py
 5 proof       test_bars.py,test_library.py
-6 cli_common  test_cli.py,test_library.py
-7 cli_bars    test_cli.py,test_library.py
-7 cli_parts   test_cli.py,test_library.py
-8 cli_items   test_cli.py,test_library.py
+6 cli_common  test_cli.py,test_library.py,test_bars.py,test_clef.py,test_layout.py,test_render.py
+7 cli_bars    test_cli.py,test_library.py,test_bars.py
+7 cli_parts   test_cli.py,test_library.py,test_clef.py,test_render.py
+8 cli_items   test_cli.py,test_library.py,test_layout.py,test_render.py
 9 cli_main    test_cli.py,test_library.py

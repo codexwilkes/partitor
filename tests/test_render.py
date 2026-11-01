@@ -760,7 +760,7 @@ class TestRepage(unittest.TestCase):
 
     def test_wrapper_lists_every_library_command(self):
         eng = Path(SRC).read_text()
-        cmds = set(re.findall(r'"(\w+)": cmd_\w+', eng.split("cmds = {", 1)[1].split("}", 1)[0]))
+        cmds = set(re.findall(r'"(\w+)": [\w.]*cmd_\w+', eng.split("cmds = {", 1)[1].split("}", 1)[0]))
         run = (Path(SRC).parent.parent / "bin" / "partitor").read_text()
         line = next(ln for ln in run.splitlines() if "needs_lib=1 ;;" in ln and "|" in ln)
         listed = set(line.split(")")[0].strip().split("|"))

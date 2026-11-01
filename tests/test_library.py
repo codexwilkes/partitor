@@ -27,6 +27,7 @@ sys.path.insert(0, HERE)
 from support import (  # noqa: E402,F401
     SRC,
     build,
+    cli_items,
     cv2,
     make_score_pdf,
     needs_deps,
@@ -320,8 +321,8 @@ class TestPartialBuild(unittest.TestCase):
 
     def test_menu_r_with_words(self):
         calls = []
-        real = pt.cmd_rebuild
-        pt.cmd_rebuild = lambda ns: calls.append((ns.parts, ns.jobs)) or 0
+        real = cli_items.cmd_rebuild
+        cli_items.cmd_rebuild = lambda ns: calls.append((ns.parts, ns.jobs)) or 0
         answers = iter(["r Trombones 2-3", "R", "b"])
         real_in = builtins.input
         builtins.input = lambda prompt="": next(answers)
@@ -330,7 +331,7 @@ class TestPartialBuild(unittest.TestCase):
                 pt.item_menu(self.item)
         finally:
             builtins.input = real_in
-            pt.cmd_rebuild = real
+            cli_items.cmd_rebuild = real
         self.assertEqual(calls, [(["Trombones", "2-3"], None), ([], None)])
 
 
@@ -953,3 +954,61 @@ class TestBuildModule(unittest.TestCase):
             build.cmd_build = real
         self.assertEqual(rc, 7)
         self.assertEqual(seen, ["x.pdf"])
+
+
+@needs_deps
+class TestCliModules(unittest.TestCase):
+    """The CLI helpers sit in cli_common; cmd_rebuild (an R1 name) sits in cli_items."""
+
+    RING = ("saved", "_item_or_die", "_lib_or_die", "cmd_set", "_cmd_step", "bar_summary")
+
+    def test_ring_helpers_are_one_set_of_objects_in_cli_common(self):
+        common = sys.modules["partitor.cli_common"]
+        for name in self.RING:
+            with self.subTest(name=name):
+                self.assertEqual(getattr(common, name).__module__, "partitor.cli_common")
+                self.assertIs(getattr(pt, name), getattr(common, name))        # a shim by name
+        for mod in ("cli_bars", "cli_parts", "cli_items"):
+            m = sys.modules["partitor." + mod]
+            for name in self.RING:
+                self.assertNotIn(name, vars(m).get("__annotations__", {}))
+                if name in vars(m):
+                    self.assertIs(vars(m)[name], getattr(common, name))        # imported, not copied
+
+    def test_cmd_rebuild_has_no_shim_and_main_dispatches_to_cli_items(self):
+        self.assertFalse(hasattr(pt, "cmd_rebuild"))
+        self.assertEqual(cli_items.cmd_rebuild.__module__, "partitor.cli_items")
+        if os.geteuid() == 0:
+            self.skipTest("the engine refuses root")
+        seen = []
+        real_argv = sys.argv
+        real = cli_items.cmd_rebuild
+        cli_items.cmd_rebuild = lambda ns: seen.append(ns.id) or 5
+        sys.argv = ["partitor", "rebuild", "2026-10-0001"]
+        try:
+            rc = pt.main()
+        finally:
+            sys.argv = real_argv
+            cli_items.cmd_rebuild = real
+        self.assertEqual(rc, 5)
+        self.assertEqual(seen, ["2026-10-0001"])
+
+    def test_the_menu_command_r_calls_the_cmd_rebuild_of_cli_items(self):
+        seen = []
+        real = cli_items.cmd_rebuild
+        cli_items.cmd_rebuild = lambda ns: seen.append(ns.id) or 0
+        answers = iter(["r", "b"])
+        real_in = builtins.input
+        builtins.input = lambda prompt="": next(answers)
+        with tempfile.TemporaryDirectory() as tmp:
+            item = Path(tmp, "2026-10-0008-x")
+            item.mkdir()
+            pt.save_item(item, {"id": "2026-10-0008", "slug": "x", "composer": "Schein",
+                                "title": "Nun", "parts": ["A"], "layout": {}})
+            try:
+                with open(os.devnull, "w") as dn, contextlib.redirect_stdout(dn):
+                    pt.item_menu(item)
+            finally:
+                builtins.input = real_in
+                cli_items.cmd_rebuild = real
+        self.assertEqual(seen, ["2026-10-0008"])

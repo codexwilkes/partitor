@@ -267,6 +267,8 @@ class TestRealRepo(unittest.TestCase):
         self.assertIn("library", present)          # moved in step M5
         for m in ("build", "proof"):
             self.assertIn(m, present)              # moved in step M6
+        for m in ("cli_common", "cli_bars", "cli_parts", "cli_items"):
+            self.assertIn(m, present)              # moved in step M7
         for m in present:
             with self.subTest(module=m):
                 code = f"import sys; sys.path.insert(0, {lib!r}); import partitor.{m}"
@@ -415,7 +417,7 @@ class TestRealRepo(unittest.TestCase):
 
     def test_m6_run_build_and_cmd_build_are_read_as_build_names(self):
         """Patched names: build defines them, no module imports them by name, the script has
-        no shim and reads them as build.run_build and build.cmd_build."""
+        no shim and its readers use build.run_build and build.cmd_build."""
         import ast
         with open(os.path.join(ROOT, "tests", "patchable.txt"), encoding="utf-8") as fh:
             patched = {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
@@ -427,18 +429,67 @@ class TestRealRepo(unittest.TestCase):
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.level:
                     self.assertFalse({a.name for a in node.names} & patched, m)
+        # the readers: the script (main, until step M8) and cli_items (cmd_new, offer_reflow)
+        reads = set()
+        for path in (os.path.join(ROOT, "lib", "partitor-engine"),
+                     os.path.join(ROOT, "lib", "partitor", "cli_items.py")):
+            with open(path, encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom):
+                    self.assertFalse({a.name for a in node.names} & mine)        # no shim
+                if isinstance(node, ast.Name):
+                    self.assertNotIn(node.id, mine)                              # no bare read
+                if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+                        and node.value.id == "build" and node.attr in mine):
+                    reads.add(node.attr)
+        self.assertEqual(reads, mine)
+
+    def test_m7_cli_modules_sit_on_their_levels_and_keep_no_state(self):
+        """cli_common (6), cli_bars and cli_parts (7), cli_items (8): lower imports only, so
+        cli_bars and cli_parts do not import each other; no `global`."""
+        import ast
+        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
+                 "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
+                 "lines": 2, "ownership": 2, "analysis": 3, "render": 3, "library": 4,
+                 "build": 5, "proof": 5, "cli_common": 6, "cli_bars": 7, "cli_parts": 7,
+                 "cli_items": 8}
+        for m in ("cli_common", "cli_bars", "cli_parts", "cli_items"):
+            with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    got = {node.module} if node.module else {a.name for a in node.names}
+                    for g in got:
+                        if g != "VERSION":
+                            self.assertLess(level[g], level[m], f"{m} imports {g}")
+                self.assertNotIsInstance(node, ast.Global)
+
+    def test_m7_cmd_rebuild_is_read_as_a_cli_items_name(self):
+        """cmd_rebuild is patched by tests: cli_items defines it, no module imports it by name,
+        the script has no shim and reads cli_items.cmd_rebuild (menu r and the command table)."""
+        import ast
+        with open(os.path.join(ROOT, "tests", "patchable.txt"), encoding="utf-8") as fh:
+            patched = {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
+        self.assertIn("cmd_rebuild", patched)
+        for m in ("cli_common", "cli_bars", "cli_parts", "cli_items"):
+            with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    self.assertFalse({a.name for a in node.names} & patched, m)
         with open(os.path.join(ROOT, "lib", "partitor-engine"), encoding="utf-8") as fh:
             script = ast.parse(fh.read())
-        reads = set()
+        reads = 0
         for node in ast.walk(script):
             if isinstance(node, ast.ImportFrom):
-                self.assertFalse({a.name for a in node.names} & mine)            # no shim
+                self.assertNotIn("cmd_rebuild", {a.name for a in node.names})      # no shim
             if isinstance(node, ast.Name):
-                self.assertNotIn(node.id, mine)                                  # no bare read
+                self.assertNotEqual(node.id, "cmd_rebuild")                         # no bare read
             if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
-                    and node.value.id == "build" and node.attr in mine):
-                reads.add(node.attr)
-        self.assertEqual(reads, mine)
+                    and node.value.id == "cli_items" and node.attr == "cmd_rebuild"):
+                reads += 1
+        self.assertEqual(reads, 2)
 
     def test_check_margins_lives_in_config_and_render_does_not_keep_it(self):
         """O7: check_margins and MIN_MARGIN_MM belong to config; library reads them from there."""

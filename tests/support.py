@@ -3,7 +3,7 @@
 """Shared helpers for the engine tests (tests/test_*.py) and for tools/g0_golden.py.
 
 What is here: the loader that makes the engine script importable as `pt`, the package
-modules that tests patch or read state from (`analysis`, `build`, `clef`, `config`, `console`, `lines`, `parallel`, `render`,
+modules that tests patch or read state from (`analysis`, `build`, `clef`, `cli_items`, `config`, `console`, `lines`, `parallel`, `render`,
 `vision`; patch the
 owner, never a copy: rule R1 in CONTRIBUTING.md), `HAVE_DEPS` and `needs_deps`, the synthetic score and scan drawers
 (`make_score_pdf`, `rasterize`), `mock_attr`, and the module fixtures
@@ -59,7 +59,7 @@ if HAVE_DEPS:
             sys.modules.pop("partitor_mod", None)
             raise
     # The same objects the script uses: the package is imported once per process.
-    from partitor import analysis, build, clef, config, console, lines, parallel, render, vision  # noqa: E402,F401
+    from partitor import analysis, build, clef, cli_items, config, console, lines, parallel, render, vision  # noqa: E402,F401
 
 needs_deps = unittest.skipUnless(HAVE_DEPS, "partitor venv packages not installed")
 

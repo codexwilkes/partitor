@@ -180,9 +180,17 @@ class TestInit(InitFixture):
 
 class TestHints(unittest.TestCase):
     def test_hints_name_an_existing_script(self):
-        for f in ("bin/partitor", "lib/partitor-engine"):
-            with open(os.path.join(ROOT, f), encoding="utf-8") as fh:
-                self.assertIn("partitor-init", fh.read())
+        with open(os.path.join(ROOT, "bin", "partitor"), encoding="utf-8") as fh:
+            self.assertIn("partitor-init", fh.read())
+        # the engine is the script and the modules of lib/partitor (the hint moved with the CLI)
+        pkg = os.path.join(ROOT, "lib", "partitor")
+        files = [os.path.join(ROOT, "lib", "partitor-engine")] + [
+            os.path.join(pkg, n) for n in sorted(os.listdir(pkg)) if n.endswith(".py")]
+        text = ""
+        for f in files:
+            with open(f, encoding="utf-8") as fh:
+                text += fh.read()
+        self.assertIn("partitor-init", text)
         self.assertTrue(os.access(INIT, os.X_OK))
 
     def test_installer_links_the_three_commands(self):
