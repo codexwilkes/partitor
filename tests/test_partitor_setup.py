@@ -362,6 +362,7 @@ class SetupFixture(unittest.TestCase):
         write(os.path.join(self.stubs, "runuser"),
               "#!/bin/sh\nshift 2; [ \"$1\" = -- ] && shift\n"
               "[ -n \"$STUB_LOGO_UNREADABLE\" ] && [ \"$1\" = test ] && exit 1\n"
+              "[ \"$1\" = find ] && [ -n \"$STUB_PWD_LOG\" ] && pwd > \"$STUB_PWD_LOG\"\n"
               "if [ \"$1\" = find ] && [ -n \"$STUB_PKG_UNREADABLE\" ]; then\n"
               "  printf '%s\\n' \"$STUB_PKG_UNREADABLE\"; exit 0; fi\n"
               "exec \"$@\"\n")
@@ -394,7 +395,7 @@ class SetupFixture(unittest.TestCase):
             os.makedirs(os.path.dirname(self.cred), exist_ok=True)
             write(self.cred, "username=partitor\npassword=secret-not-shown\n", mode)
 
-    def run_s(self, *args, extra=None):
+    def run_s(self, *args, extra=None, cwd=None):
         grp = subprocess.check_output(["id", "-gn"], text=True).strip()
         env = dict(os.environ, PATH=self.stubs + os.pathsep + os.environ["PATH"],
                    PARTITOR_PREFIX=self.pfx, PARTITOR_ROOT=self.opt, PARTITOR_SVC_USER=ME,
@@ -403,7 +404,8 @@ class SetupFixture(unittest.TestCase):
                    STUB_VENV_PY=self.venv_py,
                    PARTITOR_SYSTEMCTL="systemctl", PARTITOR_CRED_OWNER=f"{ME}:{grp}")
         env.update(extra or {})
-        return subprocess.run(["bash", SETUP, *args], env=env, capture_output=True, text=True)
+        return subprocess.run(["bash", SETUP, *args], env=env, capture_output=True, text=True,
+                              cwd=cwd)
 
     def calls(self):
         if not os.path.exists(self.log):
@@ -550,6 +552,14 @@ class TestSetup(SetupFixture):
     def test_package_readable_is_ok(self):
         r = self.run_s()
         self.assertIn(f"ok   package readable by {ME}: lib/partitor", r.stdout)
+
+    def test_package_check_runs_from_the_root_folder_not_the_callers(self):
+        """runuser keeps the caller's folder; a service user that cannot enter it (/root) broke `find`."""
+        seen = os.path.join(self.tmp, "find-pwd.txt")
+        r = self.run_s(extra={"STUB_PWD_LOG": seen}, cwd=self.tmp)
+        self.assertIn(f"ok   package readable by {ME}: lib/partitor", r.stdout)
+        with open(seen) as fh:
+            self.assertEqual(fh.read().strip(), "/")
 
     def test_unreadable_package_file_warns_and_does_not_fail(self):
         bad_file = os.path.join(self.pkg, "console.py")

@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.6.0. Section numbers are stable: the code cites
+Status: describes partitor 0.6.1. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.

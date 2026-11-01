@@ -6,6 +6,12 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.6.1 — 2026-11-01
+
+- `partitor-install` step 6b (package readable by the service user) runs from `/`. It
+  gave a false "package not readable" when run from a folder the service user cannot
+  enter, such as `/root`, because `runuser` keeps the folder of the caller.
+
 ## 0.6.0 — 2026-11-01
 
 The logo for title and back pages can live in the library.

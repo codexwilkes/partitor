@@ -51,6 +51,7 @@
 #      the same library check. NAS not reachable: WARN.
 #
 # CHANGELOG:
+#   0.6.1 - Step 6b runs from /, so it does not depend on the folder of the caller.
 #   0.6.0 - Step 7b: WARN when the service user cannot read <library>/logo.png.
 #   0.5.0-dev.1 - Steps 6a (bytecode of lib/partitor, checked-hash, as root) and
 #           6b (WARN when the service user cannot read the package).
@@ -302,7 +303,9 @@ if [[ -d "$PKG" ]]; then
   if ! command -v "$RUNUSER" >/dev/null 2>&1; then
     warn "package readability not checked ($RUNUSER not found)"
   else
-    unreadable="$("$RUNUSER" -u "$SVC_USER" -- find "$PKG" \( \( -type f ! -readable \) -o \( -type d \( ! -readable -o ! -executable \) \) \) -print 2>&1)" && rc=0 || rc=$?
+    # From /: runuser keeps the caller's folder, and find fails when the service user
+    # cannot enter it (for example /root).
+    unreadable="$(cd / && "$RUNUSER" -u "$SVC_USER" -- find "$PKG" \( \( -type f ! -readable \) -o \( -type d \( ! -readable -o ! -executable \) \) \) -print 2>&1)" && rc=0 || rc=$?
     if (( rc == 0 )) && [[ -z "$unreadable" ]]; then
       ok "package readable by $SVC_USER: lib/partitor"
     else
