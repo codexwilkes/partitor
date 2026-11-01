@@ -44,7 +44,7 @@ result. It is safe to run again.
    **Guided** (recommended): it asks where the library lives (local folder or
    SMB share), the path, for SMB the host, share, user and password (the
    password is not echoed; it goes to `/etc/partitor/smb.cred`, mode 0600), the
-   memory cap and an optional logo. It shows a summary, writes
+   memory cap and an optional logo (or the file `logo.png` in the library). It shows a summary, writes
    `/etc/default/partitor` (settings it does not ask about are kept), and runs
    the installer.
 
@@ -111,9 +111,10 @@ run. Keys: `PARTITOR_LIBRARY`, `PARTITOR_SMB_HOST`, `PARTITOR_SMB_SHARE`
 (storage; the installer reads these); `PARTITOR_MEMORY_MAX`, `PARTITOR_JOBS`,
 `PARTITOR_CPU_WEIGHT`, `PARTITOR_IO_WEIGHT`, `PARTITOR_RUNTIME_MAX`
 (`SANDBOX.md`); `PARTITOR_LIST_PAGE` (menu items per page, 5-200);
-`PARTITOR_LOGO` (a PNG file for title and back pages; unset = no logo). Keep the file
-outside `/home`, `/root` and `/tmp` (the sandbox hides them) and readable by the service
-user; `partitor-install` warns when it is not.
+`PARTITOR_LOGO` (a PNG file for title and back pages; unset = the file `logo.png` in the
+library folder, if there is one, else no logo). Keep the file outside `/home`, `/root`
+and `/tmp` (the sandbox hides them) and readable by the service user; `partitor-install`
+warns when it is not, also for `logo.png` in the library.
 An environment variable `PARTITOR_LIBRARY` beats the file.
 
 ## Upgrade

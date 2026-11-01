@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.5.0. Section numbers are stable: the code cites
+Status: describes partitor 0.6.0. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -116,7 +116,7 @@ Rules:
 | `rests` | `compress` | `compress` or `keep`: multi-bar rest lines for left-out staves (§4.2 item 9). |
 | `min_staff_mm`, `max_staff_mm` | `5`, `8` | Staff height floor and ceiling in mm (§5.2). |
 | `reflow_offer` | `off` | `on`: the CLI offers re-flow after a build when the print is small (§4.2 item 2). `reflow=on` works with either value. |
-| `logo` | `on` | `on` or `off`. Draws the logo on title and back pages (§5.5). Needs `PARTITOR_LOGO`. |
+| `logo` | `on` | `on` or `off`. Draws the logo on title and back pages (§5.5). Needs a logo: `PARTITOR_LOGO` or `logo.png` in the library folder. |
 | `scale` | none | Staff size factor against the source. Default: automatic (§5.2). |
 | `gap` | `normal` | Staff gap step (§5.3). |
 | `group_gap` | `5` | Space between the staves of a group line or of a part on two staves, in staff spaces. Default `source` (§4.3 item 11). |
@@ -644,10 +644,20 @@ as a rest to turn in; a group line counts as rest only when every staff rests.
 - Composer: read from the first page (right-aligned line below the title); the
   wizard suggests it, else PDF metadata. Printed at the right of the part name
   on page 1.
-- Logo (optional): `PARTITOR_LOGO` names a PNG file (black on alpha works
-  best). Unset: no logo, no room kept, no warning. Set but missing: no logo, one
-  warning, no failure. `logo=off` removes it per piece; it is not a per-part
-  key. `partitor-install` warns in advance when the file cannot be used (§9).
+- Logo (optional): a PNG file (black on alpha works best). Source, in this
+  order: `PARTITOR_LOGO` (a file named in the settings); else the file
+  `logo.png` in the library folder, next to `inbox/` and `library/` (it travels
+  with the library). Neither: no logo, no room kept, no warning. `PARTITOR_LOGO`
+  set but the file missing, or a file that is not a readable image: no logo, one
+  warning, no failure (when `PARTITOR_LOGO` is set it wins, with no fallback to
+  the library file). `logo=off` removes it per piece; it is not a per-part key,
+  and there is no per-piece logo file. `partitor-install` warns in advance when
+  the file cannot be used (§9).
+  - Channel: `render` (level 3) cannot import `library` (level 4). `build` and
+    `repage` look up `library_logo(library_root())` and pass the file to `render`
+    in the option `_logo_file`. Options that start with `_` are not stored in
+    `.lines` files, so a later `repage` looks the library up again. The code never
+    sets `PARTITOR_LOGO`.
   - Title page (constructed, 3+ pages, mostly blank): centred on the text
     block, logo centre at 76 % of the page height, 64 pt high.
   - Back page (last page of every part, one page included): centred on the text
@@ -864,7 +874,7 @@ the script and in `INSTALL.md`):
 | Bytecode of `lib/partitor` | Compile as root (`python -m compileall --invalidation-mode checked-hash`) when a `.py` file has no `.pyc` or is newer than it. The service user cannot write the read-only tree, so without the files Python compiles every module in memory at each start. `--check` reports a missing or old file. |
 | Package readability | As user `partitor`, every file of `lib/partitor` must be readable and every folder searchable. WARN with the fix command when not. |
 | Links | `partitor`, `partitor-init`, `partitor-install` in `/usr/local/sbin` -> `<repo>/bin/<name>`. |
-| Logo (optional) | Check `PARTITOR_LOGO` in the settings: WARN when the file is missing, lies where the sandbox cannot see it (`/home`, `/root`, `/run/user`, `/tmp`, `/var/tmp`) or cannot be read by user `partitor`. Never a FAIL: without the logo the engine builds as before. |
+| Logo (optional) | Check `PARTITOR_LOGO` in the settings: WARN when the file is missing, lies where the sandbox cannot see it (`/home`, `/root`, `/run/user`, `/tmp`, `/var/tmp`) or cannot be read by user `partitor`. Check `<library>/logo.png` too, when it exists: WARN when user `partitor` cannot read it (silent when absent). Never a FAIL: without the logo the engine builds as before. |
 | Self-test | `partitor --sandbox-check`: every line must be ok. |
 | SMB mode: credentials | Check `/etc/partitor/smb.cred` (0600 root:root). |
 | SMB mode: units | Mount and automount units for the library folder, written from `share/systemd/*.in`; automount enabled. The share mounts on first use and unmounts when idle; the boot never depends on the NAS. |

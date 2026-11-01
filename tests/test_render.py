@@ -15,6 +15,7 @@ import dataclasses
 import io
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -28,7 +29,9 @@ from support import (  # noqa: E402,F401
     LIB,
     SRC,
     build,
+    library,
     lines,
+    make_logo_png,
     make_score_pdf,
     mock_attr,
     needs_deps,
@@ -984,3 +987,164 @@ class TestRenderAndLinesModules(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIs(getattr(render, name), getattr(typography, name))
 
+
+
+@needs_deps
+class TestLogoInLibrary(unittest.TestCase):
+    """0.6.0: the logo may be a file `logo.png` in the library folder (DESIGN.md §5.5).
+    `build` finds it and gives it to `render` as opts["_logo_file"]; PARTITOR_LOGO wins."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.env_logo = os.environ["PARTITOR_LOGO"]
+        self.env_lib = os.environ.get("PARTITOR_LIBRARY")
+        self.addCleanup(self.restore_env)
+        self.lib_logo = Path(self.tmp.name, "other.png")
+        make_logo_png(self.lib_logo, 200, 300)
+
+    def restore_env(self):
+        os.environ["PARTITOR_LOGO"] = self.env_logo
+        if self.env_lib is None:
+            os.environ.pop("PARTITOR_LIBRARY", None)
+        else:
+            os.environ["PARTITOR_LIBRARY"] = self.env_lib
+
+    def strips(self, n):
+        return TestBatchExtras.strips(self, n)
+
+    def render_part(self, opts_extra, out_name="p.pdf"):
+        opts = {**pt.LAYOUT_DEFAULTS, "scale": 2.0, "gap": 6.0, **opts_extra}
+        out = Path(self.tmp.name, out_name)
+        with contextlib.redirect_stdout(io.StringIO()) as buf:
+            n = pt.render_part("X", self.strips(40), {"title": "T"}, 400, opts, out)
+        return n, self.logo_counts(out), buf.getvalue()
+
+    @staticmethod
+    def logo_counts(pdf):
+        """Per page: images with the aspect of one of the two test logos (the music strips differ)."""
+        asp = [200 / 300, 400 / 457]
+        return [sum(1 for i in p.get_image_info()
+                    if any(abs(i["width"] / i["height"] - a) < 0.01 for a in asp))
+                for p in pymupdf.open(pdf)]
+
+    def test_library_file_is_found_by_name_in_the_root(self):
+        root = Path(self.tmp.name, "lib")
+        root.mkdir()
+        self.assertIsNone(pt.library_logo(root))
+        (root / "logo.png").write_bytes(b"x")
+        self.assertEqual(pt.library_logo(root), root / "logo.png")
+        self.assertEqual(library.LOGO_FILE, "logo.png")
+
+    def test_no_setting_and_no_library_file_means_no_logo(self):
+        del os.environ["PARTITOR_LOGO"]
+        self.assertIsNone(pt.logo_path({}))
+        self.assertFalse(pt.logo_wanted({}))
+        n, images, _ = self.render_part({})
+        self.assertEqual((len(images), sum(images)), (n, 0))
+
+    def test_library_file_gives_a_logo_when_the_setting_is_unset(self):
+        del os.environ["PARTITOR_LOGO"]
+        opts = {"_logo_file": str(self.lib_logo)}
+        self.assertEqual(pt.logo_path(opts), self.lib_logo)
+        self.assertTrue(pt.logo_wanted(opts))
+        n, images, _ = self.render_part(opts)
+        self.assertEqual([images[0], images[-1]], [1, 1])        # title page and back page
+        self.assertEqual(sum(images[1:-1]), 0)
+
+    def test_setting_wins_over_the_library_file(self):
+        opts = {"_logo_file": str(self.lib_logo)}
+        self.assertEqual(pt.logo_path(opts), Path(self.env_logo))
+        pix = pymupdf.Pixmap(self.env_logo)
+        n, images, _ = self.render_part(opts)
+        page = pymupdf.open(Path(self.tmp.name, "p.pdf"))[0]
+        asp = [i["width"] / i["height"] for i in page.get_image_info()]
+        self.assertTrue(any(abs(a - pix.width / pix.height) < 0.01 for a in asp))
+        self.assertFalse(any(abs(a - 200 / 300) < 0.01 for a in asp))
+
+    def test_logo_off_wins_over_both(self):
+        for env in (True, False):
+            with self.subTest(setting=env):
+                if not env:
+                    del os.environ["PARTITOR_LOGO"]
+                opts = {"_logo_file": str(self.lib_logo), "logo": "off"}
+                self.assertFalse(pt.logo_wanted(opts))
+                n, images, _ = self.render_part(opts)
+                self.assertEqual(sum(images), 0)
+                os.environ["PARTITOR_LOGO"] = self.env_logo
+
+    def test_unreadable_library_file_warns_once_and_builds(self):
+        del os.environ["PARTITOR_LOGO"]
+        bad = Path(self.tmp.name, "bad.png")
+        bad.write_text("not a png")
+        pt._LOGO_WARNED.clear()
+        n, images, out = self.render_part({"_logo_file": str(bad)})
+        self.assertGreaterEqual(n, 3)
+        self.assertEqual(sum(images), 0)
+        self.assertEqual(out.count("logo:"), 1)
+        self.assertIn("library logo is not a readable image", out)
+
+    def test_plan_pages_keeps_room_for_the_library_logo_as_for_the_setting(self):
+        opts = {**pt.LAYOUT_DEFAULTS, "scale": 2.0, "gap": 6.0}
+        plans = {}
+        for k in range(30, 60):
+            plans[k] = [len(p) for p in pt.plan_pages(self.strips(k), 400, opts, False)[0]]
+        del os.environ["PARTITOR_LOGO"]
+        lib = {k: [len(p) for p in pt.plan_pages(self.strips(k), 400,
+                                                 {**opts, "_logo_file": str(self.lib_logo)}, False)[0]]
+               for k in plans}
+        self.assertEqual(lib, plans)                       # same room as the setting
+
+    def make_item(self):
+        one = Path(self.tmp.name, "page.pdf")
+        make_score_pdf(str(one), systems=2, staves=2, labels=("Alto", "Bass"), title="")
+        doc = pymupdf.open()
+        for _ in range(6):
+            doc.insert_pdf(pymupdf.open(str(one)))
+        share = Path(self.tmp.name, "share")
+        (share / "inbox").mkdir(parents=True)
+        item = share / "library" / "2026-10-0001-c-t"
+        item.mkdir(parents=True)
+        doc.save(str(item / "2026-10-0001-source.pdf"))
+        pt.save_item(item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-27"})
+        return share, item
+
+    def test_build_and_repage_pass_the_library_file_to_render(self):
+        share, item = self.make_item()
+        shutil.copy(self.lib_logo, share / "logo.png")
+        del os.environ["PARTITOR_LOGO"]
+        os.environ["PARTITOR_LIBRARY"] = str(share)
+        seen = Path(self.tmp.name, "seen.txt")
+        real = render.put_logo
+
+        def spy(page, x, y, h, align="left", opts=None):   # a file: workers fork
+            with open(seen, "a") as fh:
+                fh.write(f"{(opts or {}).get('_logo_file')}\n")
+            return real(page, x, y, h, align, opts)
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
+            d = pt.load_item(item)
+            pt.apply_set(d, ["pages=5", "max_staff_mm=8"])
+            pt.save_item(item, d)
+            with mock_attr(render, "put_logo", spy):
+                self.assertEqual(build.run_build(item), 0)
+        wanted = str(share / "logo.png")
+        self.assertTrue(seen.is_file())
+        self.assertEqual(set(seen.read_text().split()), {wanted})
+        pdfs = sorted((item / "parts").glob("*.pdf"))
+        self.assertTrue(pdfs)
+        self.assertTrue(any(sum(self.logo_counts(f)) for f in pdfs))
+        for f in (item / "lines").glob("*.lines"):               # never stored
+            self.assertNotIn("_logo_file", lines.load_lines(f)["opts"])
+        seen.unlink()
+        d = pt.load_item(item)
+        pt.apply_set(d, ["Alto:breaks=4"])
+        pt.mark_pending(d, "Alto:breaks")
+        pt.save_item(item, d)
+        with contextlib.redirect_stdout(io.StringIO()):
+            with mock_attr(render, "put_logo", spy):
+                rc = pt._engine_step(pt.cmd_repage,
+                                     argparse.Namespace(id="2026-10-0001", parts=["Alto"]))
+        self.assertEqual(rc, 0)
+        self.assertEqual(set(seen.read_text().split()), {wanted})

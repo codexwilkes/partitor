@@ -248,8 +248,9 @@ class TestSettingsDocs(unittest.TestCase):
                     self.assertTrue(key in code, key)
 
     def test_logo_wording(self):
-        # logo unset: no logo, no warning (DESIGN 5.5, CHANGELOG)
-        self.assertIn("Unset: no logo, no room kept, no warning", DESIGN)
+        # no logo set and no library file: no logo, no warning (DESIGN 5.5, CHANGELOG)
+        self.assertIn("Neither: no logo, no room kept, no warning", DESIGN)
+        self.assertIn("`PARTITOR_LOGO` (a file named in the settings); else the file\n  `logo.png` in the library folder", DESIGN)
 
     def test_storage_defaults(self):
         self.assertIn('LIBRARY="$(cfg PARTITOR_LIBRARY)"; LIBRARY="${LIBRARY:-/var/lib/partitor/library}"',

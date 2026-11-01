@@ -503,7 +503,9 @@ def draw_ambitus(page: pymupdf.Page, x: float, base: float, clef: str, lo: int,
             xa -= aw + 0.1 * sp
 
 
-# The logo is optional: PARTITOR_LOGO names a PNG file. Unset: no logo, no room kept.
+# The logo is optional. The setting is PARTITOR_LOGO (a PNG file); without it, the file
+# the caller found in the library location (opts["_logo_file"], set by build; library is
+# above this module). Neither: no logo, no room kept.
 LOGO_TITLE_H = 64.0     # pt, on a title page
 LOGO_TITLE_Y = 0.76     # title page: logo centre, share of the page height (balances the title block)
 LOGO_LAST_H = 44.0      # pt, on the back page (centred above the folio)
@@ -531,47 +533,62 @@ def logo_room(ph: float, mb: float) -> float:
     return max(0.0, LOGO_LAST_MIN_H + LOGO_GAP + LOGO_FOLIO_GAP - (folio_top(ph, mb) - (ph - mb)))
 
 
-def logo_path() -> Path | None:
-    """logo_path -> the PNG file named by PARTITOR_LOGO; None when the variable
-    is unset or the file is missing."""
-    v = os.environ.get("PARTITOR_LOGO")
+def _logo_setting(opts: dict | None) -> str | None:
+    """_logo_setting -> the logo file as set: PARTITOR_LOGO wins, then
+    opts["_logo_file"] (the library file); None when neither is set."""
+    return os.environ.get("PARTITOR_LOGO") or (opts or {}).get("_logo_file") or None
+
+
+def _logo_label(opts: dict | None) -> str:
+    return "PARTITOR_LOGO file" if os.environ.get("PARTITOR_LOGO") else "library logo"
+
+
+def logo_path(opts: dict | None = None) -> Path | None:
+    """logo_path -> the logo PNG file (see _logo_setting); None when nothing is
+    set or the file is missing."""
+    v = _logo_setting(opts)
     return Path(v) if v and Path(v).is_file() else None
 
 
 def logo_wanted(opts: dict) -> bool:
-    """logo_wanted -> True when pages carry a logo: PARTITOR_LOGO is set (even
-    when the file is missing: put_logo then warns once) and the layout key
-    `logo` is not off."""
-    return opts.get("logo", "on") == "on" and bool(os.environ.get("PARTITOR_LOGO"))
+    """logo_wanted -> True when pages carry a logo: a logo is set (even when the
+    file is missing: put_logo then warns once) and the layout key `logo` is not off."""
+    return opts.get("logo", "on") == "on" and bool(_logo_setting(opts))
 
 
-def logo_width(h: float) -> float | None:
-    """logo_width -> width in pt of the logo at height h; None when missing."""
-    path = logo_path()
+def logo_width(h: float, opts: dict | None = None) -> float | None:
+    """logo_width -> width in pt of the logo at height h; None when missing or
+    not a readable image."""
+    path = logo_path(opts)
     if path is None:
         return None
-    pix = pymupdf.Pixmap(str(path))
+    try:
+        pix = pymupdf.Pixmap(str(path))
+    except Exception:                       # noqa: BLE001  (mupdf raises its own error classes)
+        return None
     return h * pix.width / pix.height
 
 
-def put_logo(page: pymupdf.Page, x: float, y: float, h: float, align: str = "left") -> float:
-    """put_logo -> width of the logo drawn (0.0 when the file is missing, with
-    one warning per run). Top-left at (x, y), height h pt; align "right" takes
-    x as the right edge, "centre" as the centre line."""
-    path = logo_path()
-    if path is None:
+def put_logo(page: pymupdf.Page, x: float, y: float, h: float, align: str = "left",
+             opts: dict | None = None) -> float:
+    """put_logo -> width of the logo drawn (0.0 when the file is missing or not
+    a readable image, with one warning per run). Top-left at (x, y), height h pt;
+    align "right" takes x as the right edge, "centre" as the centre line."""
+    path = logo_path(opts)
+    w = logo_width(h, opts) if path is not None else None
+    if w is None:
         if not _LOGO_WARNED:
             _LOGO_WARNED.append(True)
-            _warn(f"logo: PARTITOR_LOGO file not found: {os.environ.get('PARTITOR_LOGO')} (pages are drawn without it)")
+            what = "not found" if path is None else "is not a readable image"
+            _warn(f"logo: {_logo_label(opts)} {what}: {_logo_setting(opts)} (pages are drawn without it)")
         return 0.0
-    w = logo_width(h) or 0.0
     x0 = x - w if align == "right" else (x - w / 2 if align == "centre" else x)
     page.insert_image(pymupdf.Rect(x0, y, x0 + w, y + h), filename=str(path))
     return w
 
 
 def _title_page(page: pymupdf.Page, name: str, meta: dict, box: tuple,
-                logo: bool = False) -> None:
+                logo: bool = False, opts: dict | None = None) -> None:
     """Title page (DESIGN.md §5.4): title, subtitle, part name, composer,
     members of a group, centred in the upper third."""
     pw, ph = page.rect.width, page.rect.height
@@ -598,7 +615,7 @@ def _title_page(page: pymupdf.Page, name: str, meta: dict, box: tuple,
         sp_ = AMB_SP * 1.15
         draw_ambitus(page, cx - ambitus_width(sp_) / 2, y + 48, *meta["ambitus"], sp=sp_)
     if logo:                                  # centred, towards the bottom (balances the title block)
-        put_logo(page, cx, ph * LOGO_TITLE_Y - LOGO_TITLE_H / 2, LOGO_TITLE_H, "centre")
+        put_logo(page, cx, ph * LOGO_TITLE_Y - LOGO_TITLE_H / 2, LOGO_TITLE_H, "centre", opts)
 
 
 def turn_list(strips: list[Strip], pages: list, title_page: bool, opts: dict,
@@ -646,7 +663,7 @@ def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
     left_ink = max(anchor(s) for s in strips)    # widest ink left of the alignment line
     if title_page:
         page = doc.new_page(width=pw, height=ph)
-        _title_page(page, name, meta, page_box(opts, 0, duplex), logo_wanted(opts))
+        _title_page(page, name, meta, page_box(opts, 0, duplex), logo_wanted(opts), opts)
     for ci, pg in enumerate(pages):
         phys = ci + (1 if title_page else 0)
         page = doc.new_page(width=pw, height=ph)
@@ -740,8 +757,8 @@ def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
             lh = min(LOGO_LAST_H, free - LOGO_GAP)
             if lh >= LOGO_LAST_MIN_H:
                 put_logo(page, (ml + pw - mr) / 2, folio_top(ph, mb) - LOGO_FOLIO_GAP - lh, lh,
-                         "centre")
-            elif logo_path() is not None:
+                         "centre", opts)
+            elif logo_path(opts) is not None:
                 _warn(f"{name}: no room for the logo on the back page (page {ci + 1}); left out")
     doc.save(out, garbage=3, deflate=True)
     LAST_RENDER.update(content=n, title_page=title_page)

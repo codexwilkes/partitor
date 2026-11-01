@@ -40,6 +40,8 @@
 #      missing, lies where the sandbox cannot see it (/home, /root, /run/user,
 #      /tmp, /var/tmp: ProtectHome, PrivateTmp), or the service user cannot
 #      read it. A warning only: the engine builds without the logo.
+#   7b. Logo of the library (optional, <library>/logo.png): WARN when the
+#      service user cannot read it. Silent when the file is absent.
 #   8. Self-test: partitor --sandbox-check (runs the engine in the sandbox;
 #      every line must be ok).
 #   9. smb mode: /etc/partitor/smb.cred (0600 root:root, username= and
@@ -49,6 +51,7 @@
 #      the same library check. NAS not reachable: WARN.
 #
 # CHANGELOG:
+#   0.6.0 - Step 7b: WARN when the service user cannot read <library>/logo.png.
 #   0.5.0-dev.1 - Steps 6a (bytecode of lib/partitor, checked-hash, as root) and
 #           6b (WARN when the service user cannot read the package).
 #   0.4.2 - WARN when the service user cannot read PARTITOR_LOGO (step 7a).
@@ -353,6 +356,21 @@ if [[ -n "$LOGO" && "$LOGO" != none ]]; then
           echo "  Run: sudo chmod o+r $LOGO"
         fi ;;
     esac
+  fi
+fi
+
+# 7b. logo of the library (optional): the file logo.png in the library folder.
+# Silent when there is none. A warning only, as for 7a. timeout: an SMB library may be
+# on an automount whose NAS does not answer.
+LIBLOGO="$LIBRARY/logo.png"
+if timeout 10 test -f "$PFX$LIBLOGO"; then
+  if ! command -v "$RUNUSER" >/dev/null 2>&1; then
+    warn "library logo readability not checked ($RUNUSER not found)"
+  elif "$RUNUSER" -u "$SVC_USER" -- test -r "$PFX$LIBLOGO" >/dev/null 2>&1; then
+    ok "library logo readable by $SVC_USER: $LIBLOGO"
+  else
+    warn "library logo not readable by $SVC_USER: $LIBLOGO (the engine builds without it)"
+    echo "  Run: sudo chmod o+r $LIBLOGO"
   fi
 fi
 

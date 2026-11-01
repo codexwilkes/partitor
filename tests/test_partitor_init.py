@@ -151,6 +151,17 @@ class TestInit(InitFixture):
         self.assertIn("PARTITOR_LOGO=/etc/partitor/logo.png", self.logged())
         self.assertNotIn("WARN", r.stderr)
 
+    def test_logo_none_tells_about_the_library_file(self):
+        r = self.run_i("", "--yes", "--library", "/srv/library", "--logo", "none")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("put a PNG file named logo.png in /srv/library", r.stdout)
+        self.assertNotIn("PARTITOR_LOGO", self.logged())
+        lib = os.path.join(self.pfx, "srv", "library")
+        os.makedirs(lib)
+        open(os.path.join(lib, "logo.png"), "wb").close()
+        r = self.run_i("", "--yes", "--library", "/srv/library", "--logo", "none")
+        self.assertIn("the logo of the library is used: /srv/library/logo.png", r.stdout)
+
     def test_missing_logo_gives_a_warning_only(self):
         r = self.run_i("", "--yes", "--logo", "/nope/logo.png")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)

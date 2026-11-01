@@ -108,6 +108,16 @@ def library_root() -> Path:
     return Path(os.environ.get("PARTITOR_LIBRARY", LIBRARY_DEFAULT))
 
 
+LOGO_FILE = "logo.png"      # the library's own logo, next to inbox/ and library/
+
+
+def library_logo(root: Path) -> Path | None:
+    """library_logo -> the logo file of the library at root (DESIGN.md §5.5);
+    None when there is none."""
+    p = Path(root, LOGO_FILE)
+    return p if p.is_file() else None
+
+
 def item_dirs(lib: Path) -> list[Path]:
     if not lib.is_dir():
         return []

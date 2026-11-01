@@ -12,7 +12,8 @@
 #   3. SMB: host, share name, user and password (the password is not echoed
 #      and not shown again; it goes to /etc/partitor/smb.cred, 0600 root)
 #   4. the memory cap of one run (auto, or a size like 8G)
-#   5. an optional logo file (PNG) for title and back pages
+#   5. an optional logo file (PNG) for title and back pages; "none" leaves the
+#      choice to the file logo.png in the library folder, if there is one
 # Then it shows a summary and asks to go on. Existing values in
 # /etc/default/partitor are the defaults, and settings it does not ask about
 # (for example PARTITOR_JOBS) are kept.
@@ -27,7 +28,7 @@
 #     --smb-host HOST     SMB mode: host name or IPv4 address of the NAS
 #     --smb-share NAME    SMB share name (default partitor)
 #     --memory SIZE       memory cap: auto or a size (8G)
-#     --logo FILE         PNG file; "none" = no logo
+#     --logo FILE         PNG file; "none" = the logo.png of the library, if any
 #     --no-install        write the settings to --out and stop
 #     --out FILE          settings file for --no-install (default ./partitor.conf)
 #   The password is only read from the terminal, never from an option.
@@ -155,10 +156,17 @@ mem_def="${O_MEMORY:-$(cfg PARTITOR_MEMORY_MAX)}"; mem_def="${mem_def:-auto}"
 ask MEMORY "Memory cap of one run (auto = 70 % of the machine, or a size like 8G)" "$mem_def" \
   '^(auto|[0-9]+[KMGT]?)$' "auto or a size such as 8G is needed"
 logo_def="${O_LOGO:-$(cfg PARTITOR_LOGO)}"; logo_def="${logo_def:-none}"
-ask LOGO "Logo PNG file for title and back pages (none = no logo)" "$logo_def" \
+ask LOGO "Logo PNG file for title and back pages (none = the logo.png in the library, if any)" "$logo_def" \
   '^(none|/[A-Za-z0-9._/-]+)$' "none, or an absolute path of letters, digits and . _ / - "
 if [[ "$LOGO" != none && ! -f "$PFX$LOGO" ]]; then
   echo "partitor-init: WARN logo file not found now: $LOGO (the engine then prints one warning and builds without it)" >&2
+fi
+if [[ "$LOGO" == none ]]; then
+  if [[ -f "$PFX$LIBRARY/logo.png" ]]; then
+    echo "partitor-init: the logo of the library is used: $LIBRARY/logo.png"
+  else
+    echo "partitor-init: no logo now. To add one, put a PNG file named logo.png in $LIBRARY"
+  fi
 fi
 
 # ── summary ────────────────────────────────────────────────────────────────
@@ -173,7 +181,8 @@ else
   echo "  storage:  local folder $LIBRARY"
 fi
 echo "  memory:   $MEMORY"
-echo "  logo:     $LOGO"
+if [[ "$LOGO" == none ]]; then echo "  logo:     none set (logo.png in $LIBRARY, if present)"
+else echo "  logo:     $LOGO"; fi
 if (( ! YES )); then
   read -r -p "Go on? [Y/n]: " go || die "input ended"
   [[ "${go:-y}" =~ ^[Yy] ]] || die "stopped; nothing was changed"

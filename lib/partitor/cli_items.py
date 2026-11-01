@@ -30,9 +30,9 @@ from .console import (
 from .library import (
     PARTS_NEW, PARTS_PREV, REPAGE_KEYS, _id_parts, apply_set, build_names, folder_name,
     id_order, inbox_pdfs, item_dirs, item_file, item_id, item_line, item_status,
-    keep_other_parts, load_item, mark_pending, merge_item_keys, next_id, parse_parts,
-    part_layout, recover_parts, restore_previous_parts, save_item, selection_help, set_name,
-    set_value, suggest_meta, swap_parts,
+    keep_other_parts, library_logo, library_root, load_item, mark_pending, merge_item_keys,
+    next_id, parse_parts, part_layout, recover_parts, restore_previous_parts, save_item,
+    selection_help, set_name, set_value, suggest_meta, swap_parts,
 )
 from .lines import count_bad_turns, lines_path, load_lines, turn_text
 from .proof import annotate_proof, proof_from_preview
@@ -641,6 +641,9 @@ def cmd_repage(a: argparse.Namespace) -> int:
             continue
         lay = part_layout(data, nm)
         o = {**pl["opts"], **{k: lay.get(k) for k in REPAGE_KEYS}}
+        lib_logo = library_logo(library_root())
+        if lib_logo:
+            o["_logo_file"] = str(lib_logo)
         old = built[nm]
         fn = stage / old["file"]
         try:

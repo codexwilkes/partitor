@@ -32,8 +32,8 @@ from .console import (
 )
 from .library import (
     GAP_MAX, PARTS_NEW, PARTS_PREV, build_names, item_file, item_id, item_line, keep_lines,
-    keep_other_parts, load_item, part_layout, partial_blocker, piece_tag, recover_parts,
-    save_item, score_name, swap_parts,
+    keep_other_parts, library_logo, library_root, load_item, part_layout, partial_blocker,
+    piece_tag, recover_parts, save_item, score_name, swap_parts,
 )
 from .lines import count_bad_turns, fill_rests, finish_lines, lines_path, save_lines
 from .mapping import assign_maps
@@ -339,6 +339,9 @@ def cmd_build(a: argparse.Namespace) -> int:
         opts[key] = float(opts[key])
     if opts["gap_min"] > opts["gap"]:
         opts["gap_min"] = opts["gap"]
+    lib_logo = library_logo(library_root())
+    if lib_logo:                         # render cannot see the library: pass the file (not stored in .lines)
+        opts["_logo_file"] = str(lib_logo)
     sysmaps = {}
     bad = False
     for srec in lay["systems"]:

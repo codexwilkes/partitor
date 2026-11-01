@@ -612,6 +612,30 @@ class TestSetup(SetupFixture):
         r = self.logo_run("none", make=False)
         self.assertNotIn("logo", r.stdout.replace("PARTITOR_LOGO=none", ""))
 
+    def library_logo_run(self, make=True, unreadable=False):
+        """Install with the library at /mnt/partitor; logo.png in it, no PARTITOR_LOGO."""
+        self.configure(smb=True)
+        if make:
+            path = self.pfx + "/mnt/partitor/logo.png"
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            write(path, "png", 0o644)
+        return self.run_s(extra={"STUB_LOGO_UNREADABLE": "1" if unreadable else ""})
+
+    def test_library_logo_readable_is_ok(self):
+        r = self.library_logo_run()
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("ok   library logo readable by", r.stdout)
+
+    def test_library_logo_not_readable_warns_and_does_not_fail(self):
+        r = self.library_logo_run(unreadable=True)
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertIn("WARN library logo not readable by", r.stdout)
+        self.assertIn("chmod o+r /mnt/partitor/logo.png", r.stdout)
+
+    def test_no_library_logo_says_nothing(self):
+        r = self.library_logo_run(make=False)
+        self.assertNotIn("logo", r.stdout)
+
     def test_logo_check_runs_with_check_and_changes_nothing(self):
         self.logo_run("/etc/partitor/logo.png")
         r = self.run_s("--check", extra={"STUB_LOGO_UNREADABLE": "1"})

@@ -6,6 +6,24 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.6.0 — 2026-11-01
+
+The logo for title and back pages can live in the library.
+
+- The engine looks for the file `logo.png` in the library folder (next to `inbox/` and
+  `library/`). It is used when `PARTITOR_LOGO` is not set; `PARTITOR_LOGO` wins when both
+  exist. No logo file at all: output is unchanged (no logo, no room kept, no warning).
+- `logo=off` still removes the logo per piece. There is no per-piece logo file.
+- A logo file that is not a readable image (library or `PARTITOR_LOGO`) gives one warning
+  and the build goes on without the logo; before, a `PARTITOR_LOGO` file of that kind
+  stopped the build.
+- `build` and `repage` look up the library file and pass it to the page renderer in the
+  option `_logo_file`. It is not stored in `.lines` files.
+- `partitor-install` also checks that the service user can read `<library>/logo.png`
+  (a warning only; silent when there is no file). `partitor-init` tells whether the
+  library has a logo when you answer `none`.
+- Docs: `docs/DESIGN.md` §5.5 and §9, `docs/INSTALL.md`.
+
 ## 0.5.0 — 2026-10-31
 
 The engine is now the package `lib/partitor/`, in 23 modules with a fixed import order
