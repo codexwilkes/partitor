@@ -6,6 +6,12 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.6.3 — 2026-11-01
+
+- The `logo` line in the settings help of `layout.yaml` and `score.yaml` now says where the
+  logo comes from: the file of `PARTITOR_LOGO`, else `logo.png` in the library folder. No
+  change in behaviour. Existing files keep the old text until they are written again.
+
 ## 0.6.2 — 2026-11-01
 
 Item commands start faster. No change in output, messages or exit codes.

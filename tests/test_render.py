@@ -994,6 +994,15 @@ class TestLogoInLibrary(unittest.TestCase):
     """0.6.0: the logo may be a file `logo.png` in the library folder (DESIGN.md §5.5).
     `build` finds it and gives it to `render` as opts["_logo_file"]; PARTITOR_LOGO wins."""
 
+    def test_the_layout_help_names_both_logo_sources(self):
+        """The `logo` line of the layout help (copied into every layout.yaml and score.yaml)
+        names PARTITOR_LOGO and the library file."""
+        text = pt.LAYOUT_HELP
+        i = text.index("#   logo:")
+        entry = text[i:text.index("#   min_staff_mm", i)]
+        self.assertIn("PARTITOR_LOGO", entry)
+        self.assertIn("logo.png in the library folder", entry)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

@@ -113,8 +113,8 @@ LAYOUT_HELP = """\
 #     (compress; --rests)
 #   title_page: auto | off; auto = a title page for 3+ pages of music
 #     printed double-sided (auto; --title-page)
-#   logo: on | off; the logo (PARTITOR_LOGO) on the first page and the back page
-#     (on; `set ID logo=off`)
+#   logo: on | off; the logo on the first page and the back page: the file of
+#     PARTITOR_LOGO, else logo.png in the library folder (on; `set ID logo=off`)
 #   min_staff_mm: smallest staff height (5; --min-staff-mm)
 #   page_count: force this many pages (none; --page-count)
 #   margin_top, margin_bottom, margin_side: mm (15, 15, 15; --margin-top,
