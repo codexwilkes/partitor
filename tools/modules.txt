@@ -23,7 +23,7 @@
 3 analysis    test_analysis.py
 3 render      test_render.py,test_clef.py
 4 library     test_library.py,test_analysis.py,test_bars.py,test_clef.py,test_layout.py,test_parallel.py,test_render.py
-5 build       test_library.py
+5 build       test_library.py,test_analysis.py,test_layout.py,test_mapping.py,test_render.py
 5 proof       test_bars.py,test_library.py
 6 cli_common  test_cli.py,test_library.py
 7 cli_bars    test_cli.py,test_library.py

@@ -26,6 +26,7 @@ sys.path.insert(0, HERE)
 
 from support import (  # noqa: E402,F401
     SRC,
+    build,
     cv2,
     make_score_pdf,
     needs_deps,
@@ -48,13 +49,13 @@ class TestSafeBuild(unittest.TestCase):
         pt.save_item(self.item, {"id": "2026-10-0004", "slug": "x", "composer": "Schein",
                                  "title": "Nun", "parts": ["A"], "layout": {}})
         (self.item / "2026-10-0004-source.pdf").write_bytes(b"%PDF")
-        self.real = pt.cmd_build
+        self.real = build.cmd_build
         self.mode = "ok"
         self.calls = 0
-        pt.cmd_build = self.fake
+        build.cmd_build = self.fake
 
     def tearDown(self):
-        pt.cmd_build = self.real
+        build.cmd_build = self.real
         self.tmp.cleanup()
 
     def fake(self, ns):
@@ -66,8 +67,8 @@ class TestSafeBuild(unittest.TestCase):
             return 1
         if self.mode == "kill":
             raise KeyboardInterrupt
-        pt.LAST_BUILD.clear()
-        pt.LAST_BUILD.append({"part": "A", "pages": 2, "content_pages": 2, "staff_mm": 6.0,
+        build.LAST_BUILD.clear()
+        build.LAST_BUILD.append({"part": "A", "pages": 2, "content_pages": 2, "staff_mm": 6.0,
                               "staff_max_mm": 6.0, "width_mm": 6.0, "gap": 10.0,
                               "file": f"01-a-gen{self.calls}.pdf"})
         return 0
@@ -77,8 +78,11 @@ class TestSafeBuild(unittest.TestCase):
         return sorted(p.name for p in d.iterdir()) if d.is_dir() else None
 
     def build(self):
+        before = self.calls
         with open(os.devnull, "w") as dn, contextlib.redirect_stdout(dn):
-            return pt.run_build(self.item)
+            rc = build.run_build(self.item)
+        self.assertEqual(self.calls, before + 1)         # run_build reached the fake cmd_build
+        return rc
 
     def test_first_build_makes_parts_and_no_stage(self):
         self.assertEqual(self.build(), 0)
@@ -210,14 +214,14 @@ class TestPartialBuild(unittest.TestCase):
                                  "title": "Nun", "parts": names, "groups": {"G": ["B", "C"]},
                                  "layout": {}})
         (self.item / "2026-10-0004-source.pdf").write_bytes(b"%PDF")
-        self.real = pt.cmd_build
+        self.real = build.cmd_build
         self.gen = 0
         self.asked = []
-        pt.cmd_build = self.fake
+        build.cmd_build = self.fake
         self.build()                                           # the first, full build
 
     def tearDown(self):
-        pt.cmd_build = self.real
+        build.cmd_build = self.real
         self.tmp.cleanup()
 
     def fake(self, ns):
@@ -226,7 +230,7 @@ class TestPartialBuild(unittest.TestCase):
         self.asked.append(ns.only)
         d = Path(ns.parts_dir)
         d.mkdir(exist_ok=True)
-        pt.LAST_BUILD.clear()
+        build.LAST_BUILD.clear()
         data = pt.load_item(self.item)
         for num, nm in pt.build_names(data):
             if ns.only and nm not in ns.only:
@@ -234,14 +238,17 @@ class TestPartialBuild(unittest.TestCase):
             fn = pt.part_file_name(num, nm, ns.tail)
             (d / fn).write_bytes(f"g{self.gen}".encode())            # the generation is the content
             (d / fn.replace(".pdf", "-11x17.pdf")).write_bytes(f"g{self.gen}".encode())
-            pt.LAST_BUILD.append({"part": nm, "pages": 2, "content_pages": 2, "staff_mm": 6.0,
+            build.LAST_BUILD.append({"part": nm, "pages": 2, "content_pages": 2, "staff_mm": 6.0,
                                   "staff_max_mm": 6.0, "width_mm": 6.0, "gap": 10.0,
                                   "file": fn, "large": fn.replace(".pdf", "-11x17.pdf")})
         return 0
 
     def build(self, only=None):
+        before = len(self.asked)
         with open(os.devnull, "w") as dn, contextlib.redirect_stdout(dn):
-            return pt.run_build(self.item, only)
+            rc = build.run_build(self.item, only)
+        self.assertEqual(len(self.asked), before + 1)    # run_build reached the fake cmd_build
+        return rc
 
     def files(self, sub="parts"):
         return sorted(p.name for p in (self.item / sub).iterdir())
@@ -306,8 +313,9 @@ class TestPartialBuild(unittest.TestCase):
 
     def test_a_failed_partial_build_leaves_parts_as_they_were(self):
         before = self.files()
-        pt.cmd_build = lambda ns: 1
+        build.cmd_build = lambda ns: self.asked.append(ns.only) or 1     # fails, and is seen
         self.assertEqual(self.build(["B"]), 1)
+        self.assertEqual(self.asked[-1], ["B"])
         self.assertEqual(self.files(), before)
 
     def test_menu_r_with_words(self):
@@ -354,14 +362,14 @@ class TestPartialBuildReal(unittest.TestCase):
                             e["map"] = ["-", "Bass"]
                     pt.save_item(item, d)
                     os.environ["PARTITOR_JOBS"] = "1"
-                    self.assertEqual(pt.run_build(item), 0)
+                    self.assertEqual(build.run_build(item), 0)
                     serial = self.sig(item)
                     os.environ["PARTITOR_JOBS"] = "2"
-                    self.assertEqual(pt.run_build(item), 0)
+                    self.assertEqual(build.run_build(item), 0)
                     self.assertEqual(self.sig(item), serial)             # workers: the same files
                 buf = io.StringIO()
                 with contextlib.redirect_stdout(buf):
-                    self.assertEqual(pt.run_build(item, ["Alto"]), 0)
+                    self.assertEqual(build.run_build(item, ["Alto"]), 0)
                 self.assertIn("analysing 2 of 3 page(s)", buf.getvalue())   # page 2 only rests
                 self.assertEqual(self.sig(item), serial)                 # Alto the same, Bass kept
             finally:
@@ -885,3 +893,63 @@ class TestLibrary(unittest.TestCase):
                            env=env)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("does not run as root", r.stderr)
+
+
+@needs_deps
+class TestBuildModule(unittest.TestCase):
+    """build owns run_build and cmd_build (R1 names, no shim) and the LAST_BUILD list."""
+
+    def test_patched_names_have_no_shim_and_other_names_do(self):
+        self.assertFalse(hasattr(pt, "run_build"))
+        self.assertFalse(hasattr(pt, "cmd_build"))
+        self.assertEqual(build.run_build.__module__, "partitor.build")
+        self.assertEqual(build.cmd_build.__module__, "partitor.build")
+        self.assertIs(pt.run_detect, build.run_detect)         # not patched: a shim by name
+        self.assertIs(pt.annotate_proof, sys.modules["partitor.proof"].annotate_proof)
+
+    def test_last_build_is_one_list_changed_in_place(self):
+        self.assertIs(pt.LAST_BUILD, build.LAST_BUILD)
+        build.LAST_BUILD.clear()
+        build.LAST_BUILD.append({"part": "A"})
+        self.assertEqual(pt.LAST_BUILD, [{"part": "A"}])
+        build.LAST_BUILD.clear()
+        self.assertIs(pt.LAST_BUILD, build.LAST_BUILD)
+
+    def test_run_build_calls_the_cmd_build_of_the_build_module(self):
+        seen = []
+        real = build.cmd_build
+
+        def spy(ns):
+            seen.append(ns.parts_dir)
+            return 1
+        with tempfile.TemporaryDirectory() as tmp:
+            item = Path(tmp, "2026-10-0007-x")
+            item.mkdir()
+            pt.save_item(item, {"id": "2026-10-0007", "slug": "x", "composer": "Schein",
+                                "title": "Nun", "parts": ["A"], "layout": {}})
+            (item / "2026-10-0007-source.pdf").write_bytes(b"%PDF")
+            build.cmd_build = spy
+            try:
+                with open(os.devnull, "w") as dn, contextlib.redirect_stdout(dn):
+                    rc = build.run_build(item)
+            finally:
+                build.cmd_build = real
+        self.assertEqual(rc, 1)
+        self.assertEqual(len(seen), 1)
+        self.assertIs(build.cmd_build, real)
+
+    def test_main_dispatches_build_through_the_module(self):
+        if os.geteuid() == 0:
+            self.skipTest("the engine refuses root")
+        seen = []
+        real_argv = sys.argv
+        real = build.cmd_build
+        build.cmd_build = lambda ns: seen.append(ns.pdf) or 7
+        sys.argv = ["partitor", "build", "x.pdf"]
+        try:
+            rc = pt.main()
+        finally:
+            sys.argv = real_argv
+            build.cmd_build = real
+        self.assertEqual(rc, 7)
+        self.assertEqual(seen, ["x.pdf"])

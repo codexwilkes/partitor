@@ -265,6 +265,8 @@ class TestRealRepo(unittest.TestCase):
         for m in ("lines", "render"):
             self.assertIn(m, present)              # moved in step M4
         self.assertIn("library", present)          # moved in step M5
+        for m in ("build", "proof"):
+            self.assertIn(m, present)              # moved in step M6
         for m in present:
             with self.subTest(module=m):
                 code = f"import sys; sys.path.insert(0, {lib!r}); import partitor.{m}"
@@ -392,6 +394,51 @@ class TestRealRepo(unittest.TestCase):
                 bound = {node.name} if isinstance(node, ast.FunctionDef) else {
                     t.id for t in node.targets if isinstance(t, ast.Name)}
                 self.assertFalse(bound & patched, "library must not own a patched name")
+
+    def test_m6_build_and_proof_are_level_5_and_do_not_import_each_other(self):
+        """build and proof (both 5): lower imports only, none between them, no `global`."""
+        import ast
+        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
+                 "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
+                 "lines": 2, "ownership": 2, "analysis": 3, "render": 3, "library": 4,
+                 "build": 5, "proof": 5}
+        for m in ("build", "proof"):
+            with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    got = {node.module} if node.module else {a.name for a in node.names}
+                    for g in got:
+                        if g != "VERSION":
+                            self.assertLess(level[g], level[m], f"{m} imports {g}")
+                self.assertNotIsInstance(node, ast.Global)
+
+    def test_m6_run_build_and_cmd_build_are_read_as_build_names(self):
+        """Patched names: build defines them, no module imports them by name, the script has
+        no shim and reads them as build.run_build and build.cmd_build."""
+        import ast
+        with open(os.path.join(ROOT, "tests", "patchable.txt"), encoding="utf-8") as fh:
+            patched = {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
+        mine = {"run_build", "cmd_build"}
+        self.assertLessEqual(mine, patched)
+        for m in ("build", "proof"):
+            with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    self.assertFalse({a.name for a in node.names} & patched, m)
+        with open(os.path.join(ROOT, "lib", "partitor-engine"), encoding="utf-8") as fh:
+            script = ast.parse(fh.read())
+        reads = set()
+        for node in ast.walk(script):
+            if isinstance(node, ast.ImportFrom):
+                self.assertFalse({a.name for a in node.names} & mine)            # no shim
+            if isinstance(node, ast.Name):
+                self.assertNotIn(node.id, mine)                                  # no bare read
+            if (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+                    and node.value.id == "build" and node.attr in mine):
+                reads.add(node.attr)
+        self.assertEqual(reads, mine)
 
     def test_check_margins_lives_in_config_and_render_does_not_keep_it(self):
         """O7: check_margins and MIN_MARGIN_MM belong to config; library reads them from there."""

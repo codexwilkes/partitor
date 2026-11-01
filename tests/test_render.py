@@ -26,6 +26,7 @@ sys.path.insert(0, HERE)
 from support import (  # noqa: E402,F401
     LIB,
     SRC,
+    build,
     lines,
     make_score_pdf,
     mock_attr,
@@ -693,7 +694,7 @@ class TestRepage(unittest.TestCase):
                 d = pt.load_item(item)
                 pt.apply_set(d, ["pages=5", "max_staff_mm=8"])
                 pt.save_item(item, d)
-                self.assertEqual(pt.run_build(item), 0)
+                self.assertEqual(build.run_build(item), 0)
             self.assertTrue(any((item / "lines").glob("*.lines")))
             self.assertFalse((item / pt.LINES_NEW).exists())
             before = pt.load_item(item)["built"]["parts"]

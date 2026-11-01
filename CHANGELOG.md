@@ -6,6 +6,33 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.5.0-dev.7 — 2026-10-31
+
+Sixth move of engine code (plan: `docs/DESIGN.md` §12). Two modules leave the engine
+script and go to the package `lib/partitor/`. No behaviour change: the output is the same
+(50 golden cases checked with `tools/g0_golden.py`).
+
+### Added
+
+- Modules `build` (the `pieces`, `detect` and `build` commands, `run_detect`, `run_build`,
+  build reports, size steps; about 840 definition lines) and `proof` (the proof PDF; about
+  180 definition lines) in `lib/partitor/`. Both sit on level 5 and import nothing from each
+  other. The script imports their names, so commands, options and output stay as they were.
+- `run_build` and `cmd_build` are patched by tests, so they have no shim in the script: the
+  script reads them as `build.run_build` and `build.cmd_build` (the command table of `main`
+  too). `LAST_BUILD` is changed in place only; the script and `build` share one list.
+- 6 new tests: 535 are found now (529 before). They cover the level and the imports of
+  `build` and `proof`, that `run_build` and `cmd_build` have no shim and are not imported
+  by name, that `run_build` and `main` call the `cmd_build` of `build` (a fake is called),
+  and that `LAST_BUILD` is one list.
+
+### Changed
+
+- Tests that replaced `run_build` or `cmd_build` on the script now replace them on `build`,
+  and assert that the fake was called.
+- `tools/modules.txt` maps `build` to the test files that use its names.
+- Docs: `docs/DESIGN.md` §12 and `CONTRIBUTING.md` list the 18 modules that exist.
+
 ## 0.5.0-dev.6 — 2026-10-31
 
 Fifth move of engine code (plan: `docs/DESIGN.md` §12). One module leaves the engine

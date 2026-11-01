@@ -33,6 +33,7 @@ from support import (  # noqa: E402,F401
     SP,
     SRC,
     analysis,
+    build,
     config,
     console,
     cv2,
@@ -350,10 +351,12 @@ class TestOcrState(unittest.TestCase):
         self.assertEqual(set(vision._TESS), {"path"})
 
     def test_script_reads_it_through_the_owner(self):
-        text = Path(SRC).read_text(encoding="utf-8")
-        self.assertIn('vision._TESS["path"]', text)
-        code = "\n".join(ln for ln in text.split("\n") if not ln.lstrip().startswith("#"))
-        self.assertIsNone(re.search(r"(?<!vision\.)\b_TESS\b", code))   # no bare name, no shim
+        # cmd_detect reads it; since step M6 that code is in build, not in the script
+        build_text = Path(SRC).with_name("partitor").joinpath("build.py").read_text(encoding="utf-8")
+        self.assertIn('vision._TESS["path"]', build_text)
+        for text in (Path(SRC).read_text(encoding="utf-8"), build_text):
+            code = "\n".join(ln for ln in text.split("\n") if not ln.lstrip().startswith("#"))
+            self.assertIsNone(re.search(r"(?<!vision\.)\b_TESS\b", code))   # no bare name, no shim
 
     def test_detect_sees_a_change_of_the_owner_state(self):
         tmp = tempfile.mkdtemp(prefix="tess-")
@@ -579,7 +582,7 @@ class TestDetectParallel(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
                 with mock_attr(analysis, "analyse_one", self._spy(log)):
-                    self.assertEqual(pt.run_build(item), 0)
+                    self.assertEqual(build.run_build(item), 0)
         finally:
             if old is None:
                 os.environ.pop("PARTITOR_JOBS", None)
@@ -600,7 +603,7 @@ class TestDetectParallel(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
                 self.assertEqual(cv2.getNumThreads(), threads)   # pool restored after the fork
-                self.assertEqual(pt.run_build(item), 0)
+                self.assertEqual(build.run_build(item), 0)
         finally:
             if old is None:
                 os.environ.pop("PARTITOR_JOBS", None)

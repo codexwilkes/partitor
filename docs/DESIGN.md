@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.5.0-dev.6. Section numbers are stable: the code cites
+Status: describes partitor 0.5.0-dev.7. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -913,10 +913,10 @@ See `KNOWN-LIMITS.md`.
 
 The engine is mostly one script today, `lib/partitor-engine`. It moves in small steps into
 the package `lib/partitor/`, in 23 modules (releases `0.5.0-dev.1` to `0.5.0`).
-Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.6
-these 16 modules exist: `console`, `config`, `model`, `typography`, `mapping`, `bars`,
+Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.7
+these 18 modules exist: `console`, `config`, `model`, `typography`, `mapping`, `bars`,
 `parallel`, `vision`, `clef`, `strips`, `reflow`, `ownership`, `lines`, `analysis`,
-`render`, `library`; the script
+`render`, `library`, `build`, `proof`; the script
 imports their names until the last step (except the names of R1, below). A module that is not in
 `lib/partitor/` yet is a proposal in the tables below.
 
@@ -986,13 +986,16 @@ This map comes from function names and headings. Check it when a module exists.
   worker), `config.TUNE`, `config.SIZE_FIRST`, `parallel.fork_map`, `analysis.analyse_one`
   (patched by tests; the script has no copy and reads `analysis.analyse_one`),
   `render.SYSTEM_GAP_LAST` (patched by tests; `plan_pages` reads it in `render`, the script
+  has no copy), `build.run_build` and `build.cmd_build` (patched by tests; the script reads
+  them as `build.run_build` and `build.cmd_build`, also in the command table of `main`, and
   has no copy) and `vision._TESS` (the
   path of the tesseract program; nothing rebinds it, but the plan names the owner, so the
   script reads `vision._TESS["path"]`). An object that is changed in place and never
   rebound (`console._counts`, `_FAILURES`, `_WARNINGS`, `clef.CLEF_LAST`, `clef._CLEF_TPL`,
-  `render.LAST_RENDER`, `render._LOGO_WARNED`) may be imported by name: both names are the
+  `render.LAST_RENDER`, `render._LOGO_WARNED`, `build.LAST_BUILD`) may be imported by name: both names are the
   same object. `console._reset_counts` keeps it so; the two clef caches are private to
-  `clef`, and `render` fills `LAST_RENDER` with `.update` and item assignment only. The
+  `clef`, and `render` fills `LAST_RENDER` with `.update` and item assignment only;
+  `build` fills `LAST_BUILD` with `.clear` and `.append` only. The
   page-turn costs (`TURN_BAD`, `PAGE_COST`, `FILL_COST` and the like) stay constants of
   `typography`; `render` imports them by name. `library` has no name of this kind: it
   keeps no state in memory (it works on files) and no test patches a name of it.

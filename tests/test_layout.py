@@ -26,6 +26,7 @@ import test_analysis  # noqa: E402  (TestSystemWindow.make_pdf; the module, not 
 from support import (  # noqa: E402,F401
     SP,
     SRC,
+    build,
     config,
     flow_line,
     make_score_pdf,
@@ -229,7 +230,7 @@ class TestReflow(unittest.TestCase):
                 pt.save_item(it, data)
                 return 0
             ans = iter(answers)
-            with mock_attr(pt, "run_build", fake_build), \
+            with mock_attr(build, "run_build", fake_build), \
                  mock_attr(builtins, "input", lambda *_: next(ans)), \
                  contextlib.redirect_stdout(io.StringIO()):
                 pt.offer_reflow(item)
@@ -692,7 +693,7 @@ class TestGroupReflow(unittest.TestCase):
                 pt.save_item(it, data)
                 return 0
             ans = iter(["", ""])
-            with mock_attr(pt, "run_build", fake_build), \
+            with mock_attr(build, "run_build", fake_build), \
                  mock_attr(builtins, "input", lambda *_: next(ans)), \
                  contextlib.redirect_stdout(io.StringIO()) as out:
                 pt.offer_reflow(item, ["G"])
