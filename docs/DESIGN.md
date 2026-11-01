@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.5.0-dev.5. Section numbers are stable: the code cites
+Status: describes partitor 0.5.0-dev.6. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -913,10 +913,10 @@ See `KNOWN-LIMITS.md`.
 
 The engine is mostly one script today, `lib/partitor-engine`. It moves in small steps into
 the package `lib/partitor/`, in 23 modules (releases `0.5.0-dev.1` to `0.5.0`).
-Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.5
-these 15 modules exist: `console`, `config`, `model`, `typography`, `mapping`, `bars`,
+Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.6
+these 16 modules exist: `console`, `config`, `model`, `typography`, `mapping`, `bars`,
 `parallel`, `vision`, `clef`, `strips`, `reflow`, `ownership`, `lines`, `analysis`,
-`render`; the script
+`render`, `library`; the script
 imports their names until the last step (except the names of R1, below). A module that is not in
 `lib/partitor/` yet is a proposal in the tables below.
 
@@ -994,7 +994,10 @@ This map comes from function names and headings. Check it when a module exists.
   same object. `console._reset_counts` keeps it so; the two clef caches are private to
   `clef`, and `render` fills `LAST_RENDER` with `.update` and item assignment only. The
   page-turn costs (`TURN_BAD`, `PAGE_COST`, `FILL_COST` and the like) stay constants of
-  `typography`; `render` imports them by name.
+  `typography`; `render` imports them by name. `library` has no name of this kind: it
+  keeps no state in memory (it works on files) and no test patches a name of it.
+  `check_margins` and `MIN_MARGIN_MM` are in `config` (plan O7): the script and `library`
+  use them, `render` does not.
 - **`global`.** `global NAME` is allowed only for a name that the same module assigns
   or defines at top level. For a name of another module write `owner.NAME = value`.
 - **Size.** At most 1 100 definition lines per module. One module is exempt

@@ -6,6 +6,29 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.5.0-dev.6 — 2026-10-31
+
+Fifth move of engine code (plan: `docs/DESIGN.md` §12). One module leaves the engine
+script and goes to the package `lib/partitor/`. No behaviour change: the output is the same
+(50 golden cases checked with `tools/g0_golden.py`).
+
+### Added
+
+- Module `library` (item folder, ids, load and save, set keys, parts folder swap) in
+  `lib/partitor/` (about 500 definition lines). The script imports its names, so commands,
+  options and output stay as they were. No test patches a name of `library`, so no name
+  needs a read through the module.
+- 3 new tests: 529 are found now (526 before). They cover the level and the imports of
+  `library` (it has no `global` and imports no patched name by name), and that
+  `check_margins` is one object in `config` and `library` and is no longer in `render`.
+
+### Changed
+
+- `check_margins` and `MIN_MARGIN_MM` moved from `render` to `config`: only the build
+  command and `library` use them, `render` does not. The code is unchanged.
+- `tools/modules.txt` maps `library` to the test files that use its names.
+- Docs: `docs/DESIGN.md` §12 and `CONTRIBUTING.md` list the 16 modules that exist.
+
 ## 0.5.0-dev.5 — 2026-10-31
 
 Fourth move of engine code (plan: `docs/DESIGN.md` §12). Two modules leave the engine

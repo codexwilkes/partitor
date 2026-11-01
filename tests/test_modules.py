@@ -264,6 +264,7 @@ class TestRealRepo(unittest.TestCase):
             self.assertIn(m, present)              # moved in step M3
         for m in ("lines", "render"):
             self.assertIn(m, present)              # moved in step M4
+        self.assertIn("library", present)          # moved in step M5
         for m in present:
             with self.subTest(module=m):
                 code = f"import sys; sys.path.insert(0, {lib!r}); import partitor.{m}"
@@ -360,6 +361,50 @@ class TestRealRepo(unittest.TestCase):
         for node in ast.walk(script):
             if isinstance(node, ast.ImportFrom):
                 self.assertNotIn("SYSTEM_GAP_LAST", {a.name for a in node.names})   # no shim
+
+    def test_m5_library_sits_on_level_4_and_imports_only_lower_ones(self):
+        """library (4): imports go to strictly lower levels; it has no `global` and no render import."""
+        import ast
+        level = {"console": 0, "config": 0, "bars": 0, "clef": 1, "render": 3, "library": 4}
+        with open(os.path.join(ROOT, "lib", "partitor", "library.py"), encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        got_all = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level:
+                got = {node.module} if node.module else {a.name for a in node.names}
+                got_all |= got
+                for g in got:
+                    self.assertLess(level[g], level["library"], f"library imports {g}")
+            self.assertNotIsInstance(node, ast.Global)   # the module keeps no state of its own
+        self.assertEqual(got_all, {"bars", "clef", "config", "console"})
+
+    def test_m5_library_imports_no_patched_name_by_name(self):
+        """No name tests replace (patchable.txt) is imported by name by library, and none has a shim."""
+        import ast
+        with open(os.path.join(ROOT, "tests", "patchable.txt"), encoding="utf-8") as fh:
+            patched = {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
+        with open(os.path.join(ROOT, "lib", "partitor", "library.py"), encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level:
+                self.assertFalse({a.name for a in node.names} & patched)
+            if isinstance(node, (ast.FunctionDef, ast.Assign)):
+                bound = {node.name} if isinstance(node, ast.FunctionDef) else {
+                    t.id for t in node.targets if isinstance(t, ast.Name)}
+                self.assertFalse(bound & patched, "library must not own a patched name")
+
+    def test_check_margins_lives_in_config_and_render_does_not_keep_it(self):
+        """O7: check_margins and MIN_MARGIN_MM belong to config; library reads them from there."""
+        code = ("import sys; sys.path.insert(0, %r); from partitor import config, library, render; "
+                "print(library.check_margins is config.check_margins, "
+                "hasattr(render, 'check_margins'), hasattr(render, 'MIN_MARGIN_MM'), "
+                "config.MIN_MARGIN_MM)" % os.path.join(ROOT, "lib"))
+        r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL)
+        if r.returncode != 0 and "No module named" in r.stderr:
+            self.skipTest("the venv packages are not installed")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.split(), ["True", "False", "False", "5.0"])
 
     def test_ownership_reaches_tune_through_config(self):
         """TUNE is changed in place by the script and read by ownership as config.TUNE (R1)."""

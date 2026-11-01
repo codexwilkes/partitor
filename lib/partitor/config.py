@@ -243,3 +243,19 @@ def part_file_name(num: int, part: str, tail: str) -> str:
 
 
 SKIP_KEY = "skip"     # score.yaml: part names not extracted (kept in the list)
+MIN_MARGIN_MM = 5.0   # no margin below this (printer edge)
+
+
+def check_margins(opts: dict) -> str:
+    """check_margins -> error text, or '' when the margins are usable."""
+    for k in ("margin_top", "margin_bottom", "margin_side"):
+        if float(opts[k]) < MIN_MARGIN_MM:
+            return f"{k} {opts[k]} mm is below {MIN_MARGIN_MM} mm"
+    if float(opts["gutter"]) < 0:
+        return "gutter must not be negative"
+    if float(opts["margin_side"]) - float(opts["gutter"]) / 2 < MIN_MARGIN_MM:
+        return (f"gutter {opts['gutter']} mm leaves an outer margin below "
+                f"{MIN_MARGIN_MM} mm (margin_side {opts['margin_side']} mm)")
+    if opts["duplex"] not in ("auto", "on", "off"):
+        return f"duplex must be auto, on or off (not {opts['duplex']})"
+    return ""

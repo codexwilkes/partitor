@@ -32,7 +32,6 @@ from .typography import (
 # landscape (0.3.0-dev.35): the same height as Letter, 2.2 x the line width.
 PAPER = {"a4": (595.28, 841.89), "letter": (612.0, 792.0), "ledger": (1224.0, 792.0)}
 MARGIN = 42.5        # pt (15 mm), default margin (tests)
-MIN_MARGIN_MM = 5.0  # no margin below this (printer edge)
 TITLE_BAND = 85.0    # pt, page 1
 RUN_HEAD = 22.0      # pt, later pages
 
@@ -55,21 +54,6 @@ def page_box(opts: dict, pi: int, duplex: bool) -> tuple[float, float, float, fl
     inner, outer = side + g, side - g
     left, right = (inner, outer) if pi % 2 == 0 else (outer, inner)
     return left, right, mm2pt(opts.get("margin_top", 15.0)), mm2pt(opts.get("margin_bottom", 15.0))
-
-
-def check_margins(opts: dict) -> str:
-    """check_margins -> error text, or '' when the margins are usable."""
-    for k in ("margin_top", "margin_bottom", "margin_side"):
-        if float(opts[k]) < MIN_MARGIN_MM:
-            return f"{k} {opts[k]} mm is below {MIN_MARGIN_MM} mm"
-    if float(opts["gutter"]) < 0:
-        return "gutter must not be negative"
-    if float(opts["margin_side"]) - float(opts["gutter"]) / 2 < MIN_MARGIN_MM:
-        return (f"gutter {opts['gutter']} mm leaves an outer margin below "
-                f"{MIN_MARGIN_MM} mm (margin_side {opts['margin_side']} mm)")
-    if opts["duplex"] not in ("auto", "on", "off"):
-        return f"duplex must be auto, on or off (not {opts['duplex']})"
-    return ""
 
 
 def is_duplex(opts: dict, npages: int) -> bool:
