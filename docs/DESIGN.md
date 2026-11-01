@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.6.1. Section numbers are stable: the code cites
+Status: describes partitor 0.6.2. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -935,7 +935,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | Lvl | Module | Owns |
 |---|---|---|
 | 0 | `console` | Output primitives, colours, counters, prompts, `Abort` |
-| 0 | `config` | Tunables, `TUNE`, layout and score keys, defaults, name helpers |
+| 0 | `config` | Tunables, `TUNE`, layout and score keys, defaults, paper sizes (`PAPER`), name helpers |
 | 0 | `model` | Data classes `Staff`, `PageResult`, `Strip`, `RestRun` |
 | 0 | `typography` | Fonts and text measure |
 | 0 | `mapping` | Staff label to part map |
@@ -948,8 +948,8 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 2 | `ownership` | Ink ownership, safety gate, barline detect |
 | 2 | `lines` | Line fitting, labels, multi-bar rests, saved lines |
 | 3 | `analysis` | Page loop, preview |
-| 3 | `render` | Paper, packing, page plan, part drawing |
-| 4 | `library` | Item folder, ids, load and save, parts folder swap |
+| 3 | `render` | Packing, page plan, part drawing |
+| 4 | `library` | Item folder, ids, load and save, parts folder swap, `step_size` |
 | 5 | `build` | `pieces`, `detect`, `build`, run and report helpers |
 | 5 | `proof` | Proof PDF |
 | 6 | `cli_common` | Shared CLI helpers, `set` |
@@ -1009,6 +1009,21 @@ This map comes from function names and headings. Check it when a module exists.
   keeps no state in memory (it works on files) and no test patches a name of it.
   `check_margins` and `MIN_MARGIN_MM` are in `config` (plan O7): the script and `library`
   use them, `render` does not.
+- **Image libraries.** Commands that read no image (`list`, `show`, `set`, `expand`,
+  `contract`, `bars`, `parts`, `groups`, `meta`, `rename`, `reid`, `proof`, `--version`,
+  `--help`) start without cv2, numpy or pymupdf. Only PyYAML is loaded. So the modules on
+  their path (`config`, `console`, `model`, `mapping`, `typography`, `bars`, `clef`,
+  `library`, `proof`, `cli_common`, `cli_bars`, `cli_parts`, `cli_items`, `cli_main`) do not
+  import cv2, numpy or pymupdf at the top: a function imports the package it uses
+  (`import numpy as np` inside the function), and `model` imports numpy under
+  `TYPE_CHECKING` for its annotations (they stay strings). The heavy modules (`vision`,
+  `strips`, `reflow`, `ownership`, `lines`, `analysis`, `render`, `parallel`, `build`) may
+  import them at the top. A light module reaches a heavy one only inside the function that
+  needs it (`from .build import run_detect` in `analyse_item`); `main` loads `build` for
+  `pieces`, `detect` and `build` only. No test patches `pymupdf`, `cv2` or `np` in a module.
+  `tests/test_lazy_imports.py` runs each light command in a fresh interpreter and looks at
+  `sys.modules`. `PAPER` is in `config` (the `build` option `--paper` needs it before
+  any image library loads) and `step_size` is in `library` (`expand` and `contract` need it).
 - **`global`.** `global NAME` is allowed only for a name that the same module assigns
   or defines at top level. For a name of another module write `owner.NAME = value`.
 - **Size.** At most 1 100 definition lines per module. One module is exempt

@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import re
 
-import numpy as np
-
 
 # =============================================================================
 # Bar numbers
@@ -122,6 +120,7 @@ def propose_bar_rules(systems: list[dict]) -> dict:
     before a repeat]} from bar widths (DESIGN.md §4.2 item 7). A first bar
     whose music is PICKUP_SHORT of a bar or more narrower than usual is a
     pickup; two short bars around a repeat are one bar."""
+    import numpy as np
     rules: dict = {"pickup": [], "split": [], "fix": {}}
     all_int = [w for r in systems for w in (r.get("widths") or [])[1:]]
     if not all_int:

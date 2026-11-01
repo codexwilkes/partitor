@@ -61,7 +61,7 @@ name. The 23 modules and their import levels:
 | Lvl | Module | Put here |
 |---|---|---|
 | 0 | `console` | Output, colours, prompts |
-| 0 | `config` | Tunables, defaults, name helpers |
+| 0 | `config` | Tunables, defaults, paper sizes, name helpers |
 | 0 | `model` | Data classes |
 | 0 | `typography` | Fonts, text measure |
 | 0 | `mapping` | Staff label to part map |
@@ -74,8 +74,8 @@ name. The 23 modules and their import levels:
 | 2 | `ownership` | Ink ownership, safety gate |
 | 2 | `lines` | Line fitting, multi-bar rests, saved lines |
 | 3 | `analysis` | Page loop, preview |
-| 3 | `render` | Paper, packing, part drawing |
-| 4 | `library` | Item folder, ids, load and save |
+| 3 | `render` | Packing, part drawing |
+| 4 | `library` | Item folder, ids, load and save, `step_size` |
 | 5 | `build` | `pieces`, `detect`, `build` |
 | 5 | `proof` | Proof PDF |
 | 6 | `cli_common` | Shared CLI helpers |
@@ -93,6 +93,10 @@ Rules (`tools/check-modules.py` checks them; CI runs it):
   patch or a rebinding then changes only the owner. An object that is only changed in place
   (a counter dict, a list) may be imported by name; both names are the same object.
   `global NAME` is allowed only for a name that the same module defines.
+- **Image libraries:** the modules that `list`, `show`, `set` and the other item commands
+  use must not import cv2, numpy or pymupdf at the top. Import the package inside the
+  function that uses it, and a heavy module (`build`, `render`, `analysis`) inside the
+  function of the command that needs it (`DESIGN.md` §12.3; `tests/test_lazy_imports.py`).
 - **A new patchable name:** when a test replaces a name with `mock_attr` or an
   assignment on `pt`, add the name to `tests/patchable.txt` (one per line) in the same
   change, and make the readers use `module.NAME`.

@@ -6,8 +6,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import pymupdf
-
 
 # ── Typography (DESIGN.md §5.5): EB Garamond (OFL), embedded ──────────────
 FONT_FILES = {"regular": ("EBGaramond-Regular.ttf", "tiro"),
@@ -34,6 +32,7 @@ def font_dirs() -> list[Path]:
 def _font(kind: str) -> tuple[str, str | None, object]:
     """_font -> (fontname for insert_text, fontfile or None, measurer).
     Falls back to the built-in Times when the TTF is not found."""
+    import pymupdf
     if kind not in _FONTS:
         fname, base = FONT_FILES[kind]
         path = next((d / fname for d in font_dirs() if (d / fname).is_file()), None)

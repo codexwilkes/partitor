@@ -8,8 +8,6 @@ import re
 import shutil
 from pathlib import Path
 
-import pymupdf
-
 from .bars import effective_systems, renumber
 from .clef import extreme_bar, part_extremes, pitch_name
 from .config import SCORE_FILE
@@ -20,6 +18,7 @@ def proof_from_preview(item: Path) -> Path | None:
     """Join preview/page-*.png into proof.pdf (one page each), remove
     preview/, then label it (annotate_proof). proof.pdf opens in File
     Station and on a phone."""
+    import pymupdf
     pdir = item / "preview"
     pngs = sorted(pdir.glob("page-*.png"), key=lambda p: natural_key(p.name))
     if not pngs:
@@ -56,6 +55,7 @@ def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list) -> Non
     (orange). Barlines: the system's widths (staff spaces from the staff
     start, bar edits applied) times the staff space. The first bar's number
     stands right of the part name above the staff."""
+    import pymupdf
     g = e["geom"]
     nums = e.get("bar_nums") or []
     wd = [float(w) for w in ef.get("widths") or []]
@@ -105,6 +105,7 @@ def annotate_proof(item: Path, data: dict | None = None) -> None:
     after every change to the maps, part names, ambitus or bar rules.
     data: the layout to draw (the bars menu shows edits not yet saved);
     default: the saved score.yaml."""
+    import pymupdf
     proof = item_file(item, "proof.pdf")
     if not proof.is_file() or not item_file(item, SCORE_FILE).is_file():
         return

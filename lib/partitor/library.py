@@ -10,7 +10,6 @@ import time
 import unicodedata
 from pathlib import Path
 
-import pymupdf
 import yaml
 
 from .bars import renumber
@@ -102,6 +101,38 @@ def part_layout(data: dict, part: str | None) -> dict:
     if part:
         lay.update(((data.get("layout") or {}).get(PART_LAYOUT_KEY) or {}).get(part) or {})
     return {**LAYOUT_DEFAULTS, **lay}
+
+
+def step_size(data: dict, bigger: bool, part: str | None = None
+              ) -> tuple[list[str], str]:
+    """step_size -> (set pairs, reason) for one expand/contract step:
+    size first (pages +-1), then gap (+-1 sp) (DESIGN.md §5.2). part: that
+    part only (pairs 'Part:key=value'), else all parts."""
+    b = (data.get("built") or {}).get("parts") or []
+    if part:
+        b = [p for p in b if p.get("part") == part]
+        if not b:
+            raise ValueError(f"{part}: not built yet")
+    if not b:
+        raise ValueError("not built yet")
+    lay = part_layout(data, part)
+    pre = f"{part}:" if part else ""
+    pages = max(p.get("content_pages", p["pages"]) for p in b)
+    room = any(p["staff_mm"] < p["staff_max_mm"] - 0.05 for p in b)
+    if bigger:
+        if room:
+            return [f"{pre}pages={pages + 1}"], "larger staff on one more page"
+        if lay.get("reflow") != "on" and any(
+                p.get("width_mm", 99.0) < lay["max_staff_mm"] - 0.05 for p in b):
+            return [f"{pre}reflow=on"], "staff held by the source line width; lines re-flowed"
+        if lay["gap"] < GAP_MAX:
+            return [f"{pre}gap={min(GAP_MAX, lay['gap'] + 1)}"], "staff at full width; more space"
+        raise ValueError("at the largest size and gap")
+    if pages > 1:
+        return [f"{pre}pages={pages - 1}"], "one page less, smaller staff"
+    if lay["gap"] - 1 >= lay["gap_min"]:
+        return [f"{pre}gap={lay['gap'] - 1}"], "less space between staves"
+    raise ValueError("at the smallest gap on one page")
 
 
 def library_root() -> Path:
@@ -248,6 +279,7 @@ def inbox_pdfs(share: Path) -> list[Path]:
 def suggest_meta(pdf: Path) -> tuple[str, str]:
     """suggest_meta -> (title, composer) from PDF metadata, else the file
     name (IMSLP pattern 'IMSLP123-PMLP45-Composer_Title.pdf' handled)."""
+    import pymupdf
     title = composer = ""
     try:
         md = pymupdf.open(pdf).metadata or {}

@@ -6,10 +6,6 @@ from __future__ import annotations
 import copy
 import re
 
-import cv2
-import numpy as np
-import pymupdf
-
 from .config import OWN_NONE, SKIP_KEY
 from .mapping import CONTINUO_RE
 from .model import Staff
@@ -31,6 +27,8 @@ def clef_features(owner: np.ndarray, line_px: np.ndarray, st: Staff,
     columns (vertical cover >= 85% of the staff height) are removed; a
     vertical closing rejoins pieces cut by line removal; the largest blob
     is the clef."""
+    import cv2
+    import numpy as np
     x0 = max(0, int(st.x0 - 0.2 * sp))
     x1 = int(st.x0 + 3.5 * sp)
     y0 = max(0, int(st.top - 3 * sp))
@@ -77,6 +75,8 @@ def _clef_template(kind: str, sp: float, scale: float) -> tuple[np.ndarray, int]
     """_clef_template -> (bool glyph, row of its reference line) from
     Bravura at staff space sp (SMuFL: em = 4 sp, the glyph's baseline is
     the clef's line); None without the font."""
+    import numpy as np
+    import pymupdf
     key = (kind, round(sp * scale, 1))
     if key in _CLEF_TPL:
         return _CLEF_TPL[key]
@@ -110,6 +110,8 @@ def clef_blob(owner: np.ndarray, line_px: np.ndarray, st: Staff, idx: int, sp: f
     inside the staff: an F clef's dots), raw (main and dots with the staff
     lines kept, for the comparison with glyphs), x0, y0 (page position of
     the masks). None when there is no clef-sized blob."""
+    import cv2
+    import numpy as np
     # from 0.25 sp after the staff start: the system barline and bracket
     # stand there, a clef never
     x0 = max(0, int(st.x0 + 0.25 * sp))
@@ -454,6 +456,8 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
     the barlines (1.2 sp each side) are blanked. Accidentals are not
     read: the steps are letter names.
     Returns (lowest, highest, count, x of the lowest, x of the highest)."""
+    import cv2
+    import numpy as np
     x0 = int(st.x0 + 3.5 * sp)
     x1 = int(st.x1)
     y0 = max(0, int(st.top - 6 * sp))
@@ -600,6 +604,8 @@ def _octave_eight_below(owner: np.ndarray, st: Staff, idx: int, sp: float) -> bo
     """A small '8' under a G clef (vocal tenor): a piece 0.5-1.7 sp high,
     0.3-1.2 sp wide, with a hole, 1.2-4 sp below the bottom line, centred
     under the clef (0.8-2.6 sp after the staff start; lyrics start later)."""
+    import cv2
+    import numpy as np
     x0, x1 = max(0, int(st.x0 + 0.25 * sp)), int(st.x0 + 3.4 * sp)
     y0, y1 = int(st.bottom + 1.2 * sp), min(owner.shape[0], int(st.bottom + 4.0 * sp))
     if y1 <= y0:
@@ -635,6 +641,8 @@ def _clef_once(owner: np.ndarray, line_px: np.ndarray, st: Staff,
     that clef is used (normalised cross-correlation of blurred images,
     staff lines drawn into both). Maria (scan): mensuration signs, scan
     tails and taller old C clefs no longer mislead."""
+    import cv2
+    import numpy as np
     b = clef_blob(owner, line_px, st, idx, sp, thick)
     if b is None:
         return "?", -1.0

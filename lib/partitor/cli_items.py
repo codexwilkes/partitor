@@ -10,12 +10,9 @@ import shutil
 import time
 from pathlib import Path
 
-import pymupdf
 import yaml
 
-from . import VERSION, build
-from .analysis import parse_pages
-from .build import _rebuild_report, _size_summary, build_report, run_detect, small_parts
+from . import VERSION
 from .clef import ambitus_report, part_clefs
 from .cli_bars import confirm_bar_rules
 from .cli_common import _cmd_step, _item_or_die, _lib_or_die, bar_summary, saved
@@ -34,9 +31,7 @@ from .library import (
     next_id, parse_parts, part_layout, recover_parts, restore_previous_parts, save_item,
     selection_help, set_name, set_value, suggest_meta, swap_parts,
 )
-from .lines import count_bad_turns, lines_path, load_lines, turn_text
 from .proof import annotate_proof, proof_from_preview
-from .render import GROUP_REFLOW_PAGES, LARGE, LAST_RENDER, large_copy, render_part, turns
 
 
 def cmd_proof(a: argparse.Namespace) -> int:
@@ -55,6 +50,10 @@ def cmd_proof(a: argparse.Namespace) -> int:
 def cmd_new(a: argparse.Namespace) -> int:
     """new [n]: wizard for an inbox PDF (DESIGN.md §6.2). --jobs: workers of the
     detect and build steps (default PARTITOR_JOBS, else auto)."""
+    from . import build
+    from .analysis import parse_pages
+    from .build import build_report, run_detect
+    import pymupdf
     start = time.monotonic()
     jobs = getattr(a, "jobs", None)
     share, lib = _lib_or_die()
@@ -387,6 +386,7 @@ def analyse_item(item: Path, interactive: bool = True) -> int:
     groups, skip list, ambitus and settings; previous answers become the
     suggestions of systems still uncertain. Not interactive: no question
     is asked (open choices stay for partitor rebuild)."""
+    from .build import run_detect
     data = load_item(item)
     rc = run_detect(item, data.get("pages"), data.get("title", ""),
                     data.get("composer", ""), reference_names(data))
@@ -471,6 +471,9 @@ def offer_reflow(item: Path, only: list[str] | None = None) -> None:
     them, not the item; the trial builds only them. A group's pages grow
     faster than a part's (several staves per line): its page budget is
     GROUP_REFLOW_PAGES times the pages without re-flow (`pages=N` changes it)."""
+    from . import build
+    from .build import _size_summary, build_report, small_parts
+    from .render import GROUP_REFLOW_PAGES, turns
     data = load_item(item)
     small = small_parts(data, only)
     if not small:
@@ -603,6 +606,8 @@ def cmd_repage(a: argparse.Namespace) -> int:
     saved by the last build (no analysis, no build). Sets turns=rest for the
     parts (kept by later builds); breaks, duplex and title_page are taken
     from the layout. Writes through parts.new/ like a build."""
+    from .lines import count_bad_turns, lines_path, load_lines, turn_text
+    from .render import LARGE, LAST_RENDER, large_copy, render_part, turns
     start = time.monotonic()
     item = _item_or_die(a.id)
     recover_parts(item)
@@ -705,6 +710,7 @@ def cmd_repage(a: argparse.Namespace) -> int:
 def cmd_rebuild(a: argparse.Namespace) -> int:
     """rebuild <id>: detect again when score.yaml has no systems (failed
     new), ask open choices, then build."""
+    from .build import _rebuild_report, run_detect
     start = time.monotonic()
     item = _item_or_die(a.id)
     data = load_item(item)

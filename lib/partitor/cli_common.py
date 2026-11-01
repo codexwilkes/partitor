@@ -7,11 +7,10 @@ import argparse
 import time
 from pathlib import Path
 
-from .build import _rebuild_report, step_size
 from .console import _die, _note, _ok, _summary, _warn
 from .library import (
     apply_set, find_item, folder_name, item_id, item_status, library_root, load_item,
-    mark_pending, save_item,
+    mark_pending, save_item, step_size,
 )
 from .proof import annotate_proof
 
@@ -32,6 +31,7 @@ def saved(item: Path, a: argparse.Namespace, start: float) -> int:
         if item_status(data) == "needs choices":
             _warn(f"map:  systems need choices first: partitor rebuild {data['id']}")
         else:
+            from .build import _rebuild_report
             _rebuild_report(item, data.get("built"))
         return _summary(start)
     _note(f"saved, not built ({item_status(data)}). Review: partitor show {data['id']}"

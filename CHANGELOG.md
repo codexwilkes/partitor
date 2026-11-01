@@ -6,6 +6,17 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.6.2 — 2026-11-01
+
+Item commands start faster. No change in output, messages or exit codes.
+
+- `list`, `show`, `set`, `expand`, `contract`, `bars`, `parts`, `groups`, `meta`, `rename`,
+  `reid`, `proof`, `--version` and `--help` no longer load cv2, numpy or pymupdf. The
+  engine imports them in the functions that use them, and `main` loads the build code for
+  `pieces`, `detect` and `build` only.
+- `PAPER` (paper sizes) moved from `render` to `config`; `step_size` (used by `expand` and
+  `contract`) moved from `build` to `library`. Both are unchanged.
+
 ## 0.6.1 — 2026-11-01
 
 - `partitor-install` step 6b (package readable by the service user) runs from `/`. It

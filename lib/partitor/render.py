@@ -11,7 +11,7 @@ import pymupdf
 
 from . import config
 from .clef import ACC_GLYPH, CLEF_BOTTOM
-from .config import AMB_SP, SYSTEM_GAP_FACTOR, composer_surname
+from .config import AMB_SP, PAPER, SYSTEM_GAP_FACTOR, composer_surname
 from .console import _warn
 from .lines import line_labels, put_smallcaps
 from .model import Strip
@@ -28,9 +28,6 @@ from .typography import (
 # =============================================================================
 # Packing and rendering
 # =============================================================================
-# (width, height) in pt, as the sheet is printed. ledger = 17 x 11 in,
-# landscape (0.3.0-dev.35): the same height as Letter, 2.2 x the line width.
-PAPER = {"a4": (595.28, 841.89), "letter": (612.0, 792.0), "ledger": (1224.0, 792.0)}
 MARGIN = 42.5        # pt (15 mm), default margin (tests)
 TITLE_BAND = 85.0    # pt, page 1
 RUN_HEAD = 22.0      # pt, later pages

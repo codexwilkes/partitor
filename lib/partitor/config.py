@@ -162,6 +162,10 @@ LAYOUT_HELP = """\
 #   bar_rules_status: proposed (by detect) or confirmed (by the CLI).
 """
 
+# (width, height) in pt, as the sheet is printed. ledger = 17 x 11 in,
+# landscape (0.3.0-dev.35): the same height as Letter, 2.2 x the line width.
+PAPER = {"a4": (595.28, 841.89), "letter": (612.0, 792.0), "ledger": (1224.0, 792.0)}
+
 # Layout defaults (layout.yaml `layout:`; build options override). gap and
 # gap_min in staff spaces between one staff's bottom line and the next
 # staff's top line. Starting values, to be set from printed test pages.

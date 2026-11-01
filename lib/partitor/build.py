@@ -31,7 +31,7 @@ from .console import (
     _skip, _summary, _warn,
 )
 from .library import (
-    GAP_MAX, PARTS_NEW, PARTS_PREV, build_names, item_file, item_id, item_line, keep_lines,
+    PARTS_NEW, PARTS_PREV, build_names, item_file, item_id, item_line, keep_lines,
     keep_other_parts, library_logo, library_root, load_item, part_layout, partial_blocker,
     piece_tag, recover_parts, save_item, score_name, swap_parts,
 )
@@ -892,35 +892,3 @@ def _size_summary(built: dict, names: list[str] | None = None) -> tuple[float, i
     ps = [p for p in built.get("parts") or [] if names is None or p["part"] in names]
     return (min(p["staff_mm"] for p in ps),
             max(p.get("content_pages", p["pages"]) for p in ps))
-
-
-def step_size(data: dict, bigger: bool, part: str | None = None
-              ) -> tuple[list[str], str]:
-    """step_size -> (set pairs, reason) for one expand/contract step:
-    size first (pages +-1), then gap (+-1 sp) (DESIGN.md §5.2). part: that
-    part only (pairs 'Part:key=value'), else all parts."""
-    b = (data.get("built") or {}).get("parts") or []
-    if part:
-        b = [p for p in b if p.get("part") == part]
-        if not b:
-            raise ValueError(f"{part}: not built yet")
-    if not b:
-        raise ValueError("not built yet")
-    lay = part_layout(data, part)
-    pre = f"{part}:" if part else ""
-    pages = max(p.get("content_pages", p["pages"]) for p in b)
-    room = any(p["staff_mm"] < p["staff_max_mm"] - 0.05 for p in b)
-    if bigger:
-        if room:
-            return [f"{pre}pages={pages + 1}"], "larger staff on one more page"
-        if lay.get("reflow") != "on" and any(
-                p.get("width_mm", 99.0) < lay["max_staff_mm"] - 0.05 for p in b):
-            return [f"{pre}reflow=on"], "staff held by the source line width; lines re-flowed"
-        if lay["gap"] < GAP_MAX:
-            return [f"{pre}gap={min(GAP_MAX, lay['gap'] + 1)}"], "staff at full width; more space"
-        raise ValueError("at the largest size and gap")
-    if pages > 1:
-        return [f"{pre}pages={pages - 1}"], "one page less, smaller staff"
-    if lay["gap"] - 1 >= lay["gap_min"]:
-        return [f"{pre}gap={lay['gap'] - 1}"], "less space between staves"
-    raise ValueError("at the smallest gap on one page")

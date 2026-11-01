@@ -12,8 +12,7 @@ from pathlib import Path
 
 import yaml
 
-from . import VERSION, build, cli_items
-from .build import cmd_detect, cmd_pieces
+from . import VERSION, cli_items
 from .cli_bars import cmd_bars
 from .cli_common import _lib_or_die, cmd_set
 from .cli_items import (
@@ -21,13 +20,12 @@ from .cli_items import (
     cmd_rename, cmd_repage, cmd_show, item_matches, list_page_size,
 )
 from .cli_parts import ambitus_menu, ask_part, cmd_groups, cmd_parts
-from .config import LAYOUT_DEFAULTS, PAGE_HEADER_SP
+from .config import LAYOUT_DEFAULTS, PAGE_HEADER_SP, PAPER
 from .console import Abort, BOLD, RST, _die, _warn, ask
 from .library import (
     PAPER_NEXT, _id_parts, find_item, id_order, inbox_pdfs, item_dirs, item_id, item_line,
     item_mtime, item_status, library_root, load_item, work_mark,
 )
-from .render import PAPER
 
 
 def item_menu(item: Path) -> None:
@@ -333,8 +331,11 @@ def main() -> int:
     b.add_argument("--jobs", help="worker processes: a number or auto (default: PARTITOR_JOBS, else auto)")
     b.add_argument("--only", nargs="+", metavar="NAME", help="build these parts or groups only")
     a = p.parse_args()
-    cmds = {"pieces": cmd_pieces, "detect": cmd_detect, "build": build.cmd_build,
-            "menu": cmd_menu, "new": cmd_new, "list": cmd_list, "show": cmd_show,
+    if a.cmd in ("pieces", "detect", "build"):
+        from . import build        # the image libraries load only for these commands
+        return {"pieces": build.cmd_pieces, "detect": build.cmd_detect,
+                "build": build.cmd_build}[a.cmd](a)
+    cmds = {"menu": cmd_menu, "new": cmd_new, "list": cmd_list, "show": cmd_show,
             "set": cmd_set, "expand": cmd_expand, "contract": cmd_contract,
             "rebuild": cli_items.cmd_rebuild, "repage": cmd_repage, "bars": cmd_bars, "parts": cmd_parts,
             "proof": cmd_proof,
