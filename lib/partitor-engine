@@ -8,8 +8,9 @@
 # range). `detect` finds staves and systems on each page, gives every ink
 # component one owner (a staff, the system header, or a known discard class),
 # suggests the part of every staff, and writes a layout file plus an HTML
-# preview. `build` repeats the analysis, checks it against the layout file,
-# and writes one PDF per part. Ink is never split: each connected component
+# preview. `build` repeats the analysis (or reads it from cache/ of the item
+# folder, where detect stored it; PARTITOR_CACHE=0 turns this off), checks it
+# against the layout file, and writes one PDF per part. Ink is never split: each connected component
 # goes whole to one owner. Ink is never lost silently: a staff that is not
 # accepted, or discard outside the known classes, fails the run. The input
 # PDF is never written.

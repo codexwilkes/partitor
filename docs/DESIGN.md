@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.6.3. Section numbers are stable: the code cites
+Status: describes partitor 0.7.0. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -59,6 +59,7 @@ in). The engine has no network access at all (§8).
       2026-10-0012-score.yaml              written by the CLI only
       2026-10-0012-proof.pdf               analysis preview
       lines/                               saved finished lines (repage)
+      cache/                               page-analysis cache (§12.4); safe to delete
       parts/
         01-canto-Composer-Title--2026-10-0012.pdf
         01-canto-Composer-Title--2026-10-0012-11x17.pdf
@@ -331,7 +332,7 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
    found (title text above a first system, page ranges), and the operator
    chooses one or more; each becomes its own library item.
 8. **Memory.** The engine processes page by page and keeps only compact
-   results (strips, or a compressed cache per page). `detect` and `build` use
+   results (strips, or a compressed cache per page, §12.4). `detect` and `build` use
    worker processes (`PARTITOR_JOBS`, `--jobs`; §4.4); the memory cap
    (`PARTITOR_MEMORY_MAX`) covers all workers together.
 9. **Page-edge artefacts.** Book-spine shadow, dark scan borders and corner
@@ -921,7 +922,7 @@ See `KNOWN-LIMITS.md`.
 
 ## 12. Code map
 
-The engine is the package `lib/partitor/`, in 23 modules (the split took the releases
+The engine is the package `lib/partitor/`, in 24 modules (the split took the releases
 `0.5.0-dev.1` to `0.5.0`). `lib/partitor-engine` is a launcher: it puts `lib/` on the path and
 starts `partitor.cli_main.main`; `python -m partitor` starts the same function. Every step of
 the split kept the output identical (`tools/g0_golden.py check`). The development history of the
@@ -947,7 +948,8 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 1 | `strips` | Strip build, group strips, bar marks, rehearsal boxes |
 | 2 | `ownership` | Ink ownership, safety gate, barline detect |
 | 2 | `lines` | Line fitting, labels, multi-bar rests, saved lines |
-| 3 | `analysis` | Page loop, preview |
+| 2 | `stagecache` | Stage cache of the page analysis (§12.4) |
+| 3 | `analysis` | Page loop, preview, cache read and write around `analyse_page` |
 | 3 | `render` | Packing, page plan, part drawing |
 | 4 | `library` | Item folder, ids, load and save, parts folder swap, `step_size` |
 | 5 | `build` | `pieces`, `detect`, `build`, run and report helpers |
@@ -974,6 +976,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | §4.3 item 13 (ambitus) | `clef` |
 | §4.3 items 7, 11 (multi-work, group outputs) | `build`, `strips` |
 | §4.4 parallel | `parallel` |
+| §12.4 stage cache | `stagecache`, `analysis` |
 | §5.1 to 5.4, 5.6 layout | `render` |
 | §5.5 typography | `typography`, `lines` |
 | §6 CLI | `cli_*` |
@@ -992,6 +995,8 @@ This map comes from function names and headings. Check it when a module exists.
   owner and leaves the copy as it was. Today these are `console._TTY` (rebound in a
   worker), `config.TUNE`, `config.SIZE_FIRST`, `parallel.fork_map`, `analysis.analyse_one`
   (patched by tests; no other file has a copy and reads `analysis.analyse_one`),
+  `ownership.analyse_page` (patched by tests; `analysis` reads `ownership.analyse_page`),
+  `stagecache.ANALYSIS_CACHE_FORMAT` (patched by tests),
   `render.SYSTEM_GAP_LAST` (patched by tests; `plan_pages` reads it in `render`, the script
   has no copy), `build.run_build` and `build.cmd_build` (patched by tests; their readers use
   `build.run_build` and `build.cmd_build`, also the command table of `main`, and
@@ -1052,3 +1057,34 @@ This map comes from function names and headings. Check it when a module exists.
 - **Checks.** `tools/check-modules.py --static` (also in `tools/check-repo.sh` and CI),
   `--import` (each module alone in a fresh interpreter), `--affected MODULE` (the modules
   that import it, and the test files to run).
+
+### 12.4 Stage cache of the page analysis
+
+`detect` and `build` run the same analysis of each page (`ownership.analyse_page`). The
+result (`PageResult`, with the owner image) is kept in `cache/` of the item folder, one file
+per page (`p0007-<key>.pcache`, gzip level 1 of a pickle, 0.5 to 0.7 MB for a 400 dpi page),
+so a `build` after a `detect`, and a second `build` of the same score, read the page instead
+of analysing it. The cache holds the result **before** the operator's bar edits; `analyse_one`
+applies those edits to every result, read or new.
+
+- **Key.** SHA-256 of: the PDF content hash, page number, dpi, OCR on or off, the system base
+  (always 0 with the cache), `TUNE["page_header_sp"]`, `ANALYSIS_CACHE_FORMAT`, `VERSION`, a
+  hash of the source of every module that `ownership` reaches by relative imports
+  (so a code change without a version change cannot give a stale hit), the versions of cv2,
+  numpy and pymupdf, and the tesseract path, its version line and `TESSDATA_PREFIX`. The
+  analysis reads no other setting (`PARTITOR_*` variables do not reach it).
+- **Format.** `ANALYSIS_CACHE_FORMAT` (1) is part of the key and of the file. The reader
+  (`_CacheUnpickler`) accepts `Staff`, `PageResult`, numpy array reconstruction and a few
+  builtins, and nothing else.
+- **A failed read is a miss.** A corrupt, truncated, old-format, wrong-key or refused file is
+  deleted and the page is analysed again, with one `cache:` note per process. The output is the
+  same as without a cache.
+- **Write.** Temp name, then `os.replace`; the other entries of the same page are removed,
+  so one entry per page stays. Two processes with the same key write the same bytes. A write
+  that fails (read-only folder, full disk) is skipped with one note.
+- **Switch.** `PARTITOR_CACHE=0` (also `off`, `no`, `false`) keeps no cache and reads none. The
+  wrapper passes the variable into the sandbox.
+- **Visible.** When entries exist, `detect` and `build` print one line:
+  `analysis cache: N of M page(s) found`. Nothing else in the output changes.
+- **Size.** About 0.6 MB per page; a 70-page score about 40 MB. The folder is part of the
+  item: `rm -r cache/` is always safe.

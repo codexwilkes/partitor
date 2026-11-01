@@ -64,6 +64,7 @@ the `set` keys (`DESIGN.md` §3 and §6.2).
 | `path outside /var/lib/partitor/work` | Copy the PDF into the work folder first. |
 | A run stops after an hour | Raise `PARTITOR_RUNTIME_MAX`. |
 | Killed during a detect or a build (out of memory) | Lower `PARTITOR_JOBS` or raise `PARTITOR_MEMORY_MAX`. |
+| A `build` is slow although only the layout changed | The first `detect` or `build` of a PDF fills `cache/` in the item folder; later ones read it (`analysis cache: N of M page(s) found`). A new PDF, dpi or program version analyses again. `PARTITOR_CACHE=0` turns it off; `rm -r cache/` is safe. |
 | Wrong parts or bar numbers | `KNOWN-LIMITS.md`; correct in the item menu; check the proof PDF. |
 
 An interrupted build leaves the previous `parts/` set in place; a build that

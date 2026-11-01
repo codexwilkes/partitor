@@ -12,3 +12,5 @@ SYSTEM_GAP_LAST
 run_build
 cmd_build
 cmd_rebuild
+analyse_page
+ANALYSIS_CACHE_FORMAT

@@ -156,11 +156,18 @@ def norm(text, tmp=None):
     t = DURATION.sub("<T>", t)
     t = MEMORY.sub("<MEM>", t)
     t = VERSION.sub(r"\1<VERSION>", t)
-    return "\n".join(l.rstrip() for l in t.splitlines()).strip() + "\n"
+    # the one line of the stage cache (0.7.0) is no part of the contract
+    lines = (l.rstrip() for l in t.splitlines() if not l.strip().startswith("analysis cache:"))
+    return "\n".join(lines).strip() + "\n"
 
 
 def norm_name(name):
     return ITEM_ID.sub("<ID>", name)
+
+
+def in_cache(rel):
+    """True for a file in a cache/ folder (the stage cache, 0.7.0): not an output."""
+    return "cache" in rel.split("/")[:-1]
 
 
 # ------------------------------------------------------------------- hashing
@@ -181,6 +188,8 @@ def artifacts(folder, prefix="", tmp=None, skip=("source",)):
     names = []
     for f in sorted(p for p in folder.rglob("*") if p.is_file()):
         rel = f.relative_to(folder).as_posix()
+        if in_cache(rel):
+            continue
         names.append(norm_name(rel))
         if any(s in f.name for s in skip) and f.suffix == ".pdf":
             continue
@@ -277,9 +286,11 @@ def case_lib(engine_cmd, fixture, steps=None):
             elif items:
                 res[f"{label}:names"] = {"names": sorted(
                     norm_name(p.relative_to(items[-1]).as_posix())
-                    for p in items[-1].rglob("*") if p.is_file())}
+                    for p in items[-1].rglob("*")
+                    if p.is_file() and not in_cache(p.relative_to(items[-1]).as_posix()))}
         res["share-names"] = {"names": sorted(norm_name(p.relative_to(share).as_posix())
                                               for p in share.rglob("*") if p.is_file()
+                                              and not in_cache(p.relative_to(share).as_posix())
                                               and "/library/" in "/" + p.relative_to(share).as_posix())}
         return {"artifacts": res}
 

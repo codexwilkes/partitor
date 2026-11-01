@@ -4,7 +4,7 @@
 
 What is here: the loader that makes the engine script importable as `pt`, the package
 modules that tests patch or read state from (`analysis`, `build`, `clef`, `cli_items`, `config`, `console`, `library`, `lines`, `parallel`, `render`,
-`vision`; patch the
+`vision`, `ownership`, `stagecache`; patch the
 owner, never a copy: rule R1 in CONTRIBUTING.md), `HAVE_DEPS` and `needs_deps`, the synthetic score and scan drawers
 (`make_score_pdf`, `rasterize`), `mock_attr`, and the module fixtures
 `setUpModule` and `tearDownModule` (a synthetic logo in PARTITOR_LOGO). A test
@@ -42,7 +42,7 @@ except ImportError:          # system python without the venv packages
     cv2 = np = pymupdf = yaml = None
     HAVE_DEPS = False
 
-pt = analysis = build = clef = cli_items = config = console = lines = library = parallel = render = vision = None
+pt = analysis = build = clef = cli_items = config = console = lines = library = ownership = parallel = render = stagecache = vision = None
 
 
 class _View(types.ModuleType):
@@ -111,7 +111,7 @@ if HAVE_DEPS:
     if LIB not in sys.path:
         sys.path.insert(0, LIB)              # the launcher does this for the engine itself
     pt = _package_view()                     # an import error of a module must show here
-    from partitor import analysis, build, clef, cli_items, config, console, library, lines, parallel, render, vision  # noqa: E402,F401
+    from partitor import analysis, build, clef, cli_items, config, console, library, lines, ownership, parallel, render, stagecache, vision  # noqa: E402,F401
 
 needs_deps = unittest.skipUnless(HAVE_DEPS, "partitor venv packages not installed")
 

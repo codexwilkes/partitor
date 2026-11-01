@@ -73,6 +73,8 @@
 #   PARTITOR_RUNTIME_MAX  (default 3600)  seconds before a run is stopped
 #   PARTITOR_LIST_PAGE    (default 20)    items per page in the menu (5-200)
 #   PARTITOR_LOGO         (default none)  PNG file drawn on title and back pages
+#   PARTITOR_CACHE        (default on)    0 = do not keep or use the page-analysis cache
+#                                         (cache/ in the item folder)
 #                                         (unset: logo.png in the library, if any)
 #   PARTITOR_SMB_HOST     (default none)  host of an SMB library (installer, hints)
 #   (PARTITOR_COLOR is not a setting: the wrapper sets it, 1 when its stdout is a
@@ -111,6 +113,7 @@ LIBRARY_ENV="${PARTITOR_LIBRARY:-}"
 PARTITOR_LIBRARY="/var/lib/partitor/library"
 PARTITOR_SMB_HOST=""
 PARTITOR_LOGO="${PARTITOR_LOGO:-}"
+PARTITOR_CACHE="${PARTITOR_CACHE:-}"
 LIBRARY_TIMEOUT=20
 MEMINFO="${PARTITOR_MEMINFO:-/proc/meminfo}"
 
@@ -230,6 +233,7 @@ exec "$RUN" --quiet --collect --wait "$mode" \
   --setenv=PARTITOR_JOBS="$PARTITOR_JOBS" --setenv=PARTITOR_MEMORY_MAX="$PARTITOR_MEMORY_MAX" \
   --setenv=PARTITOR_COLOR="$color" --setenv=PYTHONUNBUFFERED=1 \
   ${PARTITOR_LOGO:+--setenv=PARTITOR_LOGO="$PARTITOR_LOGO"} \
+  ${PARTITOR_CACHE:+--setenv=PARTITOR_CACHE="$PARTITOR_CACHE"} \
   -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes \
   -p PrivateDevices=yes -p PrivateNetwork=yes -p NoNewPrivileges=yes \
   -p ReadWritePaths="$rw_paths" -p CapabilityBoundingSet= \

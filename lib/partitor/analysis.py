@@ -15,7 +15,8 @@ from .bars import edit_barlines
 from .config import D_BARNUM, D_EDGE, D_NOISE, D_NOMUSIC, NOISE_WARN_FRAC, OWN_HEADER_BASE
 from .console import _fail, _ok, _progress, _progress_end, _skip, _warn
 from .model import PageResult, Staff
-from .ownership import analyse_page
+from .stagecache import StageCache
+from . import ownership
 
 
 # =============================================================================
@@ -36,7 +37,8 @@ def parse_pages(spec: str | None, count: int) -> list[int]:
 
 
 def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: bool = True,
-                bar_edits: dict | None = None) -> tuple[PageResult, list[dict]]:
+                bar_edits: dict | None = None,
+                cache: StageCache | None = None) -> tuple[PageResult, list[dict]]:
     """analyse_one -> (PageResult, system records) of one page.
 
     nsys: the number of systems on the pages before (only a base for the
@@ -46,8 +48,14 @@ def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: boo
     owner code OWN_HEADER_BASE + index); the records and ids use the place of
     the system on its page (p3.s2). bar_edits ({system id: [edit]},
     bar_edits_by_system): the operator's corrections are applied to the
-    barlines of those systems (build)."""
-    res = analyse_page(doc[pno], pno, dpi, nsys, ocr=ocr)
+    barlines of those systems (build). cache: the stage cache of the item (DESIGN.md
+    §12.4); the result of analyse_page is read from it or stored in it, before
+    bar_edits are applied."""
+    res = cache.get(pno, nsys) if cache is not None else None
+    if res is None:
+        res = ownership.analyse_page(doc[pno], pno, dpi, nsys, ocr=ocr)
+        if cache is not None:
+            cache.put(pno, nsys, res)
     for j, grp in enumerate(res.systems):
         eds = (bar_edits or {}).get(f"p{pno + 1}.s{j + 1}")
         if not eds:
@@ -84,17 +92,20 @@ def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: boo
 
 
 def iter_pages(pdf: Path, dpi: int, pages: list[int], ocr: bool = True,
-               bar_edits: dict | None = None):
+               bar_edits: dict | None = None, cache: StageCache | None = None):
     """iter_pages -> yields (PageResult, system records of that page).
 
     One page at a time, in this process: the caller uses the owner image,
     then drops it. Callers: `pieces` (200 dpi, no OCR) and `detect` with one
-    job. `detect` with more jobs and `build` use analyse_one in workers."""
+    job. `detect` with more jobs and `build` use analyse_one in workers.
+    With a cache the base is 0, as in the workers, so that detect and build
+    share the entries (the base is only a key inside one page)."""
     doc = pymupdf.open(pdf)
     nsys = 0
     for k, pno in enumerate(pages):
         _progress(f"page {pno + 1} ({k + 1}/{len(pages)}): analysing")
-        res, recs = analyse_one(doc, pno, dpi, nsys, ocr=ocr, bar_edits=bar_edits)
+        res, recs = analyse_one(doc, pno, dpi, 0 if cache is not None else nsys, ocr=ocr,
+                                bar_edits=bar_edits, cache=cache)
         nsys += len(res.systems)
         _progress_end()
         yield res, recs

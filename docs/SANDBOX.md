@@ -39,6 +39,7 @@ Set them in `/etc/default/partitor` (`KEY=value` lines):
 |---|---|---|
 | `PARTITOR_MEMORY_MAX` | `auto` | Hard memory cap of one run, all workers together. `auto` = 70 % of the machine's memory, at least 1G. Or a size such as `8G`. Set it lower when other services need memory. |
 | `PARTITOR_JOBS` | `auto` | Worker processes of a `detect` (also inside `new`) or a build. `auto` = CPUs - 1, at most 6, and as many as the memory cap holds (about 1.5 GB each, 2 GB for the main process). |
+| `PARTITOR_CACHE` | on | `0` = `detect` and `build` keep no page-analysis cache and read none (`cache/` in the item folder, `DESIGN.md` §12.4). |
 | `PARTITOR_CPU_WEIGHT` | 20 | cgroup CPU weight (100 = normal). |
 | `PARTITOR_IO_WEIGHT` | 20 | cgroup IO weight (100 = normal). |
 | `PARTITOR_RUNTIME_MAX` | 3600 | Seconds before a run is stopped. |

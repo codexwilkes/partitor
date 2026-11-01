@@ -236,14 +236,14 @@ class TestRealRepo(unittest.TestCase):
         r = subprocess.run([sys.executable, "-I", TOOL, "--static"], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
-    def test_repo_modules_table_has_23_modules_with_known_levels(self):
+    def test_repo_modules_table_has_24_modules_with_known_levels(self):
         r = subprocess.run([sys.executable, "-I", TOOL, "--affected", "console"],
                            capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("tests: *", r.stdout)
         with open(os.path.join(ROOT, "tools", "modules.txt"), encoding="utf-8") as fh:
             rows = [ln.split() for ln in fh if ln.strip() and not ln.startswith("#")]
-        self.assertEqual(len(rows), 23)
+        self.assertEqual(len(rows), 24)
         self.assertEqual(sorted({int(r[0]) for r in rows}), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 
     def test_every_existing_module_imports_alone(self):
@@ -270,7 +270,7 @@ class TestRealRepo(unittest.TestCase):
         for m in ("cli_common", "cli_bars", "cli_parts", "cli_items"):
             self.assertIn(m, present)              # moved in step M7
         self.assertIn("cli_main", present)         # moved in step M8
-        self.assertEqual(len(present), len(listed))    # all 23 modules of the plan exist
+        self.assertEqual(len(present), len(listed))    # all 24 modules exist (23 of the plan, stagecache in 0.7.0)
         for m in present:
             with self.subTest(module=m):
                 code = f"import sys; sys.path.insert(0, {lib!r}); import partitor.{m}"
@@ -311,7 +311,7 @@ class TestRealRepo(unittest.TestCase):
         import ast
         level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
-                 "ownership": 2, "analysis": 3}
+                 "ownership": 2, "stagecache": 2, "analysis": 3}
         for m in ("reflow", "ownership", "analysis"):
             with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
                 tree = ast.parse(fh.read())
@@ -339,7 +339,7 @@ class TestRealRepo(unittest.TestCase):
         import ast
         level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
-                 "lines": 2, "ownership": 2, "render": 3}
+                 "lines": 2, "ownership": 2, "stagecache": 2, "render": 3}
         for m in ("lines", "render"):
             with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
                 tree = ast.parse(fh.read())
@@ -404,7 +404,7 @@ class TestRealRepo(unittest.TestCase):
         import ast
         level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
-                 "lines": 2, "ownership": 2, "analysis": 3, "render": 3, "library": 4,
+                 "lines": 2, "ownership": 2, "stagecache": 2, "analysis": 3, "render": 3, "library": 4,
                  "build": 5, "proof": 5}
         for m in ("build", "proof"):
             with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
@@ -454,7 +454,7 @@ class TestRealRepo(unittest.TestCase):
         import ast
         level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
-                 "lines": 2, "ownership": 2, "analysis": 3, "render": 3, "library": 4,
+                 "lines": 2, "ownership": 2, "stagecache": 2, "analysis": 3, "render": 3, "library": 4,
                  "build": 5, "proof": 5, "cli_common": 6, "cli_bars": 7, "cli_parts": 7,
                  "cli_items": 8}
         for m in ("cli_common", "cli_bars", "cli_parts", "cli_items"):
@@ -501,7 +501,7 @@ class TestRealRepo(unittest.TestCase):
         import ast
         level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
-                 "lines": 2, "ownership": 2, "analysis": 3, "render": 3, "library": 4,
+                 "lines": 2, "ownership": 2, "stagecache": 2, "analysis": 3, "render": 3, "library": 4,
                  "build": 5, "proof": 5, "cli_common": 6, "cli_bars": 7, "cli_parts": 7,
                  "cli_items": 8, "cli_main": 9}
         with open(os.path.join(ROOT, "lib", "partitor", "cli_main.py"), encoding="utf-8") as fh:

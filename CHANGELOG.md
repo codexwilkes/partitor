@@ -6,6 +6,28 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.7.0 — 2026-11-01
+
+A rebuild no longer analyses the pages again when nothing that affects the result has changed.
+The output, the messages (except one new line) and the exit codes are the same as before.
+
+- New: `detect` and `build` keep the result of the page analysis in `cache/` in the item
+  folder (one file per page, about 0.6 MB at 400 dpi) and read it back. Measured on a
+  70-page score, part-only build of one group (60 pages analysed, one worker): 31 minutes
+  without the cache, 31 seconds with it. The parts are pixel-identical and the saved lines
+  are equal.
+- The entry is keyed by the PDF content, page, dpi, OCR, the page header limit, the program
+  version, the source of the analysis code, the cv2, numpy and pymupdf versions and the
+  tesseract program and version. A changed input gives a new analysis, never an old result.
+  An unreadable or old entry is deleted and the page is analysed again, with one `cache:` note.
+  One entry per page stays.
+- One new line when entries are found: `analysis cache: N of M page(s) found`.
+- `PARTITOR_CACHE=0` keeps no cache and reads none. The wrapper passes it into the sandbox.
+  `rm -r cache/` in an item folder is always safe.
+- `detect` with one job now analyses each page with system base 0, as the workers do, when the
+  cache is on, so that `detect` and `build` share the entries. The result is the same.
+- New module `stagecache` (level 2), 35 new tests. Documented in `DESIGN.md` §12.4.
+
 ## 0.6.3 — 2026-11-01
 
 - The `logo` line in the settings help of `layout.yaml` and `score.yaml` now says where the

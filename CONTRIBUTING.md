@@ -56,7 +56,7 @@ For a refactor of the engine, record and check golden renders with
 
 The engine is the package `lib/partitor/` (`DESIGN.md` §12); `lib/partitor-engine` is only the
 launcher that starts `partitor.cli_main.main`. A change goes into the module that owns the
-name. The 23 modules and their import levels:
+name. The 24 modules and their import levels:
 
 | Lvl | Module | Put here |
 |---|---|---|
@@ -73,6 +73,7 @@ name. The 23 modules and their import levels:
 | 1 | `strips` | Strip build, bar marks, rehearsal boxes |
 | 2 | `ownership` | Ink ownership, safety gate |
 | 2 | `lines` | Line fitting, multi-bar rests, saved lines |
+| 2 | `stagecache` | Stage cache of the page analysis |
 | 3 | `analysis` | Page loop, preview |
 | 3 | `render` | Packing, part drawing |
 | 4 | `library` | Item folder, ids, load and save, `step_size` |

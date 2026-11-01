@@ -15,7 +15,7 @@ import numpy as np
 import pymupdf
 import yaml
 
-from . import VERSION, analysis, config, parallel, vision
+from . import VERSION, analysis, config, parallel, stagecache, vision
 from .analysis import check_page, iter_pages, parse_pages, preview_page, write_preview_index
 from .bars import (
     assign_bars, bar_edits_by_system, bar_mismatches, effective_systems, mismatch_text,
@@ -100,6 +100,14 @@ def cmd_pieces(a: argparse.Namespace) -> int:
     return _summary(start)
 
 
+def _cache_note(cache: "stagecache.StageCache | None", pages: list[int]) -> None:
+    """One note when the stage cache holds entries for some of the pages."""
+    n = cache.present(pages) if cache is not None else 0
+    if n:
+        _note(f"analysis cache: {n} of {len(pages)} page(s) found "
+              f"(switch off: {stagecache.CACHE_ENV}=0)")
+
+
 def cmd_detect(a: argparse.Namespace) -> int:
     """detect: analyse the pages, write layout.yaml and the preview.
 
@@ -132,6 +140,8 @@ def cmd_detect(a: argparse.Namespace) -> int:
     composers: list[str] = []
     t_analysis = time.monotonic()
     jobs = job_count(getattr(a, "jobs", None), PAGE_WORKER_GB, len(pages))
+    cache = stagecache.open_cache(out, sha256(pdf), a.dpi)
+    _cache_note(cache, pages)
 
     def page_out(res: PageResult, recs: list[dict]) -> tuple:
         """Gate line and preview of one page -> only small data (system
@@ -142,7 +152,8 @@ def cmd_detect(a: argparse.Namespace) -> int:
 
     if jobs <= 1:
         # one process, as before 0.4.1 (iter_pages carries the system base)
-        results = (page_out(res, recs) for res, recs in iter_pages(pdf, a.dpi, pages))
+        results = (page_out(res, recs)
+                   for res, recs in iter_pages(pdf, a.dpi, pages, cache=cache))
     else:
         _note(f"analysing {len(pages)} page(s) with {jobs} worker(s)")
         wdocs: dict[int, "pymupdf.Document"] = {}
@@ -152,7 +163,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
             if d_ is None:                    # one open document per process
                 d_ = wdocs[os.getpid()] = pymupdf.open(pdf)
             # nsys = 0: the system index is a key inside one page (analyse_one)
-            res, recs = analysis.analyse_one(d_, pno, a.dpi, 0)
+            res, recs = analysis.analyse_one(d_, pno, a.dpi, 0, cache=cache)
             return page_out(res, recs)
 
         results = parallel.fork_map(page_task, pages, jobs)
@@ -547,6 +558,8 @@ def cmd_build(a: argparse.Namespace) -> int:
     t_analysis = time.monotonic()
     todo = [pno for pno in pages if needs_page(pno)]
     todo_set = set(todo)
+    cache = stagecache.open_cache(out, lay["sha256"], dpi)
+    _cache_note(cache, todo)
     jobs = job_count(getattr(a, "jobs", None), PAGE_WORKER_GB, len(todo))
     if only or jobs > 1:
         _note(f"analysing {len(todo)} of {len(pages)} page(s) with {jobs} worker(s)"
@@ -558,7 +571,8 @@ def cmd_build(a: argparse.Namespace) -> int:
         if d_ is None:                    # one open document per process
             d_ = wdocs[os.getpid()] = pymupdf.open(pdf)
         _progress(f"page {pno + 1} ({pages.index(pno) + 1}/{len(pages)}): analysing")
-        res, recs = analysis.analyse_one(d_, pno, dpi, 0, ocr=True, bar_edits=bar_edits)
+        res, recs = analysis.analyse_one(d_, pno, dpi, 0, ocr=True, bar_edits=bar_edits,
+                                         cache=cache)
         _progress_end()
         return consume(res, recs)
 
