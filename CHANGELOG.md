@@ -6,6 +6,17 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.7.2 — 2026-11-01
+
+The page analysis is much faster on scans with dust or specks. The result is the same, byte for byte.
+
+- The step that gives a small unowned component to the owned component next to it compared each
+  one with every owned component in a Python loop. On a page with many specks that was most of
+  the time (one scanned page: 43 s, now 3 s; other pages 1.5 to 15 times faster). It now tests all
+  owned boxes at once with numpy and keeps the same order of choice, so every owner is the same.
+- The first run after this update analyses the pages again: the analysis source changed, so the
+  cache key changed once.
+
 ## 0.7.1 — 2026-11-01
 
 The page-analysis cache survives releases that do not touch the analysis. No change in output.

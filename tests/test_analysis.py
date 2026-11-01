@@ -42,6 +42,7 @@ from support import (  # noqa: E402,F401
     mock_attr,
     needs_deps,
     np,
+    ownership,
     package_holders,
     parallel,
     pt,
@@ -640,6 +641,80 @@ CORPUS = {
 
 
 CORPUS_DIR = os.environ.get("PARTITOR_CORPUS")
+
+
+def _chain_reference(pending, stats, lab_owner, sp):
+    """The plain loop that chain_owners replaces (first owned box in order)."""
+    owned = {c: stats[c] for c in range(1, len(stats))
+             if 0 <= lab_owner[c] < config.OWN_HEADER_BASE}
+    changed = True
+    while changed and pending:
+        changed = False
+        nxt = []
+        for c in pending:
+            x, y, cw, ch, _ = stats[c]
+            hit = None
+            for oc, (ox, oy, ow, oh, _) in owned.items():
+                if ox - 0.5 * sp <= x + cw and x - 0.5 * sp <= ox + ow:
+                    if max(oy - (y + ch), y - (oy + oh)) <= config.CHAIN_SP * sp:
+                        hit = lab_owner[oc]
+                        break
+            if hit is not None:
+                lab_owner[c] = hit
+                owned[c] = stats[c]
+                changed = True
+            else:
+                nxt.append(c)
+        pending = nxt
+    return pending
+
+
+@needs_deps
+class TestChainOwners(unittest.TestCase):
+    def _case(self, rng, n, sp):
+        stats = np.zeros((n, 5), np.int32)
+        stats[:, 0] = rng.integers(0, 400, n)
+        stats[:, 1] = rng.integers(0, 400, n)
+        stats[:, 2] = rng.integers(1, 30, n)
+        stats[:, 3] = rng.integers(1, 30, n)
+        lab = np.full(n, config.OWN_NONE, np.int64)
+        owned = rng.random(n) < 0.3
+        lab[owned] = rng.integers(0, 6, int(owned.sum()))
+        head = rng.random(n) < 0.05
+        lab[head & ~owned] = config.OWN_HEADER_BASE + 1
+        pending = [c for c in range(1, n) if lab[c] == config.OWN_NONE]
+        return stats, lab, pending
+
+    def test_same_owners_and_rest_as_the_plain_loop(self):
+        rng = np.random.default_rng(7)
+        for n, sp in ((40, 12.0), (300, 13.0), (600, 21.0)):
+            stats, lab, pending = self._case(rng, n, sp)
+            lab_a, lab_b = lab.copy(), lab.copy()
+            rest_a = _chain_reference(list(pending), stats, lab_a, sp)
+            rest_b = ownership.chain_owners(list(pending), stats, lab_b, sp)
+            self.assertEqual(rest_a, rest_b)
+            self.assertTrue(np.array_equal(lab_a, lab_b))
+            self.assertGreater(int((lab_b != lab).sum()), 0, "case chains nothing")
+
+    def test_chain_runs_through_a_row_in_later_passes(self):
+        # components 1 (owned), 3, 2 in pending order: 3 needs 2, 2 needs 1
+        stats = np.array([[0, 0, 0, 0, 0], [0, 0, 10, 10, 0], [12, 0, 10, 10, 0],
+                          [24, 0, 10, 10, 0]], np.int32)
+        lab = np.array([config.OWN_NONE, 4, config.OWN_NONE, config.OWN_NONE], np.int64)
+        rest = ownership.chain_owners([3, 2], stats, lab, 12.0)
+        self.assertEqual(rest, [])
+        self.assertEqual(list(lab[1:]), [4, 4, 4])
+
+    def test_no_owned_component_leaves_all_pending(self):
+        stats = np.array([[0, 0, 0, 0, 0], [0, 0, 5, 5, 0]], np.int32)
+        lab = np.array([config.OWN_NONE, config.OWN_NONE], np.int64)
+        self.assertEqual(ownership.chain_owners([1], stats, lab, 12.0), [1])
+
+    def test_far_component_is_not_chained(self):
+        stats = np.array([[0, 0, 0, 0, 0], [0, 0, 10, 10, 0], [0, 200, 10, 10, 0]], np.int32)
+        lab = np.array([config.OWN_NONE, 2, config.OWN_NONE], np.int64)
+        self.assertEqual(ownership.chain_owners([2], stats, lab, 12.0), [2])
+        self.assertEqual(lab[2], config.OWN_NONE)
 
 
 @needs_deps

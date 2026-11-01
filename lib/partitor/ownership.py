@@ -127,6 +127,45 @@ def detect_barlines(owner: np.ndarray, conn: np.ndarray, ink: np.ndarray,
     return out
 
 
+def chain_owners(pending: list[int], stats: np.ndarray, lab_owner: np.ndarray,
+                 sp: float) -> list[int]:
+    """chain_owners -> the components still without owner.
+
+    A pending component takes the owner of the first owned component, in
+    order of arrival, that is within 0.5 sp across and CHAIN_SP * sp above
+    or below. A component that got an owner can be the neighbour of a later
+    one, in the same pass or the next; passes repeat until nothing changes.
+    The boxes sit in numpy arrays, so one pending component costs one
+    vector test, not a Python loop over every owned component."""
+    owned = [c for c in range(1, len(stats)) if 0 <= lab_owner[c] < OWN_HEADER_BASE]
+    box = np.zeros((len(owned) + len(pending), 4), np.int64)
+    own = np.zeros(len(box), np.int64)
+    k = len(owned)
+    for i, c in enumerate(owned):
+        box[i] = stats[c][:4]
+        own[i] = lab_owner[c]
+    changed = True
+    while changed and pending:
+        changed = False
+        nxt = []
+        for c in pending:
+            x, y, cw, ch, _ = stats[c]
+            ox, oy = box[:k, 0], box[:k, 1]
+            hit = ((ox - 0.5 * sp <= x + cw) & (x - 0.5 * sp <= ox + box[:k, 2])
+                   & (np.maximum(oy - (y + ch), y - (oy + box[:k, 3])) <= CHAIN_SP * sp))
+            j = int(hit.argmax()) if k else 0
+            if k and hit[j]:
+                lab_owner[c] = own[j]
+                box[k] = stats[c][:4]
+                own[k] = own[j]
+                k += 1
+                changed = True
+            else:
+                nxt.append(c)
+        pending = nxt
+    return pending
+
+
 def group_components(comps: list[int], stats: np.ndarray, sp: float
                      ) -> list[list[int]]:
     """group_components -> lists of components forming one text line.
@@ -436,28 +475,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
             pending.append(c)
 
     # chaining: an unresolved component next to an owned one inherits it
-    owned_boxes = {c: stats[c] for c in range(1, n)
-                   if 0 <= lab_owner[c] < OWN_HEADER_BASE}
-    changed = True
-    while changed and pending:
-        changed = False
-        nxt = []
-        for c in pending:
-            x, y, cw, ch, _ = stats[c]
-            hit_owner = None
-            for oc, (ox, oy, ow, oh, _) in owned_boxes.items():
-                if ox - 0.5 * sp <= x + cw and x - 0.5 * sp <= ox + ow:
-                    vgap = max(oy - (y + ch), y - (oy + oh))
-                    if vgap <= CHAIN_SP * sp:
-                        hit_owner = lab_owner[oc]
-                        break
-            if hit_owner is not None:
-                lab_owner[c] = hit_owner
-                owned_boxes[c] = stats[c]
-                changed = True
-            else:
-                nxt.append(c)
-        pending = nxt
+    pending = chain_owners(pending, stats, lab_owner, sp)
 
     # Text lines are decided as a whole (a word is never split).
     groups = group_components(pending, stats, sp)
