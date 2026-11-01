@@ -262,6 +262,8 @@ class TestRealRepo(unittest.TestCase):
             self.assertIn(m, present)              # moved in step M2
         for m in ("reflow", "ownership", "analysis"):
             self.assertIn(m, present)              # moved in step M3
+        for m in ("lines", "render"):
+            self.assertIn(m, present)              # moved in step M4
         for m in present:
             with self.subTest(module=m):
                 code = f"import sys; sys.path.insert(0, {lib!r}); import partitor.{m}"
@@ -324,6 +326,40 @@ class TestRealRepo(unittest.TestCase):
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.level:
                     self.assertFalse({a.name for a in node.names} & patched, m)
+
+    def test_m4_modules_sit_on_their_levels_and_import_only_lower_ones(self):
+        """lines (2) and render (3): imports go to strictly lower levels (plan 3)."""
+        import ast
+        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
+                 "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
+                 "lines": 2, "ownership": 2, "render": 3}
+        for m in ("lines", "render"):
+            with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    got = {node.module} if node.module else {a.name for a in node.names}
+                    for g in got:
+                        if g != "VERSION":                   # `from . import VERSION`: the package itself
+                            self.assertLess(level[g], level[m], f"{m} imports {g}")
+
+    def test_m4_modules_import_no_patched_name_by_name(self):
+        """SYSTEM_GAP_LAST is patched by tests: render defines it, no module imports it by name."""
+        import ast
+        with open(os.path.join(ROOT, "tests", "patchable.txt"), encoding="utf-8") as fh:
+            patched = {ln.strip() for ln in fh if ln.strip() and not ln.startswith("#")}
+        self.assertIn("SYSTEM_GAP_LAST", patched)
+        for m in ("lines", "render"):
+            with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
+                tree = ast.parse(fh.read())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    self.assertFalse({a.name for a in node.names} & patched, m)
+        with open(os.path.join(ROOT, "lib", "partitor-engine"), encoding="utf-8") as fh:
+            script = ast.parse(fh.read())
+        for node in ast.walk(script):
+            if isinstance(node, ast.ImportFrom):
+                self.assertNotIn("SYSTEM_GAP_LAST", {a.name for a in node.names})   # no shim
 
     def test_ownership_reaches_tune_through_config(self):
         """TUNE is changed in place by the script and read by ownership as config.TUNE (R1)."""

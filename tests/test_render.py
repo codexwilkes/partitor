@@ -26,11 +26,14 @@ sys.path.insert(0, HERE)
 from support import (  # noqa: E402,F401
     LIB,
     SRC,
+    lines,
     make_score_pdf,
+    mock_attr,
     needs_deps,
     np,
     pt,
     pymupdf,
+    render,
     yaml,
     setUpModule,
     tearDownModule,
@@ -891,3 +894,89 @@ class TestLinesFileCompatibility(unittest.TestCase):
             with self.assertRaises(ValueError) as cm:
                 pt.load_lines(f)
             self.assertIn("not allowed in a lines file", str(cm.exception))
+
+
+@needs_deps
+class TestRenderAndLinesModules(unittest.TestCase):
+    """Step M4: `lines` and `render` own their names. State and patched names follow rule R1
+    (docs/DESIGN.md section 12.3)."""
+
+    def three_system_strips(self):
+        img = np.zeros((300, 400), bool)
+        for t in (40, 120, 200):
+            for k in range(5):
+                img[t + 10 * k, :] = True
+        g = pt.Strip(img, 0, 40, 240, 10.0, np.zeros_like(img))
+        g.staff_labels = [("A", 40, 80), ("B", 120, 160), ("C", 200, 240)]
+        return [g, g]
+
+    def system_height(self):
+        opts = {**pt.LAYOUT_DEFAULTS, "gap": 6.0}
+        pages, _ = pt.plan_pages(self.three_system_strips(), 400, opts, False)
+        self.assertEqual(len(pages), 1)
+        (_, y0), (_, y1) = pages[0]
+        return y1 - y0
+
+    def test_system_gap_last_is_read_in_render_and_the_script_has_no_copy(self):
+        """A patch of render.SYSTEM_GAP_LAST changes the plan (the fake is in force); a name set on the
+        script would change nothing, so the script keeps no SYSTEM_GAP_LAST."""
+        self.assertFalse(hasattr(pt, "SYSTEM_GAP_LAST"))
+        spread = self.system_height()
+        with mock_attr(render, "SYSTEM_GAP_LAST", pt.SYSTEM_GAP_FACTOR):
+            self.assertEqual(render.SYSTEM_GAP_LAST, pt.SYSTEM_GAP_FACTOR)
+            plain = self.system_height()
+        self.assertGreater(spread, plain)
+        pt.SYSTEM_GAP_LAST = pt.SYSTEM_GAP_FACTOR        # a stray name on the script: no effect
+        try:
+            self.assertEqual(self.system_height(), spread)
+        finally:
+            del pt.SYSTEM_GAP_LAST
+        self.assertEqual(self.system_height(), spread)
+
+    def test_last_render_is_state_of_render_and_changed_in_place(self):
+        """render_part fills render.LAST_RENDER; the script shares the same dict (never rebound)."""
+        import ast
+        self.assertIs(pt.LAST_RENDER, render.LAST_RENDER)
+        self.assertIs(pt._LOGO_WARNED, render._LOGO_WARNED)
+        img = np.zeros((100, 400), bool)
+        for k in range(5):
+            img[40 + 10 * k, :] = True
+        strips = [pt.Strip(img.copy(), 0, 40, 80, 10.0, np.zeros_like(img)) for _ in range(3)]
+        opts = {**pt.LAYOUT_DEFAULTS, "scale": 2.0, "gap": 6.0, "gutter": 6.0}
+        render.LAST_RENDER.clear()
+        with tempfile.TemporaryDirectory() as tmp:
+            n = pt.render_part("X", strips, {"title": "T"}, 400, opts, Path(tmp, "p.pdf"))
+        self.assertIn("turns", render.LAST_RENDER)
+        self.assertEqual(render.LAST_RENDER["content"] + int(render.LAST_RENDER["title_page"]), n)
+        self.assertIs(pt.LAST_RENDER, render.LAST_RENDER)
+        with open(os.path.join(LIB, "partitor", "render.py"), encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        self.assertEqual([n_ for n_ in ast.walk(tree) if isinstance(n_, ast.Global)], [])
+        binds = [n_ for n_ in tree.body if isinstance(n_, (ast.Assign, ast.AnnAssign))
+                 and any(isinstance(t, ast.Name) and t.id == "LAST_RENDER"
+                         for t in (n_.targets if isinstance(n_, ast.Assign) else [n_.target]))]
+        self.assertEqual(len(binds), 1)
+
+    def test_lines_unpickler_and_file_functions_belong_to_lines(self):
+        """The reader class, the writer and the reader of .lines files live in `lines`; a class path
+        of the new module (partitor.lines) is accepted like every partitor.* path."""
+        self.assertEqual(lines._LinesUnpickler.__module__, "partitor.lines")
+        self.assertIs(pt._LinesUnpickler, lines._LinesUnpickler)
+        self.assertIs(pt.load_lines, lines.load_lines)
+        u = lines._LinesUnpickler(io.BytesIO(b""))
+        for module in ("__main__", "partitor", "pt", "partitor.model", "partitor.lines", "partitor.render"):
+            with self.subTest(module=module):
+                self.assertIs(u.find_class(module, "Strip"), pt.Strip)
+        d = lines.load_lines(Path(HERE, "data", "lines-0.4.2.lines"))
+        self.assertEqual(d["format"], lines.LINES_FORMAT)
+        self.assertTrue(d["strips"])
+
+    def test_page_turn_costs_stay_in_typography_and_render_reads_them_from_there(self):
+        """Decision of step M4: the turn costs are constants of typography; `render` imports them by name
+        (nothing rebinds or patches them), so the two modules never hold different values."""
+        from partitor import typography
+        for name in ("TURN_BAD", "TURN_HARD", "TURN_MOVE", "PAGE_COST", "SHORT_LAST", "FILL_COST",
+                     "REPAGE_FILL", "REST_TURN_MIN"):
+            with self.subTest(name=name):
+                self.assertIs(getattr(render, name), getattr(typography, name))
+

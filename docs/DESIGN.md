@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.5.0-dev.4. Section numbers are stable: the code cites
+Status: describes partitor 0.5.0-dev.5. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -913,9 +913,10 @@ See `KNOWN-LIMITS.md`.
 
 The engine is mostly one script today, `lib/partitor-engine`. It moves in small steps into
 the package `lib/partitor/`, in 23 modules (releases `0.5.0-dev.1` to `0.5.0`).
-Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.4
-these 13 modules exist: `console`, `config`, `model`, `typography`, `mapping`, `bars`,
-`parallel`, `vision`, `clef`, `strips`, `reflow`, `ownership`, `analysis`; the script
+Every step keeps the output identical (`tools/g0_golden.py check`). In 0.5.0-dev.5
+these 15 modules exist: `console`, `config`, `model`, `typography`, `mapping`, `bars`,
+`parallel`, `vision`, `clef`, `strips`, `reflow`, `ownership`, `lines`, `analysis`,
+`render`; the script
 imports their names until the last step (except the names of R1, below). A module that is not in
 `lib/partitor/` yet is a proposal in the tables below.
 
@@ -983,18 +984,23 @@ This map comes from function names and headings. Check it when a module exists.
   `from owner import NAME` makes a copy: a test patch or a rebinding then changes the
   owner and leaves the copy as it was. Today these are `console._TTY` (rebound in a
   worker), `config.TUNE`, `config.SIZE_FIRST`, `parallel.fork_map`, `analysis.analyse_one`
-  (patched by tests; the script has no copy and reads `analysis.analyse_one`) and `vision._TESS` (the
+  (patched by tests; the script has no copy and reads `analysis.analyse_one`),
+  `render.SYSTEM_GAP_LAST` (patched by tests; `plan_pages` reads it in `render`, the script
+  has no copy) and `vision._TESS` (the
   path of the tesseract program; nothing rebinds it, but the plan names the owner, so the
   script reads `vision._TESS["path"]`). An object that is changed in place and never
-  rebound (`console._counts`, `_FAILURES`, `_WARNINGS`, `clef.CLEF_LAST`, `clef._CLEF_TPL`)
-  may be imported by name: both names are the same object. `console._reset_counts` keeps
-  it so; the two clef caches are private to `clef`.
+  rebound (`console._counts`, `_FAILURES`, `_WARNINGS`, `clef.CLEF_LAST`, `clef._CLEF_TPL`,
+  `render.LAST_RENDER`, `render._LOGO_WARNED`) may be imported by name: both names are the
+  same object. `console._reset_counts` keeps it so; the two clef caches are private to
+  `clef`, and `render` fills `LAST_RENDER` with `.update` and item assignment only. The
+  page-turn costs (`TURN_BAD`, `PAGE_COST`, `FILL_COST` and the like) stay constants of
+  `typography`; `render` imports them by name.
 - **`global`.** `global NAME` is allowed only for a name that the same module assigns
   or defines at top level. For a name of another module write `owner.NAME = value`.
 - **Size.** At most 1 100 definition lines per module. One module is exempt
   (`ownership`: `analyse_page` is one function of 852 lines).
 - **Pickles.** Saved `.lines` files hold class paths. Files of 0.4.2 say `__main__.Strip`;
-  files written since 0.5.0-dev.2 say `partitor.model.Strip`. The reader (`_LinesUnpickler`)
+  files written since 0.5.0-dev.2 say `partitor.model.Strip`. The reader (`_LinesUnpickler`, in `lines`)
   accepts `__main__`, `partitor`, `pt` and every `partitor.*` path for `Strip` and `RestRun`
   only, and will keep doing so, so a later rename of a module does not break saved files.
   An older engine that reads a new file stops with an unpickling error, which `load_lines`

@@ -6,6 +6,29 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.5.0-dev.5 — 2026-10-31
+
+Fourth move of engine code (plan: `docs/DESIGN.md` §12). Two modules leave the engine
+script and go to the package `lib/partitor/`. No behaviour change: the output is the same
+(50 golden cases checked with `tools/g0_golden.py`); saved `.lines` files still load.
+
+### Added
+
+- Modules `lines` (line fitting, labels, multi-bar rests, saved `.lines` files) and
+  `render` (paper, packing, page plan, part drawing) in `lib/partitor/` (about 1 000
+  definition lines). The script imports their names, so commands, options and output stay
+  as they were. The page-turn costs stay in `typography`; `render` imports them.
+- 6 new tests: 526 are found now (520 before). They cover that a change of
+  `render.SYSTEM_GAP_LAST` reaches the page plan and that a name set on the script does
+  not, that `render.LAST_RENDER` is the one dict the script shares and `render_part` fills
+  in place, that the `.lines` reader and writer belong to `lines` and accept the new
+  class paths, that the turn costs are the objects of `typography`, and the levels and
+  imports of the two modules.
+
+### Changed
+
+- Tests patch `render.SYSTEM_GAP_LAST` (the script has no copy of it).
+
 ## 0.5.0-dev.4 — 2026-10-31
 
 Third move of engine code (plan: `docs/DESIGN.md` §12). Three modules leave the engine

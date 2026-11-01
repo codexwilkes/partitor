@@ -27,6 +27,7 @@ from support import (  # noqa: E402,F401
     np,
     pt,
     pymupdf,
+    render,
     setUpModule,
     tearDownModule,
 )
@@ -355,14 +356,16 @@ class TestClefsAndSpacing(unittest.TestCase):
             (_, y0), (_, y1) = pages[0]
             return y1 - y0
         spread = dy()
-        old = pt.SYSTEM_GAP_LAST
+        old = render.SYSTEM_GAP_LAST             # plan_pages reads it in `render` (rule R1)
         try:
-            pt.SYSTEM_GAP_LAST = pt.SYSTEM_GAP_FACTOR   # no widening
+            render.SYSTEM_GAP_LAST = pt.SYSTEM_GAP_FACTOR   # no widening
+            self.assertEqual(render.SYSTEM_GAP_LAST, pt.SYSTEM_GAP_FACTOR)   # the fake is in force
             plain = dy()
         finally:
-            pt.SYSTEM_GAP_LAST = old
+            render.SYSTEM_GAP_LAST = old
+        self.assertEqual(render.SYSTEM_GAP_LAST, old)
         p = pt.pitches([g, g], opts)[0]          # px
-        extra_max = (pt.SYSTEM_GAP_LAST - pt.SYSTEM_GAP_FACTOR) * 40
+        extra_max = (render.SYSTEM_GAP_LAST - pt.SYSTEM_GAP_FACTOR) * 40
         self.assertGreater(spread, plain)        # room on the page is used
         self.assertLessEqual(spread / plain, (p + extra_max) / p + 1e-6)
 

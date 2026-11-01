@@ -1,0 +1,764 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+"""Paper, packing, page plan and part drawing."""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import numpy as np
+import pymupdf
+
+from . import config
+from .clef import ACC_GLYPH, CLEF_BOTTOM
+from .config import AMB_SP, SYSTEM_GAP_FACTOR, composer_surname
+from .console import _warn
+from .lines import line_labels, put_smallcaps
+from .model import Strip
+from .reflow import find_prefixes, reflow, reflow_caps
+from .strips import (
+    REH_PAD, ambitus_width, anchor, bar_mark, bar_x, pitches, reh_boxes, rest_box,
+)
+from .typography import (
+    FILL_COST, PAGE_COST, REPAGE_FILL, REST_TURN_MIN, SHORT_LAST, TURN_BAD, TURN_HARD,
+    TURN_MOVE, put_text, text_len,
+)
+
+
+# =============================================================================
+# Packing and rendering
+# =============================================================================
+# (width, height) in pt, as the sheet is printed. ledger = 17 x 11 in,
+# landscape (0.3.0-dev.35): the same height as Letter, 2.2 x the line width.
+PAPER = {"a4": (595.28, 841.89), "letter": (612.0, 792.0), "ledger": (1224.0, 792.0)}
+MARGIN = 42.5        # pt (15 mm), default margin (tests)
+MIN_MARGIN_MM = 5.0  # no margin below this (printer edge)
+TITLE_BAND = 85.0    # pt, page 1
+RUN_HEAD = 22.0      # pt, later pages
+
+
+GROUP_REFLOW_PAGES = 1.5  # group re-flow, pages=auto: page budget / pages without re-flow
+SYSTEM_GAP_LAST = 2.0     # the same on a last page with room to spare
+
+
+def mm2pt(v: float) -> float:
+    return float(v) * 72.0 / 25.4
+
+
+def page_box(opts: dict, pi: int, duplex: bool) -> tuple[float, float, float, float]:
+    """page_box -> (left, right, top, bottom) margins in pt for page index pi
+    (0 = page 1, a recto). Double-sided: the spine margin (left on a recto,
+    right on a verso) gains `gutter`/2 and the outer margin loses it, so
+    the text width, and with it the staff size, is the same on every page."""
+    side = mm2pt(opts.get("margin_side", 15.0))
+    g = mm2pt(opts.get("gutter", 0.0)) / 2 if duplex else 0.0
+    inner, outer = side + g, side - g
+    left, right = (inner, outer) if pi % 2 == 0 else (outer, inner)
+    return left, right, mm2pt(opts.get("margin_top", 15.0)), mm2pt(opts.get("margin_bottom", 15.0))
+
+
+def check_margins(opts: dict) -> str:
+    """check_margins -> error text, or '' when the margins are usable."""
+    for k in ("margin_top", "margin_bottom", "margin_side"):
+        if float(opts[k]) < MIN_MARGIN_MM:
+            return f"{k} {opts[k]} mm is below {MIN_MARGIN_MM} mm"
+    if float(opts["gutter"]) < 0:
+        return "gutter must not be negative"
+    if float(opts["margin_side"]) - float(opts["gutter"]) / 2 < MIN_MARGIN_MM:
+        return (f"gutter {opts['gutter']} mm leaves an outer margin below "
+                f"{MIN_MARGIN_MM} mm (margin_side {opts['margin_side']} mm)")
+    if opts["duplex"] not in ("auto", "on", "off"):
+        return f"duplex must be auto, on or off (not {opts['duplex']})"
+    return ""
+
+
+def is_duplex(opts: dict, npages: int) -> bool:
+    d = opts.get("duplex", "auto")
+    return d == "on" or (d == "auto" and npages > 2)
+
+
+MIN_LAST_LINES = 3    # a part's last page holds at least this many lines
+
+
+def pack(strips: list[Strip], dpi: int, opts: dict
+         ) -> list[list[tuple[Strip, float]]]:
+    """pack -> pages of (strip, y of the strip image top, pt within the
+    content area). Strips follow at constant pitch (see pitches); a strip
+    that does not fit goes to the next page. Free space stays at the
+    bottom of the page. A last page with fewer than MIN_LAST_LINES lines
+    takes lines from the pages before it (largest lines-per-page limit
+    that gives it enough), with the same page count."""
+    pages = _pack(strips, dpi, opts, None)
+    n, total = len(pages), len(strips)
+    need = min(MIN_LAST_LINES, total // n) if n > 1 else 0
+    if n > 1 and len(pages[-1]) < need:
+        for cap in range(max(len(p) for p in pages) - 1, -(-total // n) - 1, -1):
+            alt = _pack(strips, dpi, opts, cap)
+            if len(alt) == n and len(alt[-1]) >= need:
+                return alt
+    return pages
+
+
+def _pack(strips: list[Strip], dpi: int, opts: dict, cap: int | None
+          ) -> list[list[tuple[Strip, float]]]:
+    """Greedy packing; cap = most lines per page (None: no limit)."""
+    _, ph = PAPER[opts["paper"]]
+    k = 72.0 / dpi * (opts.get("scale") or 1.0)
+    pit = pitches(strips, opts)
+    _, _, mt, mb = page_box(opts, 0, False)
+    avail1 = ph - mt - mb - (RUN_HEAD if opts.get("_no_band") else TITLE_BAND)
+    availn = ph - mt - mb - RUN_HEAD
+    pages: list[list[tuple[Strip, float]]] = [[]]
+    y_top = 0.0
+    for i, s in enumerate(strips):
+        avail = avail1 if len(pages) == 1 else availn
+        if pages[-1]:
+            y_top += pit[i - 1] * k
+            y_img = y_top - s.staff_top * k
+            if y_img + s.img.shape[0] * k > avail or (cap and len(pages[-1]) >= cap):
+                pages.append([])
+        if not pages[-1]:
+            y_img = 0.0
+            y_top = s.staff_top * k
+        pages[-1].append((s, y_img))
+    return pages
+
+
+def turns(npages: int) -> int:
+    """Page turns of a part printed as facing pages (1-2: 0, 3-4: 1)."""
+    return max(0, (npages - 1) // 2)
+
+
+def choose_layout(strips: list[Strip], dpi: int, opts: dict
+                  ) -> tuple[float, float, int]:
+    """choose_layout -> (scale, gap, pages). DESIGN.md §5.2:
+    fewest page turns first (a smaller staff and 2 pages is better than a
+    larger staff and 3 pages), then the largest staff (down to
+    `min_staff_mm`), then the widest gap from `gap` down to `gap_min`.
+    `page_count` (when set) is a hard target instead of the turn rule."""
+    smax = fit_scale(strips, dpi, opts)
+    h_px = 4.0 * strips[0].sp       # one staff (a part may have two staves)
+
+    def mm(sc: float) -> float:
+        return h_px * 72.0 / dpi * sc * 25.4 / 72.0
+
+    scales = [smax]
+    while mm(scales[-1] - 0.02) >= opts["min_staff_mm"] and scales[-1] - 0.02 > 0.3:
+        scales.append(scales[-1] - 0.02)
+    gaps = list(np.arange(opts["gap"], opts["gap_min"] - 1e-9, -0.25)) or [opts["gap"]]
+
+    def npages(sc: float, g: float) -> int:
+        # content pages (a title page adds none: the first turn is before
+        # the music, DESIGN.md §5.4)
+        return len(layout_pages(strips, dpi, {**opts, "scale": sc, "gap": float(g)})[0])
+
+    target = opts.get("page_count")
+    if target:
+        for sc in scales:
+            for g in gaps:
+                n = npages(sc, g)
+                if n <= target:
+                    return sc, float(g), n
+        sc, g = scales[-1], gaps[-1]
+        return sc, float(g), npages(sc, g)
+    if opts["paper"] in config.SIZE_FIRST:
+        # ledger (0.3.0-dev.36; operator request 2026-10-27): the staff is as large as
+        # the page width and max_staff_mm allow; pages and turns follow
+        sc = scales[0]
+        best = turns(npages(sc, gaps[-1]))
+    else:
+        best = min(turns(npages(sc, gaps[-1])) for sc in scales)
+        sc = next(sc for sc in scales if turns(npages(sc, gaps[-1])) == best)
+    for g in gaps:
+        n = npages(sc, g)
+        if turns(n) == best:
+            return sc, float(g), n
+    return sc, float(gaps[-1]), npages(sc, gaps[-1])
+
+
+def choose_reflow(strips: list[Strip], dpi: int, opts: dict, pre: list | None = None,
+                  floor_scale: float | None = None
+                  ) -> tuple[float, float, int, list[Strip]]:
+    """choose_reflow -> (scale, gap, content pages, lines) for a re-flowed
+    part. Same order as choose_layout (fewest page turns, then the largest
+    staff, then the widest gap), with the staff up to `max_staff_mm`: the
+    line length follows the staff size, never shorter than needed.
+    pre: find_prefixes(strips) when the caller has it. floor_scale: the
+    smallest scale tried, when lower than `min_staff_mm` gives (a page
+    budget below the size of the source lines must still find a layout)."""
+    pw, _ = PAPER[opts["paper"]]
+    usable = pw - 2 * mm2pt(opts.get("margin_side", 15.0))
+    sp = strips[0].sp
+    pre = find_prefixes(strips) if pre is None else pre
+    cap_px = reflow_caps(strips, pre)
+    s_hi = min(opts["max_staff_mm"] * dpi / (4 * sp * 25.4),
+               usable * dpi / 72.0 / max(cap_px, 1.0))
+    floor = opts["min_staff_mm"] * dpi / (4 * sp * 25.4)
+    if floor_scale is not None:
+        floor = min(floor, floor_scale)
+    scales = [s_hi]
+    while scales[-1] * 0.97 >= floor and len(scales) < 60:
+        scales.append(scales[-1] * 0.97)
+    gaps = list(np.arange(opts["gap"], opts["gap_min"] - 1e-9, -0.25)) or [opts["gap"]]
+    cache: dict[float, list[Strip]] = {}
+
+    def lines(sc: float) -> list[Strip]:
+        if sc not in cache:
+            k = 72.0 / dpi * sc
+            cache[sc] = reflow(strips, 0.98 * usable / k, pre)
+        return cache[sc]
+
+    def npages(sc: float, g: float) -> int:
+        return len(layout_pages(lines(sc), dpi, {**opts, "scale": sc, "gap": float(g)})[0])
+
+    target = opts.get("page_count")
+    if target:                        # the largest staff that fits N pages
+        for sc in scales:
+            for g in gaps:
+                if npages(sc, g) <= target:
+                    return sc, float(g), npages(sc, g), lines(sc)
+        sc, g = scales[-1], gaps[-1]
+        return sc, float(g), npages(sc, g), lines(sc)
+    # re-flow is chosen for size: the largest staff (max_staff_mm, or what
+    # the widest uncut piece allows); the page count follows. Among gaps,
+    # the widest with the fewest page turns at that size.
+    sc = scales[0]
+    best = min(turns(npages(sc, g)) for g in gaps)
+    for g in gaps:
+        if turns(npages(sc, g)) == best:
+            return sc, float(g), npages(sc, g), lines(sc)
+    return sc, float(gaps[-1]), npages(sc, gaps[-1]), lines(sc)
+
+
+def fit_scale(strips: list[Strip], dpi: int, opts: dict) -> float:
+    """Largest scale <= opts.scale whose widest strip fits the page width."""
+    pw, _ = PAPER[opts["paper"]]
+    usable = pw - 2 * mm2pt(opts.get("margin_side", 15.0))
+    widest = max(s.img.shape[1] for s in strips) * 72.0 / dpi
+    # ceiling: `scale` when set, else the size that gives max_staff_mm
+    cap = opts.get("scale") or (opts.get("max_staff_mm", 8.0) * dpi
+                                / (4 * strips[0].sp * 25.4))
+    return min(cap, usable / widest)
+
+
+LARGE = {"letter": ((792.0, 1224.0), "11x17"),      # Letter -> 11x17 (ledger)
+         "a4": ((841.89, 1190.55), "A3")}           # A4 -> A3 (exact sqrt 2)
+CROP_MARK = (14.4, 50.4)   # pt from each side edge: the cut line marks
+
+
+def large_copy(src: Path, paper: str) -> Path:
+    """large_copy -> path of the large-print copy of a part: each page
+    scaled to the full width of the larger sheet (Letter -> 11x17, x1.294;
+    A4 -> A3, x1.414), at the top of the sheet. Where the scaled page is
+    shorter than the sheet (11x17: 14.24 in of 17 in), short crop marks at
+    both sides show the cut line."""
+    (sw, sh), tag = LARGE[paper]
+    pw, ph = PAPER[paper]
+    f = sw / pw
+    out = src.with_name(f"{src.stem}-{tag}.pdf")
+    doc = pymupdf.open(src)
+    big = pymupdf.open()
+    for pno in range(len(doc)):
+        page = big.new_page(width=sw, height=sh)
+        page.show_pdf_page(pymupdf.Rect(0, 0, sw, ph * f), doc, pno)
+        cut = ph * f
+        if sh - cut > 1.0:
+            for a, b in ((CROP_MARK[0], CROP_MARK[1]), (sw - CROP_MARK[1], sw - CROP_MARK[0])):
+                page.draw_line((a, cut), (b, cut), color=(0, 0, 0), width=0.5)
+    big.save(out, garbage=3, deflate=True)
+    return out
+
+
+LAST_RENDER: dict = {}      # content pages and title page of the last render_part
+
+
+def rest_turn(strips: list[Strip], j: int) -> bool:
+    """A page may turn before line j and the player rests: a multi-bar rest
+    line (REST_TURN_MIN bars or more) is the last line of the page or the
+    first line of the next. A movement start or a rehearsal letter does not
+    count: the player may be playing there."""
+    for t in (j - 1, j):
+        rs = strips[t].rest_src
+        if rs is not None and rs[2].bars >= REST_TURN_MIN:
+            return True
+    return False
+
+
+def line_bars(s: Strip) -> tuple[int, int | None] | None:
+    """line_bars -> (first bar, last bar) of a line; the last is None when
+    unknown. None when the line has no bar numbers."""
+    if s.rest_src is not None:
+        run = s.rest_src[2]
+        if run.first is None:
+            return None
+        return run.first, run.first + run.bars - 1
+    if s.bar_nums:
+        return int(s.bar_nums[0]), int(s.bar_nums[-1])
+    if s.bar_no is not None:
+        return int(s.bar_no), None
+    return None
+
+
+def break_lines(strips: list[Strip], bars: list[int]) -> tuple[list[int], list[str]]:
+    """break_lines -> (j list, warnings): a page break before line j for each
+    bar N in `bars` ("break after bar N"). Lines are fixed, so N must be the
+    last bar of a line; else a warning names the line ends near N."""
+    out, warn = [], []
+    spans = [line_bars(s) for s in strips]
+    for n in sorted({int(b) for b in bars or []}):
+        hit = next((i for i, sp in enumerate(spans) if sp and sp[1] == n), None)
+        if hit is not None:
+            if hit + 1 < len(strips):
+                out.append(hit + 1)
+            else:
+                warn.append(f"break after bar {n}: the last line of the part (ignored)")
+            continue
+        ends = [sp[1] for sp in spans if sp and sp[1] is not None]
+        near = sorted(ends, key=lambda e: (abs(e - n), e))[:4]
+        inside = any(sp and sp[1] is not None and sp[0] <= n < sp[1] for sp in spans)
+        warn.append(f"break after bar {n}: " + (
+            "bar is inside a line (lines are not cut)" if inside else "no line ends at that bar")
+            + (f"; line ends near it: {', '.join(str(e) for e in sorted(near))}" if near else ""))
+    return sorted(set(out)), warn
+
+
+def good_turn(strips: list[Strip], j: int) -> bool:
+    """A page may turn before line j: a movement starts there, the line
+    opens with a rehearsal letter (a new section, after a repeat), or a
+    multi-bar rest stands on either side (the player turns while resting)."""
+    s = strips[j]
+    if s.movement or s.rest_src is not None or strips[j - 1].rest_src is not None:
+        return True
+    return any(mx <= s.staff_x0 + 3 * s.sp for mx, _ in s.marks)
+
+
+def plan_pages(strips: list[Strip], dpi: int, opts: dict, title_page: bool
+               ) -> tuple[list[list[tuple[Strip, float]]], int]:
+    """plan_pages -> (pages of (strip, y), bad turns): page breaks chosen over the
+    whole part at once (dynamic programming, not first-fit), so a turn
+    falls at a section boundary where possible (DESIGN.md §5.4): a turn
+    follows each recto (physical page 1, 3, 5, ...; page 1 is a title page
+    when title_page) when printed double-sided. A section that fits on two
+    pages then starts on a verso and needs no turn. Costs: TURN_BAD per
+    turn not at good_turn, PAGE_COST per page, SHORT_LAST, FILL_COST."""
+    n = len(strips)
+    _, ph = PAPER[opts["paper"]]
+    k = 72.0 / dpi * (opts.get("scale") or 1.0)
+    pit = pitches(strips, opts)
+    _, _, mt, mb = page_box(opts, 0, False)
+    band = RUN_HEAD if (title_page or opts.get("_no_band")) else TITLE_BAND
+    avail1 = ph - mt - mb - band
+    availn = ph - mt - mb - RUN_HEAD
+    cum = [0.0]
+    for v in pit:
+        cum.append(cum[-1] + v)
+    duplex = opts.get("duplex", "auto") != "off"
+    rest_rule = opts.get("turns", "any") == "rest"
+    logo_on = logo_wanted(opts)
+    logo_need = logo_room(ph, page_box(opts, 0, False)[3])
+
+    def turn_cost(t: int) -> float:          # cost of a turn before line t
+        if not rest_rule:
+            return 0.0 if good_turn(strips, t) else TURN_BAD
+        if rest_turn(strips, t):
+            return 0.0
+        return TURN_MOVE if strips[t].movement else TURN_HARD
+    fill_cost = REPAGE_FILL if rest_rule else FILL_COST
+    forced = sorted(f for f in set(opts.get("_breaks") or []) if 0 < f < n)
+
+    def height(i: int, j: int) -> float:        # lines i..j-1 on one page (pt)
+        last = strips[j - 1]
+        return (strips[i].staff_top + (cum[j - 1] - cum[i]) - last.staff_top
+                + last.img.shape[0]) * k
+
+    first_phys = 2 if title_page else 1
+    INF = float("inf")
+    # best[c][j]: cost of lines 0..j-1 on content pages 0..c-1
+    # at most 2 pages more than first-fit (more never saves a turn)
+    maxp = min(n, len(_pack(strips, dpi, {**opts, "_no_band": title_page or opts.get("_no_band")},
+                            None)) + (4 if rest_rule else 2) + len(forced))
+    best = [dict() for _ in range(maxp + 1)]
+    back: list[dict] = [dict() for _ in range(maxp + 1)]
+    best[0][0] = 0.0
+    total_best, end_c = INF, None
+    for c in range(maxp):
+        avail = avail1 if c == 0 else availn
+        for i, cost in list(best[c].items()):
+            fj = next((f for f in forced if f > i), None)   # a manual break ends a page here
+            for j in range(i + 1, n + 1):
+                h = height(i, j)
+                if h > avail and j > i + 1:
+                    break
+                cc = cost + PAGE_COST
+                if j == n and logo_on and avail - h < logo_need:
+                    cc += LOGO_COST          # no room for the logo under the last line
+                if j < n:
+                    cc += fill_cost * max(0.0, 1.0 - h / avail) ** 2
+                    phys = first_phys + c
+                    if phys % 2 == 1 or not duplex:
+                        cc += turn_cost(j)
+                if cc < best[c + 1].get(j, INF):
+                    best[c + 1][j] = cc
+                    back[c + 1][j] = i
+                if fj is not None and j >= fj:
+                    break
+        if n in best[c + 1]:
+            last_i = back[c + 1][n]
+            tot = best[c + 1][n]
+            if c > 0 and n - last_i < min(MIN_LAST_LINES, n // (c + 1)):
+                tot += SHORT_LAST
+            if tot < total_best:
+                total_best, end_c = tot, c + 1
+        if not best[c + 1]:
+            break
+    # pages from the back pointers, then y of each line as in _pack
+    cuts, j, c = [], n, end_c
+    while c > 0:
+        i = back[c][j]
+        cuts.append((i, j))
+        j, c = i, c - 1
+    pages = []
+    cuts = list(reversed(cuts))
+    for c, (i, j) in enumerate(cuts):
+        # last page of a group score with room to spare: systems further
+        # apart, up to SYSTEM_GAP_LAST (operator request 2026-10-24: "the whole page
+        # is available")
+        extra = 0.0
+        if c == len(cuts) - 1 and j - i > 1 and len(strips[i].staff_labels) > 1:
+            avail = avail1 if c == 0 else availn
+            free = avail - height(i, j)
+            s0 = strips[i]
+            n_st = len(s0.staff_labels)
+            inner = ((s0.staff_bottom - s0.staff_top) - n_st * 4 * s0.sp) / (n_st - 1)
+            extra = max(0.0, min(free / (j - i - 1),
+                                 (SYSTEM_GAP_LAST - SYSTEM_GAP_FACTOR) * inner * k))
+        page, y_top = [], 0.0
+        for t in range(i, j):
+            s = strips[t]
+            if t == i:
+                y_top = s.staff_top * k
+                page.append((s, 0.0))
+            else:
+                y_top += pit[t - 1] * k + extra
+                page.append((s, y_top - s.staff_top * k))
+        pages.append(page)
+    bad, j = 0, 0
+    for c, pg in enumerate(pages[:-1]):
+        j += len(pg)
+        if ((first_phys + c) % 2 == 1 or not duplex) and turn_cost(j) >= (
+                TURN_HARD if rest_rule else TURN_BAD):
+            bad += 1
+    return pages, bad
+
+
+def layout_pages(strips: list[Strip], dpi: int, opts: dict
+                 ) -> tuple[list[list[tuple[Strip, float]]], bool]:
+    """layout_pages -> (content pages, title page?). DESIGN.md §5.4: page
+    breaks by plan_pages, with and without a title page (title_page auto,
+    double-sided, 3+ content pages); fewer bad turns, then fewer pages
+    win; a tie keeps the title page (the music starts on a spread)."""
+    pages, bad = plan_pages(strips, dpi, opts, False)
+    if opts.get("title_page", "auto") == "auto" and opts.get("duplex", "auto") != "off" \
+       and len(pages) >= 3:
+        tp, tbad = plan_pages(strips, dpi, opts, True)
+        if len(tp) >= 3 and (tbad, len(tp)) <= (bad, len(pages)):
+            return tp, True
+    return pages, False
+
+
+AMB_HEAD = 0.8         # ambitus notehead size, share of a normal head (cue size)
+CLEF_LINE = {"G": 2, "C": 3, "F": 4}
+
+
+def draw_ambitus(page: pymupdf.Page, x: float, base: float, clef: str, lo: int,
+                 hi: int, lo_alt: int = 0, hi_alt: int = 0, sp: float = AMB_SP) -> None:
+    """draw_ambitus: a small staff (bottom line at base) with the clef and
+    the lowest and highest notes as black noteheads without stems, stacked
+    in one column at 80 % size (cue size), ledger lines as needed.
+    lo, hi: diatonic numbers. lo_alt, hi_alt: +1 sharp, -1 flat, 0 none;
+    an accidental (80 % size) stands left of the heads. Accidentals less
+    than a sixth apart stand in two columns (upper nearer the heads) and
+    the head column moves right, inside the same width."""
+    w = ambitus_width(sp)
+    lw = max(0.35, 0.12 * sp)
+    for i in range(5):
+        y = base - i * sp
+        page.draw_line((x, y), (x + w, y), color=(0, 0, 0), width=lw)
+    fam = clef[0]
+    line = 2 if clef == "G8" else (int(clef[1]) if clef[1:].isdigit() else CLEF_LINE.get(fam, 2))
+    glyph = "\ue052" if clef == "G8" else {"G": "\ue050", "C": "\ue05c",
+                                            "F": "\ue062"}.get(fam, "\ue050")
+    put_text(page, (x + 0.3 * sp, base - (line - 1) * sp), glyph, "music", 4 * sp)
+    bottom = CLEF_BOTTOM.get(clef, 30)
+    head = "\ue0a4"                                  # noteheadBlack, no stem
+    hsize = AMB_HEAD * 4 * sp                        # 80 % of the staff's notehead
+    hw = text_len(head, "music", hsize)
+    acc = {lo: lo_alt, hi: hi_alt} if lo != hi else {lo: lo_alt or hi_alt}
+    stagger = bool(lo_alt and hi_alt and 0 < hi - lo < 6)
+    xh = x + (5.5 if stagger else 4.6) * sp          # both notes in one column
+    xs = {lo: xh, hi: xh}
+    if hi - lo == 1:                                 # a second: the upper head
+        xs[hi] = xh + hw                             # moves right, as in a chord
+    for d in (lo, hi):
+        step = d - bottom
+        y = base - step * sp / 2
+        for ls in list(range(-2, step - 1, -2)) + list(range(10, step + 1, 2)):
+            yl = base - ls * sp / 2
+            page.draw_line((xs[d] - 0.3 * sp, yl), (xs[d] + hw + 0.3 * sp, yl),
+                           color=(0, 0, 0), width=lw * 1.4)
+        put_text(page, (xs[d], y), head, "music", hsize)
+    xa = xh - 0.2 * sp
+    for d in ((hi,) if lo == hi else (hi, lo)):      # upper accidental nearer the heads
+        a_ = acc.get(d, 0)
+        if not a_:
+            continue
+        g_ = ACC_GLYPH[a_]
+        aw = text_len(g_, "music", hsize)
+        put_text(page, (xa - aw, base - (d - bottom) * sp / 2), g_, "music", hsize)
+        if stagger:
+            xa -= aw + 0.1 * sp
+
+
+# The logo is optional: PARTITOR_LOGO names a PNG file. Unset: no logo, no room kept.
+LOGO_TITLE_H = 64.0     # pt, on a title page
+LOGO_TITLE_Y = 0.76     # title page: logo centre, share of the page height (balances the title block)
+LOGO_LAST_H = 44.0      # pt, on the back page (centred above the folio)
+LOGO_LAST_MIN_H = 28.0  # pt, smaller than this the wordmark is not legible: logo left out
+LOGO_GAP = 4.0          # pt, between the last line and the logo
+LOGO_FOLIO_GAP = 10.0   # pt, between the logo and the folio
+LOGO_COST = 20.0        # plan_pages: the last page has no room for the logo (less than PAGE_COST)
+FOLIO_SIZE = 9.5        # pt
+_LOGO_WARNED: list[bool] = []
+
+
+def folio_base(ph: float, mb: float) -> float:
+    """folio_base -> baseline (pt from the top) of the folio, in the bottom margin."""
+    return ph - mb + min(18.0, mb - 6.0)
+
+
+def folio_top(ph: float, mb: float) -> float:
+    """folio_top -> top of the folio's digits (pt from the top of the page)."""
+    return folio_base(ph, mb) - 0.7 * FOLIO_SIZE
+
+
+def logo_room(ph: float, mb: float) -> float:
+    """logo_room -> height the music area must leave free on the last page for
+    the logo above the folio, beyond the bottom margin (pt, 0 when the margin holds it)."""
+    return max(0.0, LOGO_LAST_MIN_H + LOGO_GAP + LOGO_FOLIO_GAP - (folio_top(ph, mb) - (ph - mb)))
+
+
+def logo_path() -> Path | None:
+    """logo_path -> the PNG file named by PARTITOR_LOGO; None when the variable
+    is unset or the file is missing."""
+    v = os.environ.get("PARTITOR_LOGO")
+    return Path(v) if v and Path(v).is_file() else None
+
+
+def logo_wanted(opts: dict) -> bool:
+    """logo_wanted -> True when pages carry a logo: PARTITOR_LOGO is set (even
+    when the file is missing: put_logo then warns once) and the layout key
+    `logo` is not off."""
+    return opts.get("logo", "on") == "on" and bool(os.environ.get("PARTITOR_LOGO"))
+
+
+def logo_width(h: float) -> float | None:
+    """logo_width -> width in pt of the logo at height h; None when missing."""
+    path = logo_path()
+    if path is None:
+        return None
+    pix = pymupdf.Pixmap(str(path))
+    return h * pix.width / pix.height
+
+
+def put_logo(page: pymupdf.Page, x: float, y: float, h: float, align: str = "left") -> float:
+    """put_logo -> width of the logo drawn (0.0 when the file is missing, with
+    one warning per run). Top-left at (x, y), height h pt; align "right" takes
+    x as the right edge, "centre" as the centre line."""
+    path = logo_path()
+    if path is None:
+        if not _LOGO_WARNED:
+            _LOGO_WARNED.append(True)
+            _warn(f"logo: PARTITOR_LOGO file not found: {os.environ.get('PARTITOR_LOGO')} (pages are drawn without it)")
+        return 0.0
+    w = logo_width(h) or 0.0
+    x0 = x - w if align == "right" else (x - w / 2 if align == "centre" else x)
+    page.insert_image(pymupdf.Rect(x0, y, x0 + w, y + h), filename=str(path))
+    return w
+
+
+def _title_page(page: pymupdf.Page, name: str, meta: dict, box: tuple,
+                logo: bool = False) -> None:
+    """Title page (DESIGN.md §5.4): title, subtitle, part name, composer,
+    members of a group, centred in the upper third."""
+    pw, ph = page.rect.width, page.rect.height
+    ml, mr, mt, _ = box
+    cx = (ml + pw - mr) / 2
+
+    def centre(text: str, size: float, y: float, kind: str) -> None:
+        put_text(page, (cx - text_len(text, kind, size) / 2, y), text, kind, size)
+    y = mt + ph * 0.22
+    if meta.get("title"):
+        centre(meta["title"], 28, y, "regular")
+        y += 30
+    if meta.get("subtitle"):
+        centre(meta["subtitle"], 16, y, "italic")
+        y += 24
+    if meta.get("composer"):
+        centre(meta["composer"], 15, y + 8, "regular")
+        y += 30
+    y += 40
+    centre(name, 24, y, "bold")
+    if meta.get("members"):
+        centre(meta["members"], 12, y + 24, "italic")
+    if meta.get("ambitus"):
+        sp_ = AMB_SP * 1.15
+        draw_ambitus(page, cx - ambitus_width(sp_) / 2, y + 48, *meta["ambitus"], sp=sp_)
+    if logo:                                  # centred, towards the bottom (balances the title block)
+        put_logo(page, cx, ph * LOGO_TITLE_Y - LOGO_TITLE_H / 2, LOGO_TITLE_H, "centre")
+
+
+def turn_list(strips: list[Strip], pages: list, title_page: bool, opts: dict,
+              breaks: list[int] | None = None) -> list[dict]:
+    """turn_list -> one dict per page turn (after each recto; every page when
+    single-sided): pdf_page (the page before the turn, 1-based in the PDF),
+    bar (last bar before the turn, None if unknown), next_bar, rest (bars of
+    the multi-bar rest beside the turn; 0 if none), ok (the player rests or
+    a movement or rehearsal letter starts: good_turn), resting (rest_turn),
+    manual (a page break set by `breaks`)."""
+    duplex = opts.get("duplex", "auto") != "off"
+    first_phys = 2 if title_page else 1
+    out, j = [], 0
+    for c, pg in enumerate(pages[:-1]):
+        j += len(pg)
+        phys = first_phys + c
+        if not (phys % 2 == 1 or not duplex):
+            continue
+        a, b = line_bars(strips[j - 1]), line_bars(strips[j])
+        rest = max((strips[t].rest_src[2].bars for t in (j - 1, j)
+                    if strips[t].rest_src is not None), default=0)
+        out.append({"pdf_page": phys, "bar": a[1] if a and a[1] is not None else None,
+                    "next_bar": b[0] if b else None, "rest": rest,
+                    "ok": good_turn(strips, j), "resting": rest_turn(strips, j),
+                    "movement": bool(strips[j].movement) and not rest_turn(strips, j),
+                    "manual": j in (breaks or [])})
+    return out
+
+
+def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
+                opts: dict, out: Path) -> int:
+    """render_part -> physical page count. Writes out (PDF). meta: title,
+    subtitle, composer, members (group score: its parts, top to bottom)."""
+    pw, ph = PAPER[opts["paper"]]
+    k = 72.0 / dpi * (opts.get("scale") or 1.0)
+    breaks, bwarn = break_lines(strips, opts.get("breaks") or [])
+    for w_ in bwarn:
+        _warn(f"{name}: {w_}")
+    opts = {**opts, "_breaks": breaks}
+    pages, title_page = layout_pages(strips, dpi, opts)
+    LAST_RENDER["turns"] = turn_list(strips, pages, title_page, opts, breaks)
+    doc = pymupdf.open()
+    n = len(pages)
+    duplex = title_page or is_duplex(opts, n)
+    left_ink = max(anchor(s) for s in strips)    # widest ink left of the alignment line
+    if title_page:
+        page = doc.new_page(width=pw, height=ph)
+        _title_page(page, name, meta, page_box(opts, 0, duplex), logo_wanted(opts))
+    for ci, pg in enumerate(pages):
+        phys = ci + (1 if title_page else 0)
+        page = doc.new_page(width=pw, height=ph)
+        ml, mr, mt, mb = page_box(opts, phys, duplex)
+        if ci == 0 and not title_page:
+            # Title band. insert_text draws at a baseline and never drops
+            # text (insert_textbox drops text that does not fit its box).
+            cx = (ml + pw - mr) / 2
+
+            def centre(text: str, size: float, base: float, kind: str) -> None:
+                put_text(page, (cx - text_len(text, kind, size) / 2, base), text, kind, size)
+            if meta.get("title"):
+                centre(meta["title"], 21, mt + 18, "regular")
+            if meta.get("subtitle"):
+                centre(meta["subtitle"], 13, mt + 38, "italic")
+            put_text(page, (ml, mt + 66), name, "bold", 16)
+            if meta.get("ambitus") and not any(s_.ambitus_marks for s_ in strips):
+                # no room in the first-line indent: beside the part name
+                draw_ambitus(page, ml + text_len(name, "bold", 16) + 14,
+                             mt + 66 - 5.5 + 2 * AMB_SP, *meta["ambitus"])
+            if meta.get("composer"):
+                w = text_len(meta["composer"], "regular", 12)
+                put_text(page, (pw - mr - w, mt + 66), meta["composer"], "regular", 12)
+            if meta.get("members"):
+                put_text(page, (ml, mt + 80), meta["members"], "italic", 10)
+            top = mt + TITLE_BAND
+        else:
+            # interior pages: short composer — title — part
+            short = meta.get("composer_short") or composer_surname(meta.get("composer", ""))
+            head = " — ".join(x for x in (short, meta.get("title", ""), name) if x)
+            if duplex and phys % 2 == 0:          # recto: head at the outer (right)
+                w = text_len(head, "italic", 9.5)
+                put_text(page, (pw - mr - w, mt + 4), head, "italic", 9.5)
+            else:                                 # verso or single-sided: left
+                put_text(page, (ml, mt + 4), head, "italic", 9.5)
+            top = mt + RUN_HEAD
+        folio = f"{ci + 1}/{n}"
+        w = text_len(folio, "regular", FOLIO_SIZE)
+        put_text(page, ((ml + pw - mr - w) / 2, folio_base(ph, mb)), folio,
+                 "regular", FOLIO_SIZE)
+        for s, y in pg:
+            hpx, wpx = s.img.shape
+            x = ml + (left_ink - anchor(s)) * k
+            rect = pymupdf.Rect(x, top + y, x + wpx * k, top + y + hpx * k)
+            if s.bar_no is not None:
+                # bar number above the staff start, clear of the clef
+                base, _, _ = bar_mark(s)
+                put_text(page, (x + bar_x(s) * k, top + y + base * k), str(s.bar_no),
+                         "italic", s.bar_size * s.sp * k)
+            for bx0, btop, bx1, bbot, letter, fs, bl in reh_boxes(s):
+                r = pymupdf.Rect(x + bx0 * k, top + y + btop * k,
+                                 x + bx1 * k, top + y + bbot * k)
+                page.draw_rect(r, color=(0, 0, 0), width=max(0.6, 0.12 * s.sp * k))
+                put_text(page, (x + (bx0 + REH_PAD * s.sp) * k, top + y + bl * k),
+                         letter, "bold", fs * k)
+            rb = rest_box(s)
+            if rb:
+                put_text(page, (x + rb[0] * k, top + y + rb[3] * k), rb[5], rb[6], rb[4] * k)
+            for xl_, bot_, clef_, lo_, hi_, *alt_ in s.ambitus_marks:
+                draw_ambitus(page, x + xl_ * k, top + y + bot_ * k, clef_, lo_, hi_,
+                             *alt_, sp=s.sp * k)
+            for t_, x1_, base_, fs_, caps_ in line_labels(s):
+                if caps_:
+                    put_smallcaps(page, x + x1_ * k, top + y + base_ * k, t_, fs_ * k)
+                else:
+                    put_text(page, (x + x1_ * k - text_len(t_, "regular", fs_ * k),
+                                    top + y + base_ * k), t_, "regular", fs_ * k)
+            if s.bracket:
+                # group score: a bracket joins the staves (engraver practice)
+                bx = x + (s.staff_x0 - 1.0 * s.sp) * k
+                y0 = top + y + s.staff_top * k
+                y1 = top + y + s.staff_bottom * k
+                lw = 0.45 * s.sp * k
+                page.draw_line((bx, y0 - 0.3 * s.sp * k), (bx, y1 + 0.3 * s.sp * k),
+                               color=(0, 0, 0), width=lw)
+                for yy, d in ((y0 - 0.3 * s.sp * k, -1), (y1 + 0.3 * s.sp * k, 1)):
+                    page.draw_line((bx - lw / 2, yy), (bx + 0.9 * s.sp * k, yy + d * 0.5 * s.sp * k),
+                                   color=(0, 0, 0), width=0.18 * s.sp * k)
+            # grey + alpha: paper is transparent, so a nested strip never
+            # hides ink of the strip above it
+            ga = np.empty((hpx, wpx, 2), np.uint8)
+            ga[..., 0] = 0
+            ga[..., 1] = np.where(s.img, 255, 0)
+            pix = pymupdf.Pixmap(pymupdf.csGRAY, wpx, hpx, ga.tobytes(), True)
+            page.insert_image(rect, pixmap=pix)
+        if ci == n - 1 and logo_wanted(opts):
+            # back page: logo centred above the folio, in the room left under
+            # the last line (plan_pages leaves room where it can)
+            s_, y_ = pg[-1]
+            free = folio_top(ph, mb) - LOGO_FOLIO_GAP - (top + y_ + s_.img.shape[0] * k)
+            lh = min(LOGO_LAST_H, free - LOGO_GAP)
+            if lh >= LOGO_LAST_MIN_H:
+                put_logo(page, (ml + pw - mr) / 2, folio_top(ph, mb) - LOGO_FOLIO_GAP - lh, lh,
+                         "centre")
+            elif logo_path() is not None:
+                _warn(f"{name}: no room for the logo on the back page (page {ci + 1}); left out")
+    doc.save(out, garbage=3, deflate=True)
+    LAST_RENDER.update(content=n, title_page=title_page)
+    return n + (1 if title_page else 0)
