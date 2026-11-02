@@ -6,6 +6,17 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.7.3 — 2026-11-01
+
+A build or detect starts more page workers on a machine with little memory. No change in output.
+
+- The memory one page analysis needs is now estimated from the size of the largest page and the
+  dpi (about 36 bytes per pixel plus 0.1 GB), not set at 1.5 GB. Measured: 0.46 GB for A4 at
+  400 dpi, 0.89 GB at twice the pixels. The estimate is 0.6 GB and 1.1 GB. On a machine with
+  7 GB, a 60-page analysis now runs with 4 workers, not 1.
+- `--jobs` and `PARTITOR_JOBS` still set the count by hand, and `PARTITOR_MEMORY_MAX` still sets
+  the cap.
+
 ## 0.7.2 — 2026-11-01
 
 The page analysis is much faster on scans with dust or specks. The result is the same, byte for byte.

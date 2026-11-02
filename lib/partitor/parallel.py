@@ -31,7 +31,9 @@ from .console import _FAILURES, _WARNINGS, _counts, _reset_counts, _warn
 # threads, no pickled inputs: a child sees the parent's memory as it was at the
 # fork). Results come back in order, with the text each child printed.
 # jobs = 1 runs the loop in this process, as before.
-PAGE_WORKER_GB = 1.5      # estimate: peak memory of one page analysis (400 dpi)
+PAGE_BYTES_PER_PX = 36    # one page analysis: about 30 bytes per pixel measured, plus a margin
+PAGE_WORKER_BASE_GB = 0.1 # and a fixed part (interpreter, libraries)
+PAGE_WORKER_MIN_GB = 0.4  # lowest estimate, for small pages and low dpi
 RENDER_WORKER_GB = 1.0    # estimate: peak memory of rendering one part
 MAIN_GB = 2.0             # estimate: the parent (all strips of the piece, 70 pages)
 JOBS_MAX = 6              # auto never starts more children than this
@@ -56,6 +58,19 @@ def mem_available() -> int:
     except (OSError, ValueError, IndexError):
         pass
     return 4 * GIB
+
+
+def page_worker_gb(doc, pages, dpi: int) -> float:
+    """page_worker_gb -> estimate of the memory (GB) one page analysis needs.
+
+    It grows with the pixels of the largest page to analyse (A4 at 400 dpi:
+    about 0.6 GB; a ledger page: about 1.1 GB). doc[n].rect gives the size."""
+    area = 0.0
+    for pno in pages:
+        r = doc[pno].rect
+        area = max(area, abs(r.width * r.height))
+    px = area * (dpi / 72.0) ** 2
+    return max(PAGE_WORKER_MIN_GB, PAGE_WORKER_BASE_GB + px * PAGE_BYTES_PER_PX / GIB)
 
 
 def job_count(requested, worker_gb: float, items: int) -> int:

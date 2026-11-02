@@ -72,6 +72,25 @@ class TestSelection(unittest.TestCase):
         self.assertIn("2 Alto (not extracted)", pt.selection_help(d))
         self.assertIn("6 Trombones (group)", pt.selection_help(d))
 
+    def test_page_worker_gb_grows_with_the_page(self):
+        class Rect:
+            def __init__(self, w, h):
+                self.width, self.height = w, h
+
+        class Page:
+            def __init__(self, w, h):
+                self.rect = Rect(w, h)
+
+        doc = [Page(595, 842), Page(1224, 792), Page(100, 100)]    # A4, ledger, tiny
+        a4 = pt.page_worker_gb(doc, [0], 400)
+        ledger = pt.page_worker_gb(doc, [1], 400)
+        self.assertTrue(0.5 < a4 < 0.8, a4)                  # measured 0.46 GB (A4, 400 dpi)
+        self.assertTrue(0.9 < ledger < 1.4, ledger)          # measured 0.89 GB at twice the pixels
+        self.assertEqual(pt.page_worker_gb(doc, [0, 1], 400), ledger)   # largest page decides
+        self.assertEqual(pt.page_worker_gb(doc, [2], 200), parallel.PAGE_WORKER_MIN_GB)
+        base = parallel.PAGE_WORKER_BASE_GB
+        self.assertAlmostEqual(pt.page_worker_gb(doc, [0], 800) - base, 4 * (a4 - base))   # dpi squared
+
     def test_job_count(self):
         env = dict(os.environ)
         try:

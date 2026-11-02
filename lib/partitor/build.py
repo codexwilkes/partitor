@@ -38,7 +38,7 @@ from .library import (
 from .lines import count_bad_turns, fill_rests, finish_lines, lines_path, save_lines
 from .mapping import assign_maps
 from .model import PageResult, RestRun, Strip
-from .parallel import PAGE_WORKER_GB, RENDER_WORKER_GB, job_count, worker_peak_mb
+from .parallel import RENDER_WORKER_GB, job_count, page_worker_gb, worker_peak_mb
 from .reflow import find_prefixes, reflow_report
 from .render import (
     GROUP_REFLOW_PAGES, LARGE, LAST_RENDER, choose_layout, choose_reflow, fit_scale, large_copy,
@@ -139,7 +139,8 @@ def cmd_detect(a: argparse.Namespace) -> int:
     titles: list[str] = []
     composers: list[str] = []
     t_analysis = time.monotonic()
-    jobs = job_count(getattr(a, "jobs", None), PAGE_WORKER_GB, len(pages))
+    worker_gb = page_worker_gb(doc, pages, a.dpi)
+    jobs = job_count(getattr(a, "jobs", None), worker_gb, len(pages))
     cache = stagecache.open_cache(out, sha256(pdf), a.dpi)
     _cache_note(cache, pages)
 
@@ -184,7 +185,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
         results.close()
     if jobs > 1:
         _note(f"workers: {jobs}; the largest used {worker_peak_mb()} MB "
-              f"(estimate for the worker count: {PAGE_WORKER_GB:.1f} GB)")
+              f"(estimate for the worker count: {worker_gb:.1f} GB)")
         _note(f"analysis took {time.monotonic() - t_analysis:.0f} s")
     if not sysrecs:
         _fail("music:  no staves found")
@@ -560,7 +561,8 @@ def cmd_build(a: argparse.Namespace) -> int:
     todo_set = set(todo)
     cache = stagecache.open_cache(out, lay["sha256"], dpi)
     _cache_note(cache, todo)
-    jobs = job_count(getattr(a, "jobs", None), PAGE_WORKER_GB, len(todo))
+    worker_gb = page_worker_gb(doc, todo or pages, dpi)
+    jobs = job_count(getattr(a, "jobs", None), worker_gb, len(todo))
     if only or jobs > 1:
         _note(f"analysing {len(todo)} of {len(pages)} page(s) with {jobs} worker(s)"
               + (f"; building {', '.join(only)} only" if only else ""))
@@ -599,7 +601,7 @@ def cmd_build(a: argparse.Namespace) -> int:
         outs.close()
     if jobs > 1:
         _note(f"workers: {jobs}; the largest used {worker_peak_mb()} MB "
-              f"(estimate for the worker count: {PAGE_WORKER_GB:.1f} GB)")
+              f"(estimate for the worker count: {worker_gb:.1f} GB)")
     t_render = time.monotonic()
     _note(f"analysis took {t_render - t_analysis:.0f} s")
     if seen != [s["id"] for s in lay["systems"]]:

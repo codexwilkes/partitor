@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.7.2. Section numbers are stable: the code cites
+Status: describes partitor 0.7.3. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -456,7 +456,8 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
 `detect` and `build` analyse the pages in forked worker processes
 (`fork_map`; no threads). One worker takes one page. The number of workers is
 `--jobs`, else `PARTITOR_JOBS`, else auto (one CPU stays free, at most 6, and
-as many as the memory cap holds at about 1.5 GB per worker plus 2 GB for the
+as many as the memory cap holds at about 36 bytes per pixel of the largest page
+plus 0.1 GB per worker (A4 at 400 dpi: 0.6 GB; a ledger page: 1.1 GB), plus 2 GB for the
 main process). `--jobs 1` runs in one process, page by page.
 
 - **Same output.** Parallel and single-process runs give the same

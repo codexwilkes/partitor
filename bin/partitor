@@ -66,7 +66,8 @@
 #                                         together): auto, or a size like 8G
 #   PARTITOR_JOBS         (default auto)  worker processes of a detect or build: auto or a number 1-99
 #                                         (1 = no workers). auto: CPUs - 1, at most 6, and
-#                                         as many as the memory cap holds (about 1.5 GB each,
+#                                         as many as the memory cap holds (about 0.6 GB each
+#                                         for A4 at 400 dpi, more for bigger pages;
 #                                         2 GB for the main process)
 #   PARTITOR_CPU_WEIGHT   (default 20)    cgroup CPU weight (100 = normal)
 #   PARTITOR_IO_WEIGHT    (default 20)    cgroup IO weight (100 = normal)
