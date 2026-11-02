@@ -294,6 +294,73 @@ class TestSystemWindow(unittest.TestCase):
 
 
 @needs_deps
+class TestDottedStart(unittest.TestCase):
+    """vision.extend_starts: a faded scan has dotted line starts (0.8.1)."""
+    SP, TH, LEFT = 24, 3, 150
+
+    def page(self, solid_from):
+        """One staff per entry of solid_from: dotted (40 on, 30 off) from
+        LEFT, solid from that x. None: blank until x 700 (an indent)."""
+        img = np.zeros((1600, 2000), bool)
+        for top, sx in zip((200, 600, 1000, 1400), solid_from):
+            for ln in range(5):
+                y = top + ln * self.SP
+                if sx is None:
+                    img[y:y + self.TH, 700:1850] = True
+                    continue
+                img[y:y + self.TH, sx:1850] = True
+                for x in range(self.LEFT, sx, 70):
+                    img[y:y + self.TH, x:min(x + 40, sx)] = True
+        return img
+
+    def starts(self, img):
+        staves, _ = pt.detect_staves(img, self.TH, self.SP - self.TH, 0)
+        return [s.x0 for s in staves]
+
+    def test_dotted_starts_move_to_the_page_edge(self):
+        xs = self.starts(self.page([900, 600, 1100, 750]))
+        self.assertEqual(len(xs), 4)
+        for x in xs:
+            self.assertLessEqual(abs(x - self.LEFT), self.SP, xs)
+
+    def test_indent_keeps_its_start(self):
+        xs = self.starts(self.page([900, None, 600, 750]))
+        self.assertLessEqual(abs(xs[0] - self.LEFT), self.SP, xs)
+        self.assertGreaterEqual(xs[1], 690, xs)
+
+    def test_solid_page_is_unchanged(self):
+        xs = self.starts(self.page([self.LEFT] * 4))
+        self.assertEqual(len(set(xs)), 1, xs)          # same start for all
+        self.assertLessEqual(abs(xs[0] - self.LEFT), 3, xs)
+
+
+@needs_deps
+class TestSystemStart(unittest.TestCase):
+    """ownership.align_system_start: common start x of one system."""
+
+    @staticmethod
+    def staves(*x0s):
+        return [pt.Staff(0, i, [0.0] * 5, x, 900) for i, x in enumerate(x0s)]
+
+    def test_near_starts_take_the_leftmost(self):
+        grp = self.staves(100, 104, 98)
+        ownership.align_system_start(grp, 22.0)
+        self.assertEqual([s.x0 for s in grp], [98, 98, 98])
+
+    def test_indent_keeps_its_own_start(self):
+        grp = self.staves(100, 100, 100, 400)
+        ownership.align_system_start(grp, 22.0)
+        self.assertEqual([s.x0 for s in grp], [100, 100, 100, 400])
+
+    def test_no_staff_near_the_median(self):
+        # two staves 20 sp apart: the median lies between them, so no
+        # staff is within 4 sp of it. Must not raise; starts stay.
+        grp = self.staves(100, 600)
+        ownership.align_system_start(grp, 22.0)
+        self.assertEqual([s.x0 for s in grp], [100, 600])
+
+
+@needs_deps
 class TestScanPath(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

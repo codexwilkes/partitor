@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.8.0. Section numbers are stable: the code cites
+Status: describes partitor 0.8.1. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -273,6 +273,11 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
    vertical bands, link the pieces across bands into one polyline per staff
    line, and fit a smooth curve. Then straighten each staff band (vertical
    shift per column) before ownership. Tolerate broken or faint lines.
+   Faint or dotted line starts: the longest solid run of a staff can start
+   far right of the real start. `vision.extend_starts` moves the start of a
+   staff to the page edge (the first column where the line rows of all staves
+   hold ink) when its own 5 line rows hold ink all the way there. Indents
+   (blank there) and labels (text on some rows only) keep their start.
 3. **Staff plausibility.** Reject false staves: staff space outside a
    plausible range (tables and engravings give absurd sizes), lines without
    noteheads or a clef, table rules. Non-music pages (title, contents,

@@ -6,6 +6,18 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+
+
+vision: fix(detect_staves): extend dotted staff starts to the page edge
+
+Add extend_starts: a staff whose start is dotted on a faded scan takes
+the page's left edge. Group the systems from that start. Move the common
+start of a system into ownership.align_system_start and skip it when no
+staff is near the median. Add TestDottedStart and TestSystemStart.
+Bump to 0.8.1.
+
+
+
 ## 0.8.0 — 2026-11-01
 
 Staff labels with accents map to the right part, and publisher and rights lines in French,

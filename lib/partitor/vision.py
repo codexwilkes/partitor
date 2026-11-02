@@ -264,7 +264,47 @@ def detect_staves(ink: np.ndarray, thick: int, gap: int, page: int
                 i += 5
                 continue
         i += 1
+    extend_starts(ink, staves, thick, sp)
     return staves, hmask
+
+
+def extend_starts(ink: np.ndarray, staves: list[Staff], thick: int, sp: float) -> None:
+    """extend_starts: move staff starts left over faint or dotted lines.
+
+    staff_extent needs 4 of 5 lines solid at the same column. On a faded
+    scan the left part of the lines is dotted: the longest solid run starts
+    far right of the real start and the staves of one system start at
+    scattered x (0.8.1: Schuetz, In lectulo, pages 2, 4, 6). Engraved
+    systems of a page start at about one x, the page edge L: the first
+    column where the line rows of all staves together hold ink (window 1 sp,
+    at least 20%; then the first column with ink on 30% of the rows). A staff more than 4 sp right of L moves its start to L
+    when the stretch from L to its start holds ink on each of its 5 line
+    rows (at least 10% of the columns) and on average 20%. An indent is
+    blank there, a label is text on some rows only: both keep their start.
+    Healthy pages move nothing."""
+    if not staves:
+        return
+    n = ink.shape[1]
+    w = max(1, int(sp))
+    bands = [[ink[max(0, int(l - thick)):int(l + thick) + 1].any(axis=0) for l in st.lines]
+             for st in staves]
+    agg = np.mean([b for bb in bands for b in bb], axis=0)
+    cs = np.concatenate(([0.0], np.cumsum(agg)))
+    win = (cs[w:] - cs[:-w]) / w
+    hit = np.flatnonzero(win >= 0.2)
+    if not hit.size:
+        return
+    # the left-aligned window sees a barline or bracket up to 1 sp early:
+    # take the first column inside it that holds ink on 30% of the rows
+    first = int(hit[0])
+    col = np.flatnonzero(agg[first:first + w] >= 0.3)
+    left = first + int(col[0]) if col.size else first
+    for st, bb in zip(staves, bands):
+        if st.x0 - left <= 4 * sp:
+            continue
+        dens = [float(b[left:st.x0].mean()) for b in bb]
+        if min(dens) >= 0.10 and float(np.mean(dens)) >= 0.20:
+            st.x0 = left
 
 
 def refine_start(raw: np.ndarray, grp: list, thick: int, sp: float, x0: int) -> int:

@@ -223,6 +223,25 @@ def prepare(page: pymupdf.Page, dpi: int
     return ink, skew, dmax, thick, gap, tracks
 
 
+def align_system_start(grp: list[Staff], sp: float) -> None:
+    """Give the staves of one system a common start x.
+
+    Engraved systems start together: the leftmost start within 4 sp of the
+    median is used for every staff within 4 sp of the median (clefs and
+    broken scan lines only push a measured start to the right). A staff
+    more than 4 sp away keeps its own start (indent). With an even number
+    of staves the median can lie between two distant starts; then no staff
+    is within 4 sp and all keep their own start."""
+    med = float(np.median([st.x0 for st in grp]))
+    near = [st.x0 for st in grp if abs(st.x0 - med) <= 4 * sp]
+    if not near:
+        return
+    x_sys = min(near)
+    for st in grp:
+        if abs(st.x0 - med) <= 4 * sp:
+            st.x0 = x_sys
+
+
 def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
                  ocr: bool = True) -> PageResult:
     """analyse_page -> PageResult with a complete owner image.
@@ -259,17 +278,9 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
 
     systems = group_systems(ink, staves, sp, thick)
     for k, grp in enumerate(systems):
-        # one start for all staves of a system (engraved systems start
-        # together): the leftmost start within 4 sp of the median (clefs
-        # and broken scan lines only push a measured start to the right);
-        # a staff more than 4 sp away keeps its own (indent)
-        med = float(np.median([st.x0 for st in grp]))
-        near = [st.x0 for st in grp if abs(st.x0 - med) <= 4 * sp]
-        x_sys = min(near)
         for st in grp:
             st.system = sys_base + k
-            if abs(st.x0 - med) <= 4 * sp:
-                st.x0 = x_sys
+        align_system_start(grp, sp)
     # systems of a page start at one x: a system starting 1-4 sp right of
     # the others (the clef hid the short line start, Schein Nun p3.s1:
     # clefs misread, brace lost) takes their median start. An indented
