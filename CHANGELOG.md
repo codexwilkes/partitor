@@ -6,6 +6,21 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.8.0 — 2026-11-01
+
+Staff labels with accents map to the right part, and publisher and rights lines in French,
+Italian, Spanish and German are footer text. G0 output is unchanged.
+
+- `mapping.fold_accents` folds accents (NFKD, combining marks dropped; `œ`, `æ`, `ß` written as
+  `oe`, `ae`, `ss`; other letters stay). Label matching uses it: "Cör", "Cœur", "Violoncéllo"
+  and "Basse continue" no longer lose points for an accent. Before, "Cör" against "Cor" scored
+  0.67, below the 0.7 match limit.
+- Footer text: the words `edizioni`, `ediciones`, `éditeur`, `editrice` and the rights phrases
+  `droits réservés`, `diritti riservati`, `derechos reservados`, `Rechte vorbehalten` are
+  footer. `Éditions` (with the accent) is now footer, as `Editions` was. Text is matched after
+  accents are folded.
+- The page-analysis cache is renewed once: the analysis code changed, so old entries are not used.
+
 ## 0.7.3 — 2026-11-01
 
 A build or detect starts more page workers on a machine with little memory. No change in output.

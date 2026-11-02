@@ -6,14 +6,28 @@ from __future__ import annotations
 import difflib
 import itertools
 import re
+import unicodedata
 
 
 _NUMERALS = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "1": 1, "2": 2,
              "3": 3, "4": 4, "5": 5}
 
 
+# Letters that NFKD does not split into a base letter and a mark.
+_LIGATURES = str.maketrans({"œ": "oe", "Œ": "OE", "æ": "ae", "Æ": "AE",
+                            "ß": "ss", "ẞ": "SS"})
+
+
+def fold_accents(text: str) -> str:
+    """fold_accents -> text without accents: NFKD, combining marks dropped,
+    and \u0153 \u00e6 \u00df written as oe ae ss. Other letters (\u00f8, non-Latin
+    scripts) stay. Does not depend on the locale."""
+    d = unicodedata.normalize("NFKD", text.translate(_LIGATURES))
+    return "".join(c for c in d if not unicodedata.combining(c))
+
+
 def norm_tokens(text: str) -> list[str]:
-    t = re.sub(r"[^\w\s]", " ", text.lower())
+    t = re.sub(r"[^\w\s]", " ", fold_accents(text.lower()))
     return [x for x in t.split() if x]
 
 

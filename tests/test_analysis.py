@@ -346,6 +346,29 @@ class TestSafetyGate(unittest.TestCase):
 
 
 @needs_deps
+class TestFooterWords(unittest.TestCase):
+    """is_footer_text folds accents and knows publisher and rights words of
+    French, Italian, Spanish and German (0.8.0)."""
+
+    def test_footer_words_by_language(self):
+        cases = [
+            "\u00c9ditions Durand", "\u00c9diteur", "Tous droits r\u00e9serv\u00e9s",
+            "Edizioni Ricordi", "Casa editrice", "Tutti i diritti riservati",
+            "Ediciones Musicales", "Todos los derechos reservados",
+            "Alle Rechte vorbehalten", "Verlag", "Editions Peters", "EDITION PETERS",
+            "\u00a9 2001",
+        ]
+        for txt in cases:
+            with self.subTest(txt=txt):
+                self.assertTrue(pt.is_footer_text(txt))
+
+    def test_labels_and_titles_are_not_footer(self):
+        for txt in ["Violoncello", "Violonc\u00e9llo", "Stampa", "Imprim\u00e9 en France",
+                    "Basse continue", "Trompeten in C", ""]:
+            with self.subTest(txt=txt):
+                self.assertFalse(pt.is_footer_text(txt))
+
+
 class TestOcrState(unittest.TestCase):
     """_TESS lives in `vision` (step M2): the other modules reach it as `vision._TESS` (rule R1)."""
 

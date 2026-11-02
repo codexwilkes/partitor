@@ -12,7 +12,7 @@ import numpy as np
 import pymupdf
 
 from .config import DEWARP_MIN_PX, MAX_SKEW_DEG, PAPER_GUARD, TRACK_BANDS
-from .mapping import _NUMERALS
+from .mapping import _NUMERALS, fold_accents
 from .model import Staff
 
 
@@ -401,7 +401,11 @@ def ocr_line(img: np.ndarray, digits: bool = False) -> str:
     return re.sub(r"\s+", " ", r.stdout.decode("utf-8", "replace")).strip()
 
 
-FOOTER_RE = re.compile(r"©|@|\(c\)|copyright|verlag|edition|publish|"
+# Matched against fold_accents(text): write the words without accents.
+# edizion/edicion: Italian and Spanish publisher; editeur/editrice: French and
+# Italian "publisher"; the last four are "all rights reserved".
+FOOTER_RE = re.compile(r"©|@|\(c\)|copyright|verlag|edition|edizion|edicion|editeur|editrice|"
+                       r"publish|droits reserve|diritti riservat|derechos reservad|rechte vorbehalten|"
                        r"\bby\b.*\b(1[89]|20)\d\d\b|\b(1[89]|20)\d\d\b.*\bby\b|^\*",
                        re.IGNORECASE)
 
@@ -410,7 +414,7 @@ def is_footer_text(txt: str) -> bool:
     """is_footer_text -> True for page-foot text: copyright, publisher, a
     page number (digits alone), a footnote ("*) ...")."""
     t = txt.strip()
-    return bool(t) and (bool(FOOTER_RE.search(t)) or bool(re.fullmatch(r"\d{1,4}", t)))
+    return bool(t) and (bool(FOOTER_RE.search(fold_accents(t))) or bool(re.fullmatch(r"\d{1,4}", t)))
 
 
 def is_cue_text(txt: str) -> bool:

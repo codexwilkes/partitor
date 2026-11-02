@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.7.3. Section numbers are stable: the code cites
+Status: describes partitor 0.8.0. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -255,7 +255,9 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
      is `_fail`, and `proof.pdf` marks it.
    - Footer: below the last staff of a page, text farther than
      `PAGE_FOOTER_SP` (6 sp) is footer. From `FOOTER_TEXT_SP` (4 sp) on, text
-     that reads as copyright, publisher, footnote ("*) ...") or a page number
+     that reads as copyright, publisher, rights ("droits réservés", "diritti
+     riservati", "Rechte vorbehalten"; French, Italian, Spanish, German words,
+     matched after accents are folded), footnote ("*) ...") or a page number
      (digits alone, beyond 4.5 sp) is footer too. Staff ink wholly below 6 sp
      (page-edge lines, curl shadows) is footer. A text line 8 sp or wider
      below the last staff, nearer than 4 sp, is read (OCR); one that starts
@@ -285,7 +287,9 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
    - The reference is the system with the most printed labels (page 1 often
      names every part), not the most staves. Label matching knows continuo
      names as one part (Continuo, Basso continuo, Organo, B.C.) and common
-     abbreviations ("Vla I" = Viola I). When the reference's lowest part is a
+     abbreviations ("Vla I" = Viola I). Labels and part names are compared
+     without accents (`mapping.fold_accents`: NFKD, marks dropped, œ æ ß as oe ae
+     ss), so "Violoncéllo", "Cör" and "Cœur" equal Violoncello, Cor and Coeur. When the reference's lowest part is a
      continuo, the bottom staff takes it and no other staff does. Bottom
      alignment for an unlabelled staff costs at most 0.9.
    - Systems: a narrow gap without bracket or barline evidence is joined only
@@ -940,7 +944,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 0 | `config` | Tunables, `TUNE`, layout and score keys, defaults, paper sizes (`PAPER`), name helpers |
 | 0 | `model` | Data classes `Staff`, `PageResult`, `Strip`, `RestRun` |
 | 0 | `typography` | Fonts and text measure |
-| 0 | `mapping` | Staff label to part map |
+| 0 | `mapping` | Staff label to part map, accent folding (`fold_accents`) |
 | 0 | `bars` | Bar numbers, bar marks, barline edits |
 | 1 | `vision` | Page render, tracking, dewarp, staff and system detect, OCR |
 | 1 | `clef` | Clef signature, notehead steps, ambitus |

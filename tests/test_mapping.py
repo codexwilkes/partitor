@@ -48,6 +48,41 @@ class TestHelpers(unittest.TestCase):
                          "bach.p8-9.partitor")
         self.assertEqual(pt.workdir(Path("/x/bach.pdf"), None).name, "bach.partitor")
 
+    def test_fold_accents_table(self):
+        # written as escapes: the result must not depend on the source encoding or the locale
+        table = [
+            ("", ""),
+            ("Violonc\u00e9llo", "Violoncello"),
+            ("Fl\u00fbte", "Flute"),
+            ("C\u00f6r", "Cor"),
+            ("C\u0153ur", "Coeur"),
+            ("\u0152UVRE", "OEUVRE"),
+            ("\u00e6ther", "aether"),
+            ("Gru\u00df", "Gruss"),
+            ("\ufb01n", "fin"),
+            ("e\u0301", "e"),
+            ("\u00f8", "\u00f8"),
+            ("\u0394", "\u0394"),
+        ]
+        for text, want in table:
+            with self.subTest(text=text):
+                self.assertEqual(pt.fold_accents(text), want)
+
+    def test_norm_tokens_fold_accents(self):
+        self.assertEqual(pt.norm_tokens("Violonc\u00e9llo II"), ["violoncello", "ii"])
+        self.assertEqual(pt.norm_tokens("C\u0152UR"), ["coeur"])
+
+    def test_label_match_accents(self):
+        # (printed label, part name): French, German, Italian, Spanish
+        pairs = [("C\u00f6r", "Cor"), ("C\u0153ur", "Coeur"), ("Fl\u00fbte", "Flute"),
+                 ("Violonc\u00e9llo", "Violoncello"), ("Bl\u00e4ser", "Blaser"),
+                 ("Ten\u00f3r", "Tenor"), ("Sopr\u00e1no", "Soprano"),
+                 ("Fag\u00f6tt", "Fagott")]
+        for label, name in pairs:
+            with self.subTest(label=label):
+                self.assertGreaterEqual(pt.label_match(label, name), 0.7)
+        self.assertEqual(pt.label_match("T\u00e9nor II", "Tenor III"), 0.0)
+
     def test_label_match_numbers_must_agree(self):
         self.assertEqual(pt.label_match("Tenore II", "Tenore III Trombone"), 0.0)
         self.assertGreaterEqual(pt.label_match("Tenore II", "Tenore II Trombone"), 0.7)
