@@ -8,14 +8,19 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
-vision: fix(detect_staves): extend dotted staff starts to the page edge
+## 0.8.1 — 2026-11-02
 
-Add extend_starts: a staff whose start is dotted on a faded scan takes
-the page's left edge. Group the systems from that start. Move the common
-start of a system into ownership.align_system_start and skip it when no
-staff is near the median. Add TestDottedStart and TestSystemStart.
-Bump to 0.8.1.
+Fix: scans with faded, dotted staff-line starts no longer split systems, and `detect` no longer stops
+with `ValueError: min() iterable argument is empty`.
 
+- `vision.extend_starts`: a staff whose line starts are dotted takes the page's left edge as its
+  start when all 5 of its line rows hold ink there. Before, the longest solid run set the start, the
+  staves of one system started at scattered x, and `group_systems` split the system. Indents and
+  staves with a label to the left keep their start.
+- `ownership.align_system_start`: if no staff of a system lies within 4 sp of the median start, the
+  staves keep their own start. Before, `analyse_page` raised.
+- A wrong start on a last staff (pages with a faint bass line) is now corrected. Output can differ
+  from 0.8.0 on such pages.
 
 
 ## 0.8.0 — 2026-11-01
