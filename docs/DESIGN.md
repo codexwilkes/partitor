@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.8.1. Section numbers are stable: the code cites
+Status: describes partitor 0.8.2. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -170,11 +170,19 @@ notehead, slur or word goes whole to one owner.
    - Prefix (clef + key signature): per movement, lines are compared (staff
      lines removed; a scan's line starts are aligned first). The prefix ends
      at a blank gap that at least half of the movement's lines have at the
-     same distance from the clef. A line takes it only when its music
-     differs right after the gap. A line without the gap keeps its own clef
-     in its first bar.
+     same distance from the clef; a line that lacks the highest such gap
+     takes the next lower one it has. A line takes it only when its music
+     differs right after the gap, or when a blank of 2.5 sp follows the gap
+     (a rest, or a first note far from the key; 0.8.2). A line without the
+     gap keeps its own clef in its first bar and borrows the copy from a line
+     of the same movement with the same staves, also across a multi-bar rest
+     line (0.8.2: a rest line has no staff labels and used to split the
+     movement, so a line between two rest lines had no prefix).
    - Lines that cannot be cut safely stay whole: no prefix, not ending at a
-     barline, one-line movements, multi-bar rests. A whole line limits the
+     barline, one-line movements, multi-bar rests. A line ends at a barline
+     when the last barline found lies within 2.5 sp of the staff end (0.8.2;
+     a final or repeat barline is found at its middle, up to 2.2 sp before the
+     end, and the old limit of 2.0 sp left every section end whole). A whole line limits the
      size of the part (constant staff size). The build says how many lines
      can be cut, why the others stay whole, and the widest whole line.
    - A movement starts a new line. Bars of two source lines share a line only

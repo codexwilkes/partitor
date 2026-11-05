@@ -94,9 +94,11 @@
 #   --max-staff-mm MM
 #       Largest staff height (top line to bottom line). Default 8.
 #   --reflow on|off
-#       EXPERIMENTAL, off by default, ON HOLD (0.3.0-dev.35): it does not
-#       enlarge the single parts of Biber 2026-10-0003 (3.6-3.8 mm) or its
-#       Trombones group (3.7 mm). For a larger staff use --paper ledger.
+#       EXPERIMENTAL, off by default. Before 0.8.2, lines after a multi-bar
+#       rest line, lines with a rest or a far first note, and lines that
+#       end at a final barline stayed whole, and a whole line held the staff
+#       small; since 0.8.2 they are cut. For a larger staff the page budget
+#       (below) or --paper ledger can still be needed.
 #       on: new lines, cut only at barlines, each continuation line with a
 #       copy of the clef and key signature, so the staff can reach
 #       --max-staff-mm when long source lines keep it small (more pages).

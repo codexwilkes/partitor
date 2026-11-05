@@ -8,6 +8,28 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.2 — 2026-11-05
+
+Fix: re-flow cuts every music line of a group score, so the staff can grow when long source
+lines held it small.
+
+- `reflow.find_prefixes`: a multi-bar rest line has no staff labels and split a movement into
+  segments; a line alone in its segment had no clef and key prefix and stayed whole. Such a line now
+  borrows the prefix of a line of the same movement with the same staves, by the same test as before
+  (it must look like the donor up to the donor's prefix).
+- `reflow.find_prefixes`: a line that lacks the highest common gap takes the next lower one it has,
+  instead of staying whole.
+- `reflow.find_prefixes`: the "same music after the gap" test no longer rejects a line when a blank
+  of 2.5 sp follows the gap (a rest, or a first note far from the key), and it allows 1.2 sp of
+  equal ink (a note head) instead of 0.5 sp.
+- `strips.BAR_END_SP` (2.5 sp, was 2.0): a final or repeat barline is found at its middle, up to
+  2.2 sp before the staff end; such lines (section ends) counted as not ending at a barline and
+  stayed whole.
+- On a real three-staff group score (62 lines) all 50 music lines are now cut (before: 41 of 62
+  lines, 9 music lines whole), and the staff grows from 3.7 mm to the limit of the page budget.
+  Output with `reflow: off` (the default) is the same as 0.8.1.
+
+
 ## 0.8.1 — 2026-11-02
 
 Fix: scans with faded, dotted staff-line starts no longer split systems, and `detect` no longer stops

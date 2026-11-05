@@ -144,6 +144,35 @@ class TestReflow(unittest.TestCase):
         self.assertEqual(pt.find_prefixes([flow_line([(70, 44)], [100, 198], first=True)]),
                          [None])
 
+    def test_blank_after_the_key_ends_the_prefix_even_when_lines_look_alike(self):
+        """Every line has the same marks (x 100-128, no gap in them) after the
+        key and differs only from x 130 on: the lines look alike for a long
+        way, but a blank of 4 sp after the key still ends the key."""
+        def mk(dy, first=False):
+            s = flow_line([(130, dy)], [170, 198], key=True, first=first)
+            for x0 in range(100, 128, 5):            # strokes 2 px apart: no gap of 0.3 sp
+                s.img[42:62, x0:x0 + 3] = True
+            return s
+        ls = [mk(44, True), mk(52), mk(60)]
+        for i, p in enumerate(pt.find_prefixes(ls)):
+            with self.subTest(line=i):
+                self.assertIsNotNone(p)
+                self.assertTrue(54 <= p[0] <= 60, p)
+
+    def test_line_without_the_highest_common_gap_takes_a_lower_one(self):
+        """Two lines have a time signature after the key (a second gap at x 68),
+        the third has none: it keeps its own prefix, ending after the key."""
+        def mk(sig, notes):
+            s = flow_line(notes, [150, 198], key=True)
+            if sig:
+                s.img[44:60, 62:65] = True
+            return s
+        ls = [mk(True, [(90, 44)]), mk(True, [(90, 52)]), mk(False, [(80, 60)])]
+        pre = pt.find_prefixes(ls)
+        self.assertTrue(all(p is not None for p in pre), pre)
+        self.assertTrue(54 <= pre[2][0] <= 60, pre[2])
+        self.assertGreater(pre[0][0], pre[2][0])
+
     def test_break_lines_balanced(self):
         self.assertEqual(pt._break_lines([30.0] * 4, 10.0, 75.0), [0, 2])
         self.assertEqual(pt._break_lines([90.0, 10.0], 10.0, 75.0), [0, 1])  # too wide: alone
@@ -542,6 +571,34 @@ def group_line(notes, bars, width=200, key=True, first=False, parts=("A", "B", "
 
 
 @needs_deps
+class TestLineEndAtBarline(unittest.TestCase):
+    """A final or repeat barline (thin + thick) is found at its middle, up to
+    2.2 sp before the staff end: the line still ends at a barline."""
+
+    def ends(self, gap_sp):
+        from types import SimpleNamespace
+        res = SimpleNamespace(staves=[SimpleNamespace(x0=0, x1=1000)], sp=10.0,
+                              barlines={0: [300, 600, int(1000 - gap_sp * 10)]})
+        s = flow_line([], [10], width=1000)
+        pt.set_bar_geometry(s, res, [0], 0, [1, 2, 3])
+        return s
+
+    def test_final_barline_found_at_its_middle_ends_the_line(self):
+        for gap in (0.1, 2.0, 2.2, 2.5):
+            with self.subTest(gap=gap):
+                self.assertTrue(self.ends(gap).ends_at_bar)
+
+    def test_a_partial_bar_does_not_end_the_line(self):
+        for gap in (2.6, 5.0, 20.0):
+            with self.subTest(gap=gap):
+                self.assertFalse(self.ends(gap).ends_at_bar)
+        self.assertAlmostEqual(self.ends(5.0).end_gap_sp, 5.0, places=1)
+
+    def test_the_limit_is_one_constant(self):
+        self.assertEqual(pt.BAR_END_SP, 2.5)
+
+
+@needs_deps
 class TestGroupReflow(unittest.TestCase):
     """Re-flow of group scores (DESIGN.md §4.3 item 11, 0.3.0-dev.34)."""
 
@@ -574,6 +631,28 @@ class TestGroupReflow(unittest.TestCase):
         heads = lambda st: int((st.img[:, 60:] & ~np.roll(st.img, 1, axis=1)[:, 60:]).sum())
         self.assertGreater(sum(heads(o) for o in out), 0)
         self.assertEqual([o.bar_no for o in out[1:3]], [2, 3])      # numbers follow the bars
+
+    def test_line_alone_between_rest_lines_borrows_the_prefix_of_its_movement(self):
+        """A multi-bar rest line has no staff labels, so it splits the movement
+        into segments; a line that stands alone in its segment still gets the
+        clef and key of the movement (and is cut), a line of another movement
+        does not borrow."""
+        from types import SimpleNamespace
+        a = self.lines()
+        rest = group_line([], [198])
+        rest.staff_labels = []
+        rest.rest_src = (None, None, SimpleNamespace(bars=6))
+        lone = group_line([(72, 12), (125, 4)], [110, 160, 198])
+        ls = a[:2] + [rest, lone]
+        pre = pt.find_prefixes(ls)
+        self.assertIsNone(pre[2])
+        self.assertIsNotNone(pre[3])
+        self.assertIn(pre[3][1], (0, 1))
+        self.assertEqual(pt.whole_reason(lone, pre[3]), "")
+        out = pt.reflow(ls, 140.0, pre)
+        self.assertGreater(len(out), len(ls))                       # the lone line is cut too
+        ls[3].movement = True                                       # another movement: no donor
+        self.assertIsNone(pt.find_prefixes(ls)[3])
 
     def test_label_column_is_equal_on_every_re_flowed_line(self):
         ls = self.lines()

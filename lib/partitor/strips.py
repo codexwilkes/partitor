@@ -10,6 +10,11 @@ from .config import AMB_SP, HEADER_CLEAR_SP, PART_LAYOUT_KEY, SYSTEM_CLEAR_SP, S
 from .model import PageResult, Strip
 from .typography import _font, text_len
 
+# The last barline found is the line's end when it lies within this many staff
+# spaces of the staff end. A final or repeat barline (thin + thick) is found at
+# its middle, up to 2.2 sp before the end (a 2.0 limit missed them).
+BAR_END_SP = 2.5
+
 
 def make_strip(res: PageResult, st_idx: list[int], header_owner: int,
                darker: bool = False, bar_no: int | None = None,
@@ -156,7 +161,7 @@ def group_strip(res: PageResult, sys_staves: list[int], runs: list[tuple[str, li
         st.bars_x = [int(b + off) for b in bx]
         st.bar_nums = nn
         end = max(res.staves[i].x1 for i in idx_all) + off
-        st.ends_at_bar = bool(st.bars_x) and end - st.bars_x[-1] <= 2.0 * sp
+        st.ends_at_bar = bool(st.bars_x) and end - st.bars_x[-1] <= BAR_END_SP * sp
         st.end_gap_sp = (end - st.bars_x[-1]) / sp if st.bars_x else -1.0
         st.bars_why = why or ("" if st.ends_at_bar else "the line does not end at a barline")
         return st
@@ -362,7 +367,7 @@ def set_bar_geometry(stp: Strip, res: PageResult, idx: list[int], gsys: int,
     stp.bar_nums = [int(n) for n in nums]
     end = max(res.staves[i].x1 for i in idx) + off
     # a repeat or final barline (thin + thick) is found at its middle
-    stp.ends_at_bar = bool(stp.bars_x) and end - stp.bars_x[-1] <= 2.0 * res.sp
+    stp.ends_at_bar = bool(stp.bars_x) and end - stp.bars_x[-1] <= BAR_END_SP * res.sp
     stp.end_gap_sp = (end - stp.bars_x[-1]) / res.sp if stp.bars_x else -1.0
 
 

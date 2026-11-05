@@ -15,6 +15,8 @@ from .model import Strip
 # Re-flow (DESIGN.md §4.2 item 2): offered when the print is small
 # =============================================================================
 REFLOW_MAX_PREFIX_SP = 12.0     # clef + key signature: never wider than this
+REFLOW_SAME_SP = 1.2            # lines equal this far past the gap (sp) look like one structure (a longer key)
+REFLOW_CLEAR_SP = 2.5           # but a blank this wide after the gap ends the key signature
 
 
 def _x0(s: Strip) -> int:
@@ -202,6 +204,7 @@ def find_prefixes(strips: list[Strip]) -> list[tuple[int, int] | None]:
     the staves of the lines change, and a line borrows a prefix only from a
     line with the same staves at the same distances."""
     out: list[tuple[int, int] | None] = [None] * len(strips)
+    owns: dict[int, int] = {}          # line -> its own prefix end (img px from the staff start)
     orig = strips
     strips = [_group_view(s_) for s_ in orig]
     segs: list[list[int]] = []
@@ -233,18 +236,25 @@ def find_prefixes(strips: list[Strip]) -> list[tuple[int, int] | None]:
                   if sum(any(abs(x - y) <= tol for y in cs[j]) for j in core) >= need]
         if not common:
             continue
-        X = max(common)
         own: dict[int, int] = {}
         for i in cand:
-            near = [y for y in cs[i] if abs(y - X) <= tol]
-            if not near:
+            # the highest common gap this line has (a line may lack the top
+            # one: a time signature or a note in another place)
+            for X in sorted(common, reverse=True):
+                near = [y for y in cs[i] if abs(y - X) <= tol]
+                if near:
+                    break
+            else:
                 continue
             y = int(min(near, key=lambda v: abs(v - X)) + f0[i])
-            if not strips[i].movement and dd[i] > _next_ink(strips[i], y) + 0.5 * sp:
+            nxt = _next_ink(strips[i], y)
+            if not strips[i].movement and dd[i] > nxt + REFLOW_SAME_SP * sp \
+               and nxt - y < REFLOW_CLEAR_SP * sp:
                 continue                      # same music after the gap: too short
             own[i] = y
         if not own:
             continue
+        owns.update(own)
         for i in cand:
             if i in own:
                 out[i] = (_x0(strips[i]) + own[i], i)
@@ -255,6 +265,21 @@ def find_prefixes(strips: list[Strip]) -> list[tuple[int, int] | None]:
                    and _diverge(strips[i], strips[k]) >= own[k] - 0.5 * sp:
                     out[i] = (0, k)
                     break
+    # A line that stands alone in its segment (a multi-bar rest line on each
+    # side splits the movement): it borrows from a line of the same movement
+    # with the same staves, by the same test.
+    mv, m = [], 0
+    for s_ in orig:
+        m += 1 if s_.movement else 0
+        mv.append(m)
+    for i, s_ in enumerate(orig):
+        if out[i] is not None or s_.rest_src is not None or not _single(strips[i]):
+            continue
+        for k in sorted(owns, key=lambda k: abs(k - i)):
+            if mv[k] == mv[i] and _same_stack(orig[i], orig[k]) \
+               and _diverge(strips[i], strips[k]) >= owns[k] - 0.5 * s_.sp:
+                out[i] = (0, k)
+                break
     return out
 
 
