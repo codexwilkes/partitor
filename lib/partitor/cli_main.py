@@ -247,6 +247,9 @@ def plan_args(argv: list[str]) -> argparse.Namespace:
     pn.add_argument("words", nargs="*", metavar="PART [N]",
                     help="a part or group, then the option number to set; default: groups "
                          "and parts with a bad turn")
+    pn.add_argument("--group", action="append", default=[], metavar="NAME=PARTS",
+                    help="try a group the item does not have, e.g. AltTen=Alto,Tenor (part names "
+                         "or numbers): built in a temporary copy and shown; repeat for more groups")
     return pn.parse_args(argv)
 
 

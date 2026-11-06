@@ -8,6 +8,20 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.9 — 2026-11-05
+
+Add: `partitor plan ID --group Name=Alto,Tenor`: the options of a group of parts that the item does not
+have (DESIGN.md §5.8).
+
+- The item is copied to a temporary folder, only the trial groups are built there (every part is skipped,
+  the page cache is used), the tables are printed and the folder is removed. The item is not changed.
+  Part names or numbers, repeat `--group` for more groups; the score order is kept.
+- The trial groups take the layout of the item's first group (`group_gap`, margins, `binding`), and the
+  table says `trial build`. Compare the tables with those of the single parts: joining parts removes
+  turn points, because a joint line rests only where every staff rests.
+- Internal: `cli_items.plan_table` and `plan_trial`; `plan` without `--group` is unchanged.
+
+
 ## 0.8.8 — 2026-11-05
 
 Add: left fold-outs (DESIGN.md §5.7). Layout key `foldside`: `right` (default), `left` or `auto`.

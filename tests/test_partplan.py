@@ -240,5 +240,48 @@ class TestOptions(unittest.TestCase):
                          ("letter", 6.5, "on", "on", 31))
 
 
+@needs_deps
+class TestTrialGroups(unittest.TestCase):
+    """`plan --group Name=A,B`: the data of the temporary copy (0.8.9)."""
+
+    DATA = {"id": "2026-10-0003", "parts": ["Alto", "Tenor", "Bass", "Organ"],
+            "groups": {"Trio": ["Alto", "Tenor", "Bass"]},
+            "layout": {"paper": "ledger", pt.PART_LAYOUT_KEY: {"Trio": {"group_gap": 5.0, "binding": 12.7},
+                                                              "Organ": {"gap": 9.0}}},
+            "built": {"parts": [{"part": "Trio"}]}, "pending": ["gap"], "skip": []}
+
+    def test_the_copy_has_only_the_trial_groups_and_skips_every_part(self):
+        d, names = pt.trial_data(self.DATA, ["TB=Tenor,Bass", "AT=Alto,Tenor"])
+        self.assertEqual(names, ["TB", "AT"])
+        self.assertEqual(d["groups"], {"TB": ["Tenor", "Bass"], "AT": ["Alto", "Tenor"]})
+        self.assertEqual(d[pt.SKIP_KEY], self.DATA["parts"])
+        self.assertNotIn("built", d)
+        self.assertNotIn("pending", d)
+
+    def test_the_trial_groups_take_the_layout_of_the_first_group(self):
+        d, _ = pt.trial_data(self.DATA, ["AT=Alto,Tenor"])
+        self.assertEqual(d["layout"][pt.PART_LAYOUT_KEY], {"AT": {"group_gap": 5.0, "binding": 12.7}})
+        self.assertEqual(d["layout"]["paper"], "ledger")
+
+    def test_parts_may_be_named_or_numbered_and_stay_in_score_order(self):
+        d, _ = pt.trial_data(self.DATA, ["X=3,Alto"])
+        self.assertEqual(d["groups"]["X"], ["Alto", "Bass"])
+
+    def test_every_part_is_a_group_too(self):
+        d, _ = pt.trial_data(self.DATA, ["Tutti=all"])
+        self.assertEqual(d["groups"]["Tutti"], self.DATA["parts"])
+
+    def test_the_item_data_is_not_changed(self):
+        before = repr(self.DATA)
+        pt.trial_data(self.DATA, ["AT=Alto,Tenor"])
+        self.assertEqual(repr(self.DATA), before)
+
+    def test_bad_specs_are_refused(self):
+        for bad in ("nogroup", "AT=", "=Alto,Tenor", "AT=Alto", "Alto=Tenor,Bass", "AT=Alto,Nobody",
+                    "AT=Alto,Alto", "AT=9,10"):
+            with self.subTest(spec=bad), self.assertRaises(ValueError):
+                pt.trial_data(self.DATA, [bad])
+
+
 if __name__ == "__main__":
     unittest.main()

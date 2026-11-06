@@ -635,20 +635,151 @@ def plan_rows(opts_list: list, old: dict, lay: dict) -> list[str]:
     return out
 
 
-def cmd_plan(a: argparse.Namespace) -> int:
-    """plan <id> [part ...] [N]: the options of a part (paper, staff size) with
-    their page turns, estimated from the saved lines (read-only). `plan <id>
-    <part> N` sets option N for that part: paper, largest staff, re-flow,
-    fold-outs and a page budget; saved, not built (rebuild applies it)."""
+def trial_data(data: dict, specs: list[str]) -> tuple[dict, list[str]]:
+    """trial_data -> (data for a temporary copy of the item, the names of the trial
+    groups). specs: 'Name=Alto,Tenor' (part names or numbers, top staff first).
+    The copy has only the trial groups; every part is skipped (extracted by no
+    one: only the groups are built) and nothing is built yet. The layout of the
+    first group of the item (margins, `group_gap`, ...) is the layout of the trial
+    groups, so their lines are made as that group's are."""
+    out = dict(data)
+    groups, names = {}, []
+    like = next(iter(data.get("groups") or {}), None)
+    for spec in specs:
+        name, eq, words = spec.partition("=")
+        name = name.strip()
+        if not eq or not name or not words.strip():
+            raise ValueError(f"{spec}: use Name=Alto,Tenor (part names or numbers)")
+        if name in (data.get("parts") or []):
+            raise ValueError(f"{name} is already a part name")
+        got = parse_parts(data, [w for w in re.split(r"[,\s]+", words) if w])
+        if got is None:                            # parse_parts: None = every part
+            got = [nm for nm in data.get("parts") or [] if nm not in (data.get(SKIP_KEY) or [])]
+        if len(got) < 2:
+            raise ValueError(f"{spec}: a group needs two parts or more")
+        if len(got) != len(set(got)) or any(g not in (data.get("parts") or []) for g in got):
+            raise ValueError(f"{spec}: parts of the item, once each")
+        order = {nm: i for i, nm in enumerate(data.get("parts") or [])}
+        groups[name] = sorted(got, key=lambda g: order[g])               # score order
+        names.append(name)
+    out["groups"] = groups
+    out[SKIP_KEY] = list(data.get("parts") or [])
+    out.pop("built", None)
+    out.pop("pending", None)
+    lay = {k: v for k, v in (data.get("layout") or {}).items() if k != PART_LAYOUT_KEY}
+    plays = (data.get("layout") or {}).get(PART_LAYOUT_KEY) or {}
+    if like and plays.get(like):
+        lay[PART_LAYOUT_KEY] = {n: dict(plays[like]) for n in names}
+    out["layout"] = lay
+    return out, names
+
+
+def plan_table(item: Path, data: dict, built: dict, nm: str, trial: bool = False):
+    """plan_table -> the option rows of part (or group) nm, printed as a table; None if
+    there is nothing to plan (the reason is printed)."""
     from .lines import lines_path, load_lines
-    from .partplan import JUSTIFY_SHARE, Source, estimate, options, read_source, set_pairs
+    from .partplan import JUSTIFY_SHARE, Source, estimate, options, read_source
+    lay = part_layout(data, nm)
+    try:
+        pl = load_lines(lines_path(item / "lines", nm))
+    except ValueError as e:
+        _warn(f"plan:  {nm}: {e}")
+        return None
+    raw = pl.get("plan")
+    try:
+        src = Source.from_dict(raw) if raw else None
+    except ValueError as e:
+        _warn(f"plan:  {nm}: {e}")
+        src = None
+    if src is None and not any(s.bars_x for s in pl["strips"]):
+        _warn(f"plan:  {nm}: no plan data and the saved lines are re-flowed: rebuild the part once "
+              f"(partitor rebuild {data['id']} {nm})")
+        return None
+    if lay.get("duplex") == "off":
+        _warn(f"plan:  {nm}: duplex is off (single-sided): page turns follow every page; no plan")
+        return None
+    o = {**pl["opts"], **{k: lay[k] for k in PLAN_KEYS if lay.get(k) is not None}}
+    cur = lay.get("paper") or "letter"
+    papers = ("letter", "ledger") + (() if cur in ("letter", "ledger") else (cur,))   # fixed order: the numbers stay
+    if src is None:                         # a build before 0.8.6: the justified saved lines
+        src = read_source(pl["strips"], o, pl["dpi"], share=JUSTIFY_SHARE)
+    rows = options(src, o, papers, floor_mm=float(lay.get("min_staff_mm") or 5.0))
+    old = built[nm]
+    _head(f"Plan: {nm}")
+    c0 = old.get("content_pages", old["pages"])
+    est = estimate(src, o, o["paper"], float(old["staff_mm"]))
+    _note(f"{'trial build' if trial else 'built'}: "
+          f"{o['paper']}, staff {old['staff_mm']} mm, {c0} pages of music, "
+          f"{old.get('turns', 0)} turns, {old.get('bad_turns', 0)} while playing"
+          + (f"; the estimate for it: {est.pages} pages" if est.ok else ""))
+    for line in plan_rows(rows, old, lay):
+        print(line)
+    return rows
+
+
+def plan_trial(item: Path, data: dict, specs: list[str]) -> tuple[Path, dict, list[str]]:
+    """plan_trial -> (temporary item folder, its data, the trial group names): a copy of the item
+    in which only the trial groups are built (a few seconds to a minute: the page cache is used).
+    The caller removes the folder. The item itself is not touched."""
+    import contextlib
+    import io
+    import tempfile
+    from . import build            # R1: run_build is patched by tests, read as build.run_build
+    tdata, names = trial_data(data, specs)
+    tmp = Path(tempfile.mkdtemp(prefix="partitor-plan-"))
+    dest = tmp / item.name
+    try:
+        shutil.copytree(item, dest, ignore=shutil.ignore_patterns(
+            "parts", PARTS_PREV, PARTS_NEW, "lines", "lines.new", "*.tmp"))
+        save_item(dest, tdata)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            rc = build.run_build(dest)
+        if rc != 0:
+            print(buf.getvalue())
+            raise ValueError("the trial build failed (output above)")
+        return tmp, load_item(dest), names
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+
+
+def cmd_plan(a: argparse.Namespace) -> int:
+    """plan <id> [part ...] [N] [--group Name=Alto,Tenor ...]: the options of a part (paper,
+    staff size) with their page turns, estimated from the saved lines (read-only). `plan <id>
+    <part> N` sets option N for that part: paper, largest staff, re-flow, fold-outs and a page
+    budget; saved, not built (rebuild applies it). --group: the same for groups of parts that
+    the item does not have: built in a temporary copy, shown, thrown away."""
     start = time.monotonic()
     item = _item_or_die(a.id)
     data = load_item(item)
+    specs = list(getattr(a, "group", None) or [])
+    words = list(getattr(a, "words", None) or [])
+    if specs:
+        if words:
+            _die("plan: --group takes no part names", f"partitor plan {data['id']} --group Name=Alto,Tenor")
+        print(f"{BOLD}partitor {VERSION} — plan (trial groups){RST}\n{time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        _note("building the trial group(s) in a temporary copy of the item; nothing in the item changes")
+        try:
+            tmp, tdata, names = plan_trial(item, data, specs)
+        except ValueError as e:
+            _die(f"plan: {e}")
+        _reset_counts()                           # the trial build's own warnings are not ours
+        try:
+            tbuilt = {r["part"]: r for r in (tdata.get("built") or {}).get("parts") or []}
+            for nm in names:
+                if nm in tbuilt:
+                    plan_table(tmp / item.name, tdata, tbuilt, nm, trial=True)
+                else:
+                    _warn(f"plan:  {nm}: not built in the trial (see the build report: partitor rebuild)")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        _note(f"to keep a group: partitor groups {data['id']} (Name=4,5,6), then partitor rebuild {data['id']} "
+              "NAME, then partitor plan NAME. Compare the groups with the single parts: partitor plan ID PART")
+        return _summary(start)
     built = {r["part"]: r for r in (data.get("built") or {}).get("parts") or []}
     if not built:
         _die("plan: nothing built yet", f"Build first: partitor rebuild {data['id']}")
-    words = list(getattr(a, "words", None) or [])
     pick = int(words.pop()) if len(words) >= 2 and words[-1].isdigit() else None
     names = plan_names(data, built, words)
     if not names:
@@ -657,49 +788,15 @@ def cmd_plan(a: argparse.Namespace) -> int:
     if pick is not None and len(names) != 1:
         _die("plan: name one part to set an option", f"partitor plan {data['id']} Trombones {pick}")
     print(f"{BOLD}partitor {VERSION} — plan{RST}\n{time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-    chosen = None
     for nm in names:
-        lay = part_layout(data, nm)
-        try:
-            pl = load_lines(lines_path(item / "lines", nm))
-        except ValueError as e:
-            _warn(f"plan:  {nm}: {e}")
-            continue
-        raw = pl.get("plan")
-        try:
-            src = Source.from_dict(raw) if raw else None
-        except ValueError as e:
-            _warn(f"plan:  {nm}: {e}")
-            src = None
-        if src is None and not any(s.bars_x for s in pl["strips"]):
-            _warn(f"plan:  {nm}: no plan data and the saved lines are re-flowed: rebuild the part once "
-                  f"(partitor rebuild {data['id']} {nm})")
-            continue
-        if lay.get("duplex") == "off":
-            _warn(f"plan:  {nm}: duplex is off (single-sided): page turns follow every page; no plan")
-            continue
-        o = {**pl["opts"], **{k: lay[k] for k in PLAN_KEYS if lay.get(k) is not None}}
-        cur = lay.get("paper") or "letter"
-        papers = ("letter", "ledger") + (() if cur in ("letter", "ledger") else (cur,))   # fixed order: the numbers stay
-        if src is None:                         # a build before 0.8.6: the justified saved lines
-            src = read_source(pl["strips"], o, pl["dpi"], share=JUSTIFY_SHARE)
-        rows = options(src, o, papers, floor_mm=float(lay.get("min_staff_mm") or 5.0))
-        old = built[nm]
-        _head(f"Plan: {nm}")
-        c0 = old.get("content_pages", old["pages"])
-        est = estimate(src, o, o["paper"], float(old["staff_mm"]))
-        _note(f"built: {o['paper']}, staff {old['staff_mm']} mm, {c0} pages of music, "
-              f"{old.get('turns', 0)} turns, {old.get('bad_turns', 0)} while playing"
-              + (f"; the estimate for it: {est.pages} pages" if est.ok else ""))
-        for line in plan_rows(rows, old, lay):
-            print(line)
-        if pick is not None:
+        rows = plan_table(item, data, built, nm)
+        if rows is not None and pick is not None:
+            from .partplan import set_pairs
             chosen = next((r for r in rows if r.n == pick), None)
             if chosen is None or not chosen.ok:
                 _die(f"plan: option {pick}: " + ("no such option" if chosen is None else chosen.note))
-            pairs = set_pairs(nm, chosen)
             try:
-                changes = apply_set(data, pairs)
+                changes = apply_set(data, set_pairs(nm, chosen))
             except ValueError as e:
                 _die(f"plan: {e}")
             mark_pending(data, *(c.split(": ")[0] for c in changes))

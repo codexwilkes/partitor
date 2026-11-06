@@ -982,9 +982,69 @@ class TestRepage(unittest.TestCase):
                 self.assertIn("Alto:paper", pt.load_item(item).get("pending") or [])
                 self.assertEqual(pt.load_item(item)["layout"].get("paper", "letter"),
                                  before["layout"].get("paper", "letter"))           # other parts: untouched
+                # a single part (one staff) gets the whole benefit: the build follows the chosen row
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(build.run_build(item, only=["Alto"]), 0)
+                rec = next(r for r in pt.load_item(item)["built"]["parts"] if r["part"] == "Alto")
+                self.assertLessEqual(rec["staff_mm"], own["max_staff_mm"] + 0.06)
+                self.assertTrue(rec.get("reflow") or own["reflow"] == "off")
+                self.assertTrue((item / "parts" / rec["file"]).is_file())
                 rc, out = plan("Alto", "99")                                    # no such option
                 self.assertNotEqual(rc, 0)
                 self.assertIn("no such option", out)
+            finally:
+                if old_share is None:
+                    os.environ.pop("PARTITOR_LIBRARY", None)
+                else:
+                    os.environ["PARTITOR_LIBRARY"] = old_share
+
+    def test_plan_group_tries_a_group_in_a_temporary_copy(self):
+        import glob
+        with tempfile.TemporaryDirectory() as tmp:
+            one = Path(tmp, "page.pdf")
+            make_score_pdf(str(one), systems=2, staves=2, labels=("Alto", "Bass"), title="")
+            doc = pymupdf.open()
+            for _ in range(6):
+                doc.insert_pdf(pymupdf.open(str(one)))
+            share = Path(tmp, "share")
+            (share / "inbox").mkdir(parents=True)
+            item = share / "library" / "2026-10-0001-c-t"
+            item.mkdir(parents=True)
+            doc.save(str(item / "2026-10-0001-source.pdf"))
+            pt.save_item(item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-27"})
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
+                d = pt.load_item(item)
+                pt.apply_set(d, ["pages=5", "max_staff_mm=8"])
+                pt.save_item(item, d)
+                self.assertEqual(build.run_build(item), 0)
+            snap = lambda: sorted((str(f.relative_to(item)), f.stat().st_size) for f in item.rglob("*") if f.is_file())
+            yaml_before = (item / "2026-10-0001-score.yaml").read_bytes()
+            files_before = snap()
+            temps_before = set(glob.glob(os.path.join(tempfile.gettempdir(), "partitor-plan-*")))
+            old_share = os.environ.get("PARTITOR_LIBRARY")
+            os.environ["PARTITOR_LIBRARY"] = str(share)
+            try:
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                    rc = pt._engine_step(pt.cmd_plan, argparse.Namespace(
+                        id="2026-10-0001", words=[], group=["AB=Alto,Bass"]))
+                out = buf.getvalue()
+                self.assertEqual(rc, 0, out)
+                self.assertIn("Plan: AB", out)
+                self.assertIn("trial build", out)
+                self.assertIn("fold-out", out)
+                self.assertIn("temporary copy", out)
+                self.assertEqual((item / "2026-10-0001-score.yaml").read_bytes(), yaml_before)   # item untouched
+                self.assertEqual(snap(), files_before)
+                self.assertEqual(set(glob.glob(os.path.join(tempfile.gettempdir(), "partitor-plan-*"))), temps_before)
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                    rc = pt._engine_step(pt.cmd_plan, argparse.Namespace(
+                        id="2026-10-0001", words=[], group=["AB=Alto"]))
+                self.assertNotEqual(rc, 0)                                  # one part is not a group
+                self.assertIn("two parts or more", buf.getvalue())
+                self.assertEqual(set(glob.glob(os.path.join(tempfile.gettempdir(), "partitor-plan-*"))), temps_before)
             finally:
                 if old_share is None:
                     os.environ.pop("PARTITOR_LIBRARY", None)

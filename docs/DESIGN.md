@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.8.8. Section numbers are stable: the code cites
+Status: describes partitor 0.8.9. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -810,8 +810,17 @@ second: nothing is analysed or drawn. Without a part it lists the groups and the
   `max_staff_mm`, `reflow` (on when the lines are cut), `foldouts=on` and `pages` (the planned
   pages plus 2, at most 99). Then `partitor rebuild ID PART` makes it; the build reports the real pages and turns, and
   a row can be chosen again. The numbers of the rows do not change when a choice is made.
-- Not done yet: joining parts (Alto + Tenor, Tenor + Bass) and the page-turn effect of fewer parts; `plan` in the
-  main `--help` (that text is part of the G0 golden: it needs a re-record with the operator's word).
+- Trial groups: `partitor plan ID --group AltTen=Alto,Tenor [--group TenBas=Tenor,Bass ...]` shows the
+  table of groups of parts that the item does not have, to compare the page turns of joining parts. The
+  item is copied to a temporary folder, only the trial groups are built there (every part is skipped; the
+  page cache is used: a few seconds to a minute), the tables are printed, and the folder is removed.
+  The item is not changed. Part names or numbers, top staff first (the score order is kept). The trial
+  groups take the layout of the item's first group (`group_gap`, margins, `binding`, ...), so their lines
+  are made as that group's are; the table header says `trial build`. To keep a group: `partitor groups`,
+  then `rebuild` it. The joint lines count as rest only where every staff rests, so joining parts removes
+  turn points: compare the tables with those of the single parts.
+- Not done yet: `plan` in the main `--help` (that text is part of the G0 golden: it needs a re-record
+  with the operator's word).
 
 ## 6. CLI
 
@@ -838,6 +847,7 @@ partitor reid <id>             old YYYY-NNN item -> YYYY-MM-NNNN
 partitor rebuild <id> [part ...] [--jobs N|auto]
 partitor repage <id> [part ...]           page breaks again from the saved lines
 partitor plan <id> [part] [N]             options of a part; with N: set option N (not in --help yet)
+partitor plan <id> --group Name=A,B       try a group of parts in a temporary copy (read-only)
 partitor analyse <id> [--yes] | analyse --all
 partitor bars | parts | groups | meta | proof <id>
 ```
