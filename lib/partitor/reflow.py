@@ -397,7 +397,7 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
             # rehearsal marks move with their bars: a mark stands at the
             # barline before its bar (or the line start for bar 0); a copied
             # prefix carries none
-            marks, x = [], 0
+            marks, labels, x = [], [], 0
             for n_, (ps, x0, x1, keep) in enumerate(pieces):
                 lo = x0 - 2 * bw(ps) if n_ > 0 else 0
                 hi = x1 - 2 * bw(ps)
@@ -405,6 +405,9 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
                     for mx, t in ps.marks:
                         if (lo <= mx < hi) and not (n_ == 0 and mx >= x1):
                             marks.append((x + max(0, mx - x0), t))
+                    for cx, t in ps.rest_labels:         # the count of a merged rest moves with its bar
+                        if x0 <= cx < x1:
+                            labels.append((x + cx - x0, t))
                 x += x1 - x0
             if b < len(s_.bar_nums):
                 num = s_.bar_nums[b]
@@ -416,7 +419,8 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
             show = None if (first_of_mvt or num is None or num < 1) else num
             line = Strip(img, s_.staff_x0, top, top + (s_.staff_bottom - s_.staff_top),
                          s_.sp, hdr, show, s_.bar_raise, s_.bar_size,
-                         marks=sorted(set(marks)), movement=first_of_mvt,
+                         marks=sorted(set(marks)), rest_labels=sorted(labels),
+                         movement=first_of_mvt,
                          bracket=s_.bracket,
                          staff_labels=[(n, t - s_.staff_top + top, b - s_.staff_top + top)
                                        for n, t, b in s_.staff_labels])

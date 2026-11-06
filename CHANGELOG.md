@@ -8,6 +8,25 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.11 — 2026-11-06
+
+### Added
+
+- Rest merging inside a line (`rests: compress`, the default). A run of 2 bars
+  or more that hold only measure rests on every staff of a part or group line
+  becomes one multi-bar rest, with the count above the top staff. A bar with
+  a note, a stem, a hollow whole note, a rest of another length, text, a
+  rehearsal mark or a printed number is never merged. `rests: keep` turns it
+  off. The lines are shorter, so re-flow and `plan` see fewer lines and pages.
+- Saved lines (`.lines`) from before this release load without a rebuild: the
+  new field `rest_labels` gets its default. A file with any other unknown
+  field is still refused.
+
+### Changed
+
+- The page budget and the page turns of parts with long rests move: some
+  parts need fewer pages or fewer fold-outs. Run `partitor rebuild` to apply.
+
 ## 0.8.10 — 2026-11-06
 
 Change: `partitor plan` and the fold-out print are easier to follow (DESIGN.md §5.7, §5.8).

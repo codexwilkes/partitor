@@ -84,6 +84,7 @@ class Strip:
     end_gap_sp: float = -1.0    # staff end minus last barline, in sp (-1: no barline)
     num_mask: np.ndarray | None = None  # ink of printed mid-line bar numbers (same shape)
     rest_label: tuple | None = None     # (x centre in img, text): multi-bar rest count
+    rest_labels: list = field(default_factory=list)  # [(x centre in img, text)]: counts of merged rest bars inside the line
     rest_src: tuple | None = None       # (src, cw, RestRun): to rebuild at another width
     indent: int = 0             # px left of the staff start kept free (first line, labels)
     name_label: str | None = None       # full part name in the indent (small caps)

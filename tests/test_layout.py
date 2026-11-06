@@ -984,3 +984,125 @@ class TestGroupGapAndSizeFirst(unittest.TestCase):
                 rows = np.where(ink[60:700, :].any(axis=1))[0]      # not the folio
                 heights[gap] = rows.max() - rows.min()
             self.assertLess(heights[2.0], heights[None])
+
+
+@needs_deps
+class TestMergeRestBars(unittest.TestCase):
+    """Bars that hold only measure rests on every staff become one multi-bar rest."""
+
+    BARS = [130, 230, 330, 430]       # barline x: bar 0 starts at PRE
+    PRE = 30
+
+    def line(self, staves=1, hollow=None, note=None, mark=None, rests=(0, 1, 2)):
+        """sp 10; a staff top at 40, 140, ...; a whole rest hangs under line 2 in each
+        bar of `rests`; `note` (bar, staff): a quarter note instead; `hollow`
+        (bar, staff): a whole note."""
+        h = 40 + 100 * staves
+        img = np.zeros((h, 440), bool)
+        tops = [40 + 100 * k for k in range(staves)]
+        for t0 in tops:
+            for k in range(5):
+                img[t0 + 10 * k, :] = True
+        starts = [self.PRE] + [b + 2 for b in self.BARS[:-1]]
+        for b in rests:
+            for k, t0 in enumerate(tops):
+                cx = starts[b] + 40
+                if (b, k) == note:
+                    img[t0 + 20:t0 + 28, cx:cx + 9] = True
+                    img[t0 - 5:t0 + 24, cx + 8:cx + 10] = True       # a stem
+                elif (b, k) == hollow:
+                    img[t0 + 20:t0 + 30, cx:cx + 13] = True
+                    img[t0 + 22:t0 + 28, cx + 3:cx + 10] = False
+                else:
+                    img[t0 + 11:t0 + 16, cx:cx + 14] = True          # whole rest, 0.5 sp
+        for b in self.BARS:
+            img[tops[0]:tops[-1] + 41, b:b + 2] = True
+        s = pt.Strip(img, 0, tops[0], tops[0] + 40, 10.0, np.zeros_like(img),
+                     bars_x=list(self.BARS), bar_nums=[10, 11, 12, 13], ends_at_bar=True)
+        if mark is not None:
+            s.marks = [mark]
+        return s
+
+    def test_a_run_of_rest_bars_is_found(self):
+        self.assertEqual(pt.rest_bar_runs(self.line(), self.PRE), [(0, 2)])
+        self.assertEqual(pt.rest_bar_runs(self.line(staves=3), self.PRE), [(0, 2)])
+
+    def test_the_first_bar_needs_a_known_start(self):
+        self.assertEqual(pt.rest_bar_runs(self.line(), None), [(1, 2)])
+
+    def test_a_bar_with_a_note_is_never_merged(self):
+        self.assertEqual(pt.rest_bar_runs(self.line(note=(1, 0)), self.PRE), [])
+        self.assertEqual(pt.rest_bar_runs(self.line(staves=3, note=(2, 2)), self.PRE), [(0, 1)])
+        self.assertEqual(pt.rest_bar_runs(self.line(rests=(0, 1, 2, 3)), self.PRE), [(0, 3)])
+
+    def test_a_whole_note_is_not_a_rest(self):
+        """A hollow whole note on one staff keeps its bar."""
+        self.assertEqual(pt.rest_bar_runs(self.line(staves=3, hollow=(0, 1)), self.PRE), [(1, 2)])
+
+    def test_a_single_rest_bar_is_kept(self):
+        self.assertEqual(pt.rest_bar_runs(self.line(rests=(0,)), self.PRE), [])
+
+    def test_a_rehearsal_mark_keeps_its_bar(self):
+        """The mark stands at the start of bar 2: that bar stays."""
+        self.assertEqual(pt.rest_bar_runs(self.line(mark=(240, "A")), self.PRE), [(0, 1)])
+
+    def merged(self, **kw):
+        return pt.merge_rest_bars([self.line(**kw)], {"rests": "compress"}, pre=[(self.PRE, 0)])[0]
+
+    def test_the_merge_rebuilds_the_line(self):
+        s = self.line(staves=3)
+        out = self.merged(staves=3)
+        self.assertEqual(len(out.bars_x), 2)
+        self.assertEqual(out.bar_nums, [10, 13])                      # the merged bar keeps its first number
+        self.assertLess(out.img.shape[1], s.img.shape[1])
+        self.assertEqual(len(out.rest_labels), 1)
+        cx, text = out.rest_labels[0]
+        self.assertEqual(text, "3")
+        self.assertTrue(self.PRE < cx < out.bars_x[0])
+        for t0 in (40, 140, 240):                                     # an H-bar on every staff
+            self.assertGreater(int(out.img[t0 + 20, self.PRE + 30:out.bars_x[0] - 30].sum()), 0)
+        d = out.bars_x[1] - s.bars_x[3]                               # the last bar is the old one, moved
+        self.assertTrue((out.img[:, s.bars_x[2] + 10 + d:s.bars_x[3] + 2 + d]
+                         == s.img[:, s.bars_x[2] + 10:s.bars_x[3] + 2]).all())
+        self.assertEqual(out.img.shape, out.hdr.shape)
+        self.assertEqual(len(pt.rest_boxes(out)), 1)
+
+    def test_every_staff_line_runs_across_the_new_measure(self):
+        out = self.merged(staves=3)
+        for t0 in (40, 140, 240):
+            for k in range(5):
+                self.assertTrue(out.img[t0 + 10 * k, 5:out.img.shape[1] - 5].all())
+
+    def test_rests_keep_leaves_the_lines_alone(self):
+        s = self.line()
+        self.assertIs(pt.merge_rest_bars([s], {"rests": "keep"}, pre=[(self.PRE, 0)])[0], s)
+
+    def test_a_line_without_a_run_is_unchanged(self):
+        s = self.line(note=(1, 0))
+        self.assertIs(pt.merge_rest_bars([s], {}, pre=[(self.PRE, 0)])[0], s)
+
+    def test_a_merge_that_saves_nothing_is_not_made(self):
+        import dataclasses
+        narrow = dataclasses.replace(self.line(), bars_x=[60, 90, 120, 150])
+        self.assertIs(pt._merge_run(narrow, 0, 1, 10), narrow)
+
+    def test_the_count_moves_with_justify_and_indent(self):
+        out = self.merged()
+        j = pt.justify(out, out.img.shape[1] + 80)
+        self.assertEqual(len(j.rest_labels), 1)
+        self.assertGreaterEqual(j.rest_labels[0][0], out.rest_labels[0][0])
+        self.assertEqual(pt.pad_left(j, 12).rest_labels[0][0], j.rest_labels[0][0] + 12)
+
+    def test_the_count_moves_with_re_flow(self):
+        out = self.merged()
+        cut = pt.reflow([out], 150.0, pre=[(self.PRE, 0)])
+        self.assertEqual([t for s_ in cut for _, t in s_.rest_labels], ["3"])
+
+    def test_the_planner_sees_the_shorter_line(self):
+        s = self.line(staves=3)
+        before = pt.read_source([s], {}, 150).lines[0]["whole"]
+        after = pt.read_source([self.merged(staves=3)], {}, 150).lines[0]["whole"]
+        self.assertLess(after, before)
+
+
+

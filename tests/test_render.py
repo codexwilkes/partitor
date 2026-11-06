@@ -1269,6 +1269,36 @@ class TestLinesFileCompatibility(unittest.TestCase):
             self.assertNotIn(b"__main__", raw)
             self.assertIs(type(pt.load_lines(f)["strips"][0]), pt.Strip)
 
+    def test_a_file_from_before_a_field_gets_its_default(self):
+        """rest_labels came after the fixture: the old lines have none, and load."""
+        d = pt.load_lines(self.FIXTURE)
+        for st in d["strips"]:
+            self.assertEqual(st.rest_labels, [])
+
+    def test_a_file_with_an_unknown_field_is_refused(self):
+        import gzip
+        import pickle
+        st = [pt.Strip(np.zeros((10, 30), bool), 0, 2, 6, 2.0, np.zeros((10, 30), bool))]
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp, "x.lines")
+            pt.save_lines(f, "Alto", 400, {}, {"paper": "letter"}, st)
+            with gzip.open(f, "rb") as fh:
+                d = pt._LinesUnpickler(fh).load()
+            d["fields"] = list(d["fields"]) + ["from_the_future"]
+            with gzip.open(f, "wb") as fh:
+                pickle.dump(d, fh)
+            with self.assertRaises(ValueError) as cm:
+                pt.load_lines(f)
+            self.assertIn("another partitor", str(cm.exception))
+
+    def test_a_saved_line_keeps_its_merged_rest_counts(self):
+        st = [pt.Strip(np.zeros((10, 30), bool), 0, 2, 6, 2.0, np.zeros((10, 30), bool),
+                       rest_labels=[(12.0, "3")])]
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp, "x.lines")
+            pt.save_lines(f, "Alto", 400, {}, {"paper": "letter"}, st)
+            self.assertEqual(pt.load_lines(f)["strips"][0].rest_labels, [(12.0, "3")])
+
     def test_reader_accepts_old_and_package_paths_for_the_two_classes_only(self):
         import pickle
         u = pt._LinesUnpickler(io.BytesIO(b""))

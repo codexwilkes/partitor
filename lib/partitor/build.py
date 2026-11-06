@@ -35,7 +35,9 @@ from .library import (
     keep_other_parts, library_logo, library_root, load_item, part_layout, partial_blocker,
     piece_tag, recover_parts, save_item, score_name, swap_parts,
 )
-from .lines import count_bad_turns, fill_rests, finish_lines, label_column, lines_path, save_lines
+from .lines import (
+    count_bad_turns, fill_rests, finish_lines, label_column, lines_path, merge_rest_bars, save_lines,
+)
 from .partplan import read_source
 from .mapping import assign_maps
 from .model import PageResult, RestRun, Strip
@@ -611,8 +613,8 @@ def cmd_build(a: argparse.Namespace) -> int:
     if _counts["fail"]:
         return _summary(start)
 
-    part_strips = {p: fill_rests(v, opts) for p, v in part_strips.items()}
-    group_strips = {g: fill_rests(v, opts) for g, v in group_strips.items()}
+    part_strips = {p: merge_rest_bars(fill_rests(v, opts), opts) for p, v in part_strips.items()}
+    group_strips = {g: merge_rest_bars(fill_rests(v, opts), opts) for g, v in group_strips.items()}
     for v in group_strips.values():
         for s_ in v:
             if s_.rest_src is not None:

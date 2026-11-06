@@ -266,9 +266,7 @@ def profiles(s: Strip, nbins: int, bin_px: float
     t_hdr, _ = profile(s.hdr, a, nbins, bin_px)
     _, bot = profile(s.img, a, nbins, bin_px)
     boxes = [(x0, top, x1) for x0, top, x1, *_ in reh_boxes(s)]
-    rb = rest_box(s)
-    if rb:
-        boxes.append(rb[:3])
+    boxes.extend(rb[:3] for rb in rest_boxes(s))
     if s.bar_no is not None:
         _, top, wpx = bar_mark(s)
         c0 = bar_x(s)
@@ -290,19 +288,26 @@ def rest_text(n: str) -> tuple[str, str, float, float]:
     return n, "bold", 2.6, 0.8
 
 
-def rest_box(s: Strip) -> tuple[float, float, float, float, float, str, str] | None:
+def rest_box(s: Strip, label: tuple | None = None) -> tuple[float, float, float, float, float, str, str] | None:
     """rest_box -> (x0, top, x1, baseline, font size, text, font kind) of
     the multi-bar rest count, centred above the H-bar, in strip px; None
-    without one."""
-    if not s.rest_label:
+    without one. label: (x, text) of one count (default: the line's own)."""
+    label = label or s.rest_label
+    if not label:
         return None
-    cx, n = s.rest_label
+    cx, n = label
     t, kind, size, raise_ = rest_text(n)
     fs = size * s.sp
     w = text_len(t, kind, fs)
     base = s.staff_top - raise_ * s.sp
     top = base - (1.0 * s.sp if kind == "music" else 0.72 * fs)
     return (cx - w / 2, top, cx + w / 2, base, fs, t, kind)
+
+
+def rest_boxes(s: Strip) -> list[tuple[float, float, float, float, float, str, str]]:
+    """rest_boxes -> the rest_box of every count of a line: the line's own
+    (a line that is only a rest) and those of merged bars inside it."""
+    return [b for b in (rest_box(s), *(rest_box(s, lb) for lb in s.rest_labels)) if b]
 
 
 REH_SIZE = 2.6        # rehearsal letter size, staff spaces

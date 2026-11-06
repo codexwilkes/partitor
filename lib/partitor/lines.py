@@ -44,7 +44,8 @@ def pad_left(s: Strip, n: int) -> Strip:
         staff_x0=s.staff_x0 + n, indent=s.indent + n,
         marks=[(mx + n, t) for mx, t in s.marks],
         bars_x=[b + n for b in s.bars_x],
-        rest_label=None if s.rest_label is None else (s.rest_label[0] + n, s.rest_label[1]))
+        rest_label=None if s.rest_label is None else (s.rest_label[0] + n, s.rest_label[1]),
+        rest_labels=[(cx + n, tx) for cx, tx in s.rest_labels])
 
 
 def staff_end(s: Strip) -> int:
@@ -118,7 +119,8 @@ def justify(s: Strip, target: int) -> Strip:
     return dc_replace(
         s, img=rp(s.img), hdr=rp(s.hdr), num_mask=rp(s.num_mask),
         marks=[(int(start[min(mx, len(start) - 1)]), t) for mx, t in s.marks],
-        bars_x=[int(start[min(b, len(start) - 1)]) for b in s.bars_x])
+        bars_x=[int(start[min(b, len(start) - 1)]) for b in s.bars_x],
+        rest_labels=[(float(start[min(int(cx), len(start) - 1)]), tx) for cx, tx in s.rest_labels])
 
 
 def short_name(name: str) -> str:
@@ -392,6 +394,187 @@ def fill_rests(items: list, opts: dict) -> list[Strip]:
 
 
 # =============================================================================
+# Bars of rests inside a line, merged (0.8.11)
+# =============================================================================
+MERGE_MIN_BARS = 2      # a run of this many rest-only bars becomes one multi-bar rest
+MERGE_EDGE_SP = 0.8     # clear of the barlines (sp)
+MERGE_SAVE_SP = 3.0     # a merge must save this much width (sp)
+MERGE_MIN_SP = 8.0      # narrowest merged measure (sp)
+
+
+def staff_lines(s: Strip) -> list[list[float]]:
+    """staff_lines -> per staff of a line (top first) the rows of its five
+    lines, read from the image: a row with ink over most of the staff is a
+    staff line; five lines one sp apart make a staff."""
+    sp = s.sp
+    x1 = staff_end(s)
+    x0 = _x0(s) + int(2 * sp)
+    if x1 - x0 < 6 * sp:
+        return []
+    frac = s.img[:, x0:x1].mean(axis=1)
+    rows = np.flatnonzero(frac >= 0.6)
+    if not rows.size:
+        return []
+    cents, cur = [], [int(rows[0])]
+    for r in rows[1:]:
+        if r - cur[-1] <= 1:
+            cur.append(int(r))
+        else:
+            cents.append(sum(cur) / len(cur))
+            cur = [int(r)]
+    cents.append(sum(cur) / len(cur))
+    out, k = [], 0
+    while k + 4 < len(cents):
+        seg = cents[k:k + 5]
+        if all(abs((b - a) - sp) <= 0.25 * sp for a, b in zip(seg, seg[1:])):
+            out.append(seg)
+            k += 5
+        else:
+            k += 1
+    return out
+
+
+def _only_measure_rests(s: Strip, lines: list[list[float]], xa: int, xb: int) -> bool:
+    """True when columns xa..xb of the line hold, on every staff, one filled
+    rest block (a whole or half rest) and nothing else but staff lines. Any
+    other ink (note, stem, rest of another length, dot, text, a number) makes
+    it False: a bar is merged only when this is certain."""
+    sp = s.sp
+    tops = [int(round(ln[0])) for ln in lines]
+    if xb - xa < 2 * sp or not tops:
+        return False
+    for m in (s.num_mask, s.hdr):
+        if m is not None and m[:, xa:xb].any():
+            return False
+    reg = s.img[:, xa:xb].copy()
+    inked = reg.mean(axis=1)
+    reg[inked >= 0.95] = False                 # staff lines run across the bar
+    for ln in lines:                           # (a line may break around a rest: clear its rows)
+        for c in ln:
+            reg[max(0, int(round(c)) - 1):int(round(c)) + 2] = False
+    y0, y1 = tops[0], min(reg.shape[0], tops[-1] + int(round(4 * sp)) + 1)
+    reg[:, reg[y0:y1].mean(axis=0) >= 0.85] = False    # a barline (thick, double) crosses all staves
+    th = max(1, int(round(0.3 * sp)))
+    near = np.zeros(reg.shape[0], bool)
+    for t in tops:                             # rows of each staff, with the edge of a line
+        near[max(0, t - th):min(len(near), t + int(round(4 * sp)) + th + 1)] = True
+    if reg[~near].any():                       # ink above, below or between the staves
+        return False
+    for t in tops:
+        y0, y1 = max(0, t - th), min(reg.shape[0], t + int(round(4 * sp)) + th + 1)
+        part = reg[y0:y1]
+        if not part.any():
+            return False
+        n, lab, stats, _ = cv2.connectedComponentsWithStats(part.astype(np.uint8), connectivity=8)
+        if n != 2:                             # background and one block
+            return False
+        w, h, area = (int(stats[1, cv2.CC_STAT_WIDTH]), int(stats[1, cv2.CC_STAT_HEIGHT]),
+                      int(stats[1, cv2.CC_STAT_AREA]))
+        if not (0.8 * sp <= w <= 2.2 * sp and 0.25 * sp <= h <= 0.75 * sp
+                and area >= 0.85 * w * h):
+            return False
+    return True
+
+
+def rest_bar_runs(s: Strip, pre_x: int | None) -> list[tuple[int, int]]:
+    """rest_bar_runs -> [(first bar, last bar)] runs of MERGE_MIN_BARS or more
+    bars of a line that hold only measure rests on every staff. pre_x: where
+    the music of bar 0 starts (None: bar 0 is never merged)."""
+    if s.rest_src is not None or not s.ends_at_bar or len(s.bars_x) < MERGE_MIN_BARS:
+        return []
+    lines = staff_lines(s)
+    if not lines or abs(lines[0][0] - s.staff_top) > max(2, int(0.2 * s.sp)):   # (the line centre is off by a pixel)
+        return []
+    e = int(MERGE_EDGE_SP * s.sp)
+    ok = []
+    for b, bx in enumerate(s.bars_x):
+        if b == 0:
+            xa = pre_x
+            lo = 0
+        else:
+            xa = s.bars_x[b - 1] + e
+            lo = s.bars_x[b - 1] - int(1.5 * s.sp)
+        if xa is None or any(lo <= mx < bx for mx, _ in s.marks):
+            ok.append(False)
+            continue
+        ok.append(_only_measure_rests(s, lines, xa, bx - e))
+    runs, b = [], 0
+    while b < len(ok):
+        if not ok[b]:
+            b += 1
+            continue
+        z = b
+        while z + 1 < len(ok) and ok[z + 1]:
+            z += 1
+        if z - b + 1 >= MERGE_MIN_BARS:
+            runs.append((b, z))
+        b = z + 1
+    return runs
+
+
+def merge_rest_bars(strips: list[Strip], opts: dict, pre: list | None = None) -> list[Strip]:
+    """merge_rest_bars -> the lines with each run of bars that hold only
+    measure rests on every staff made one multi-bar rest (an H-bar on each
+    staff, the count above the top staff). `rests: keep` leaves the lines
+    alone. Never a bar with a note, a mark or a number. A line that is only
+    rests has its own treatment (RestRun); lines that cannot be cut are kept."""
+    if opts.get("rests", "compress") != "compress":
+        return strips
+    pre = find_prefixes(strips) if pre is None else pre
+    out = []
+    for i, s in enumerate(strips):
+        runs = rest_bar_runs(s, pre[i][0] if pre[i] is not None else None)
+        for b0, b1 in reversed(runs):
+            s = _merge_run(s, b0, b1, pre[i][0] if pre[i] is not None else 0)
+        out.append(s)
+    return out
+
+
+def _merge_run(s: Strip, b0: int, b1: int, pre_x: int) -> Strip:
+    """_merge_run -> the line with bars b0..b1 (a run found by rest_bar_runs)
+    made one measure."""
+    sp = s.sp
+    e = int(MERGE_EDGE_SP * sp)
+    xa = pre_x if b0 == 0 else s.bars_x[b0 - 1] + e
+    xb = s.bars_x[b1] - e
+    orig = xb - xa
+    w = int(max(MERGE_MIN_SP * sp, min(REST_BAR_SP * sp, 0.85 * orig)))
+    if orig - w < MERGE_SAVE_SP * sp:
+        return s
+    tops = [int(round(ln[0])) for ln in staff_lines(s)]
+    col = s.img[:, min(xb - 1, xa + int(sp))].copy()      # staff lines only
+    h = s.img.shape[0]
+    block = np.repeat(col[:, None], w, axis=1)
+    th = max(1, int(round(0.1 * sp)))
+    h4 = int(round(4 * sp))
+    sw = max(4, int(round(0.5 * sp)))
+    for t in tops:
+        mid = t + int(round(2 * sp))
+        a, b = int(2 * sp), w - int(2 * sp)
+        block[max(0, mid - int(0.45 * sp)):mid + int(0.45 * sp) + 1, a:b] = True
+        for xx in (a, b - sw):
+            block[t:min(h, t + h4 + th), xx:xx + sw] = True
+
+    def splice(m: np.ndarray | None, fill: np.ndarray | None) -> np.ndarray | None:
+        if m is None:
+            return None
+        return np.concatenate([m[:, :xa], np.zeros((h, w), bool) if fill is None else fill,
+                               m[:, xb:]], axis=1)
+    delta = w - orig
+    img = splice(s.img, block)
+    inner = set(range(b0, b1))                    # barlines inside the run go
+    bars_x = [x if k < b0 else x + delta for k, x in enumerate(s.bars_x) if k not in inner]
+    # the merged bar keeps the number of its first bar
+    nums = [n for k, n in enumerate(s.bar_nums) if not (b0 < k <= b1)]
+    marks = [(mx if mx < xa else mx + delta, t) for mx, t in s.marks]
+    labels = [(cx if cx < xa else cx + delta, t) for cx, t in s.rest_labels]
+    labels.append((xa + w / 2.0, str(b1 - b0 + 1)))
+    labels.sort()
+    return dc_replace(s, img=img, hdr=splice(s.hdr, None), num_mask=splice(s.num_mask, None),
+                      bars_x=bars_x, bar_nums=nums, marks=marks, rest_labels=labels)
+
+
+# =============================================================================
 # Cached lines (0.3.0-dev.37, `repage`)
 # =============================================================================
 # A build keeps the finished lines of each part (after finish_lines: justified,
@@ -400,6 +583,10 @@ def fill_rests(items: list, opts: dict) -> list[Strip]:
 # a gzip pickle read by a restricted unpickler (numpy arrays and the Strip and
 # RestRun classes only). LINES_FORMAT changes with the fields of Strip.
 LINES_FORMAT = 1
+# Fields added to Strip after the format shipped, with their defaults: a file
+# written before the field loads (the lines have none of it); any other
+# difference in the fields still means "rebuild the part".
+_FIELD_DEFAULTS = {"rest_labels": list}
 _NP_OK = {"_reconstruct", "ndarray", "dtype", "scalar", "_frombuffer"}
 
 
@@ -451,10 +638,16 @@ def load_lines(path: Path) -> dict:
             d = _LinesUnpickler(f).load()
     except (OSError, EOFError, pickle.UnpicklingError, AttributeError, ValueError) as e:
         raise ValueError(f"saved lines cannot be read ({path.name}: {e}): rebuild the part")
-    if not isinstance(d, dict) or d.get("format") != LINES_FORMAT \
-       or d.get("fields") != strip_fields():
-        raise ValueError(f"saved lines are from another partitor ({d.get('version', '?')} "
+    cur = strip_fields()
+    fields = d.get("fields") if isinstance(d, dict) else None
+    missing = [f for f in cur if isinstance(fields, list) and f not in fields]
+    if not isinstance(d, dict) or d.get("format") != LINES_FORMAT or not isinstance(fields, list) \
+       or any(f not in cur for f in fields) or any(f not in _FIELD_DEFAULTS for f in missing):
+        raise ValueError(f"saved lines are from another partitor ({d.get('version', '?') if isinstance(d, dict) else '?'} "
                          f"{path.name}): rebuild the part")
+    for s in d.get("strips", []):                  # a file from before the field: the default
+        for f in missing:
+            s.__dict__.setdefault(f, _FIELD_DEFAULTS[f]())
     return d
 
 

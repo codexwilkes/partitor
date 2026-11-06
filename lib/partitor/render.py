@@ -19,7 +19,7 @@ from .model import Strip
 from .reflow import find_prefixes, reflow, reflow_caps
 from .turnplan import Boundary, plan_turns
 from .strips import (
-    REH_PAD, ambitus_width, anchor, bar_mark, bar_x, pitches, reh_boxes, rest_box,
+    REH_PAD, ambitus_width, anchor, bar_mark, bar_x, pitches, reh_boxes, rest_boxes,
 )
 from .typography import (
     FILL_COST, MIN_LAST_LINES, PAGE_COST, REPAGE_FILL, REST_TURN_MIN, SHORT_LAST, TURN_BAD,
@@ -803,8 +803,7 @@ def draw_face(page: pymupdf.Page, pg: list, strips: list[Strip], name: str, meta
             page.draw_rect(r, color=(0, 0, 0), width=max(0.6, 0.12 * s.sp * k))
             put_text(page, (x + (bx0 + REH_PAD * s.sp) * k, top + y + bl * k),
                      letter, "bold", fs * k)
-        rb = rest_box(s)
-        if rb:
+        for rb in rest_boxes(s):
             put_text(page, (x + rb[0] * k, top + y + rb[3] * k), rb[5], rb[6], rb[4] * k)
         for xl_, bot_, clef_, lo_, hi_, *alt_ in s.ambitus_marks:
             draw_ambitus(page, x + xl_ * k, top + y + bot_ * k, clef_, lo_, hi_,

@@ -114,7 +114,7 @@ Rules:
 | `groups` | `{trombones: [Trombone, Basso Trombone I]}` | Named group outputs (§4.3 item 11). |
 | `skip` | `[Organ R]` | Parts not extracted (no PDF). They stay in `parts` and in the maps, marked "not extracted". |
 | `ink` | `normal` | `normal` or `darker` (§4.3 item 10). |
-| `rests` | `compress` | `compress` or `keep`: multi-bar rest lines for left-out staves (§4.2 item 9). |
+| `rests` | `compress` | `compress` or `keep`: multi-bar rest lines for left-out staves and for runs of rest-only bars inside a line (§4.2 item 9). |
 | `min_staff_mm`, `max_staff_mm` | `5`, `8` | Staff height floor and ceiling in mm (§5.2). |
 | `reflow_offer` | `off` | `on`: the CLI offers re-flow after a build when the print is small (§4.2 item 2). `reflow=on` works with either value. |
 | `logo` | `on` | `on` or `off`. Draws the logo on title and back pages (§5.5). Needs a logo: `PARTITOR_LOGO` or `logo.png` in the library folder. |
@@ -245,8 +245,19 @@ notehead, slur or word goes whole to one owner.
    line-start numbers when the next system has one (a printed number corrects
    a wrong barline count), else the counted bars. A movement start begins a
    new rest line and keeps the movement title. The H-bar has a bracket at
-   each end: full staff height, 0.5 sp thick. Not built: rests inside a staff
-   that is printed (whole-bar rests stay as engraved), "tacet".
+   each end: full staff height, 0.5 sp thick. "Tacet" is not built.
+   Bars of rests inside a line that is printed (0.8.11, `merge_rest_bars` in
+   `lines`, before re-flow): a run of 2 or more bars is one measure when every
+   staff of the line holds, in that bar, one filled rest block (a whole or half
+   rest) and nothing else but staff lines and barlines. The bar becomes an
+   H-bar with brackets on each staff and the count above the top staff
+   (`Strip.rest_labels`); the barlines inside the run go, the merged bar keeps
+   the number of its first bar, and the line gets shorter, so re-flow and the
+   planner see fewer lines. The test is made for certain: a note, a stem, a
+   hollow whole note, a rest of another length, a dot, text, a rehearsal mark
+   or a printed number keeps the bar as engraved. A run whose merge saves
+   less than 3 sp is not made. The bar after a clef and key needs the music
+   start of its line (re-flow's prefix). `rests: keep` turns it off.
 
 ### 4.3 Engine robustness
 
