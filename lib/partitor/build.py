@@ -725,7 +725,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                "turns": len(tl), "bad_turns": nbad,
                "file": fn.name, **({"large": big.name} if big else {}),
                **({"foldout": LAST_RENDER["foldout"], "foldouts": LAST_RENDER["foldouts"],
-                   "assemble": LAST_RENDER["assemble"]} if LAST_RENDER.get("foldout") else {}),
+                   "flaps": LAST_RENDER["flaps"], "assemble": LAST_RENDER["assemble"]} if LAST_RENDER.get("foldout") else {}),
                **({"group": True} if extra.get("members") else {})}
         flow = f" (re-flowed from {nsrc})" if opts.get("reflow") == "on" else ""
         _ok(f"{name}:  {len(strips)} lines{flow}  {n} page(s)  staff {h_mm:.1f} mm  "

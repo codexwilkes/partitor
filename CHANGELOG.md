@@ -8,6 +8,27 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.12 — 2026-11-06
+
+### Added
+
+- A second way to make a fold-out, for a printer without ledger paper. A part
+  with fold-outs now has a file `NN-part-foldout-flaps.pdf`: one Letter page per
+  flap, printed on one side. Cut at the dotted line and tape the flap to the
+  outer edge of its page.
+- `NN-part-assemble.txt` describes both ways (A: ledger sheets, cut and fold;
+  B: Letter flaps, cut and tape), the pages of the part file to print for way A,
+  and for each flap the page and edge it is taped to.
+
+### Changed
+
+- The part file is complete: it holds every leaf except the flaps. Print all of
+  it for the tape route, or only the listed pages for the ledger route (a ledger
+  sheet replaces two consecutive pages). Before, the file had gaps.
+- `plan` and the build name both ways: "2 fold-out sheets (17 x 11 in), or 2
+  Letter flaps to tape". The record of the part in `score.yaml` has `flaps`.
+- Docs: the guide, DESIGN §5.7 and the library layout describe the four files.
+
 ## 0.8.11 — 2026-11-06
 
 ### Added

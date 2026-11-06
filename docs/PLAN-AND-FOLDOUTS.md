@@ -74,7 +74,7 @@ accept one bad turn, or fewer sheets to assemble.
 When you choose an option that needs fold-outs, `plan` says so:
 
 ```
-plan:  Trombones: needs 2 fold-out sheets (17 x 11 in, a second file); the build writes the print and assembly steps to a text file next to the PDFs
+plan:  Trombones: needs 2 fold-out sheets (17 x 11 in), or 2 Letter flaps to tape; the build writes the print and assembly steps to a text file next to the PDFs
 ```
 
 ## Try a group of parts
@@ -92,33 +92,43 @@ table is shown. The item does not change. To keep a group, define it with
 
 ## Print and assemble
 
-A part with fold-outs has three files in `parts/`:
+A part with fold-outs has four files in `parts/`:
 
-- the part file, with Letter pages;
-- a file that ends in `-foldout-sheets.pdf`, with one ledger sheet (17 × 11 in)
-  for each fold-out. A sheet is two PDF pages: front, then back;
-- a file that ends in `-assemble.txt`: these steps, with the place of each
-  sheet in your part.
+- the part file: every page on Letter, except the flaps;
+- a file that ends in `-foldout-sheets.pdf`: one ledger sheet (17 × 11 in) for
+  each fold-out. A sheet is two PDF pages: front, then back;
+- a file that ends in `-foldout-flaps.pdf`: one Letter page for each flap;
+- a file that ends in `-assemble.txt`: the steps below, with the pages and
+  places of your part.
 
-Print:
+Make each fold-out one of two ways. The pages are the same. Use the way your
+printer allows. Different people can print different parts in different ways.
 
-1. Part file: double-sided, flip on the long edge.
+**A. Ledger printer (cut and fold).**
+
+1. Part file: double-sided, flip on the long edge. Print only the pages that
+   `-assemble.txt` lists (the sheets replace the others).
 2. Sheet file: ledger paper, double-sided, flip on the short edge.
+3. Cut each sheet along the dotted "cut" line. This takes about ½ in off the
+   free edge of the flap.
+4. Fold along the dotted line in the middle. The flap folds forward over its page.
+5. Put each sheet in the place that `-assemble.txt` gives ("in place of pages
+   3 and 4 of the part file").
 
-Each sheet page has a line at the foot with the sheet number, the flip edge
-and the place. If a sheet comes out wrong, you can read it there.
+**B. Letter printer only (cut and tape).**
 
-Assemble:
+1. Part file: double-sided, flip on the long edge, all pages.
+2. Flap file: Letter, one side only. Each page is one flap.
+3. Cut each flap along the dotted "cut" line (about ½ in off the free edge).
+4. Put the flap next to its page, edge to edge. The page and edge are on the
+   flap ("Tape the left edge of this page to the right edge of page 2a/30")
+   and in `-assemble.txt`. Tape the joint on the back with narrow tape. Fold the
+   flap forward over its page.
 
-1. The dotted lines are on the front of each sheet only. Cut along the dotted "cut" line. This takes about ½ in off
-   the free edge of the flap, so the flap is a little narrower than the page.
-2. Fold along the dotted line in the middle. The flap folds forward over its
-   page.
-3. The part file has no page for the leaves that are on a sheet. The page
-   numbers (for example 1/32, then 3/32) show where each sheet goes, and
-   `-assemble.txt` lists the place of each ("after page 1/32 of the part
-   file"). Put each sheet in the gap.
-4. Punch or bind the stack.
+Then punch or bind the stack.
+
+Each sheet page and each flap page has a line at the foot with its number, the
+print setting and the place. If a page comes out wrong, you can read it there.
 
 A sheet is one leaf. Its flap is on the outer edge. Its other face (the back
 of the bound half) is a normal page of the part. A fold-out has three faces

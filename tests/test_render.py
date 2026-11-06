@@ -635,30 +635,95 @@ class TestFoldoutRender(unittest.TestCase):
             self.assertIn("2b/2", txt)                                # the flap
             self.assertEqual(len(pymupdf.open(out)) % 2, 0)           # leaves print in pairs
 
-    def test_assemble_text_says_how_to_print_and_where_each_sheet_goes(self):
+    def test_assemble_text_gives_both_ways_and_where_each_fold_out_goes(self):
         import re
         for side in ("right", "left"):
             with tempfile.TemporaryDirectory() as d:
                 _, _, info = self.render(d, self.music(120, rests={38, 95}), foldside=side)
                 self.assertEqual(info["assemble"], "p-assemble.txt")
+                self.assertEqual(info["flaps"], "p-foldout-flaps.pdf")
                 txt = Path(d, "p-assemble.txt").read_text(encoding="utf-8")
                 n = info["foldouts"]
-                self.assertIn(f"{n} fold-out sheet", txt)
-                self.assertIn("p.pdf", txt)
-                self.assertIn("p-foldout-sheets.pdf", txt)
+                self.assertIn(f"{n} fold-out", txt)
+                for name in ("p.pdf", "p-foldout-sheets.pdf", "p-foldout-flaps.pdf"):
+                    self.assertIn(name, txt)
+                self.assertIn("A. With a ledger printer", txt)
+                self.assertIn("B. With a Letter printer only", txt)
                 self.assertIn("flip on the long edge", txt.lower())
                 self.assertIn("flip on the short edge", txt.lower())
                 self.assertIn("17 x 11 in", txt)
-                places = re.findall(r"Sheet (\d+) of (\d+): (after page \d+/\d+ of the part file|at the start"
-                                    r"[^.]*)\. It replaces leaves? ([\d and]+) of (\d+)\.", txt)
-                self.assertEqual(len(places), n, txt)
-                self.assertEqual([int(x[0]) for x in places], list(range(1, n + 1)))
-                for _, _, where, _, total in places:                # the gap really is where the text says
-                    m = re.search(r"after page (\d+)/(\d+)", where)
-                    if m:
-                        self.assertEqual(m.group(2), total)
-                pdf = " ".join(pg.get_text() for pg in pymupdf.open(Path(d, "p.pdf")))
-                self.assertIn("/" + places[0][4], pdf)
+                sheets = re.findall(r"Sheet (\d+) of (\d+): in place of pages? ([\d and]+) of the part file "
+                                    r"\(pages ([\w/ and]+)\)\.", txt)
+                flaps = re.findall(r"Flap (\d+) of (\d+): tape its (left|right) edge to the (left|right) edge of "
+                                   r"page (\w+/\d+) \(page (\d+) of the part file\)\.", txt)
+                self.assertEqual(len(sheets), n, txt)
+                self.assertEqual(len(flaps), n, txt)
+                total = len(pymupdf.open(Path(d, "p.pdf")))
+                for (_, _, pages, labels), fl in zip(sheets, flaps):
+                    nums = [int(x) for x in re.findall(r"\d+", pages)]
+                    self.assertTrue(all(1 <= x <= total for x in nums))
+                    self.assertEqual(fl[2], "left" if side == "right" else "right")   # flap edge vs page edge
+                    self.assertEqual(fl[3], side)
+                pdf = pymupdf.open(Path(d, "p.pdf"))
+                for fl in flaps:                      # the page the flap is taped to is that page
+                    self.assertIn(fl[4], pdf[int(fl[5]) - 1].get_text())
+
+    def test_the_part_file_is_complete_and_the_flaps_are_separate(self):
+        import re
+        for side in ("right", "left"):
+            with tempfile.TemporaryDirectory() as d:
+                out, _, info = self.render(d, self.music(120, rests={38, 95}), foldside=side)
+                word = lambda pg: [w[4] for w in pg.get_text("words") if re.fullmatch(r"\d+[ab]?/\d+", w[4])]
+                main = [w for pg in pymupdf.open(out) for w in word(pg)]
+                flaps = pymupdf.open(Path(d, "p-foldout-flaps.pdf"))
+                self.assertEqual(len(flaps), info["foldouts"])
+                flap = re.search(r"flap (\d+[ab]/\d+)\.", " ".join(flaps[0].get_text().split())).group(1)
+                self.assertNotIn(flap, main)                        # a flap is not in the part file
+                leaves = sorted(int(re.match(r"\d+", w).group()) for w in main)
+                total = int(main[0].split("/")[1])
+                self.assertEqual(sorted(set(leaves)), list(range(1, total + 1)))   # every leaf is there
+
+    def test_the_flap_page_is_letter_with_a_cut_line_and_a_tape_edge(self):
+        for side in ("right", "left"):
+            with tempfile.TemporaryDirectory() as d:
+                self.render(d, self.music(120, rests={38, 95}), foldside=side)
+                pg = pymupdf.open(Path(d, "p-foldout-flaps.pdf"))[0]
+                self.assertEqual((round(pg.rect.width), round(pg.rect.height)), (612, 792))
+                dashed = [x for x in pg.get_drawings() if x.get("dashes") and "[" in x["dashes"]]
+                self.assertEqual(len(dashed), 1, side)                           # the cut only
+                cut = dashed[0]["rect"].x0
+                self.assertAlmostEqual(cut, 612.0 - pt.TRIM_PT if side == "right" else pt.TRIM_PT, delta=1.0)
+                txt = " ".join(pg.get_text().split())
+                self.assertIn("tape edge", txt)
+                self.assertIn("Print on one side only", txt)
+                boxes = [pymupdf.Rect(b["bbox"]) for b in pg.get_image_info()]
+                self.assertTrue(boxes)
+                if side == "right":      # fold edge at the left of the page, free edge inside the cut
+                    self.assertLessEqual(max(b.x1 for b in boxes), cut - pt.mm2pt(5.0) + 0.5)
+                else:
+                    self.assertGreaterEqual(min(b.x0 for b in boxes), cut + pt.mm2pt(5.0) - 0.5)
+
+    def test_page_ranges_skip_the_sheet_pages(self):
+        self.assertEqual(pt.page_ranges([5, 6], 10), "1-4, 7-10")
+        self.assertEqual(pt.page_ranges([1, 2], 4), "3-4")
+        self.assertEqual(pt.page_ranges([3], 4), "1-2, 4")
+        self.assertEqual(pt.page_ranges([], 3), "1-3")
+
+    def test_the_print_range_leaves_out_exactly_the_sheet_pages(self):
+        import re
+        with tempfile.TemporaryDirectory() as d:
+            out, _, info = self.render(d, self.music(120, rests={38, 95}))
+            txt = Path(d, "p-assemble.txt").read_text(encoding="utf-8")
+            rng = re.search(r"Print only these pages: ([\d, -]+)\.", txt).group(1)
+            printed = set()
+            for part in rng.split(", "):
+                a, _, b = part.partition("-")
+                printed |= set(range(int(a), int(b or a) + 1))
+            total = len(pymupdf.open(out))
+            skipped = sorted(set(range(1, total + 1)) - printed)
+            listed = sorted(int(x) for m in re.findall(r"in place of pages? ([\d and]+) of", txt)
+                            for x in re.findall(r"\d+", m))
+            self.assertEqual(skipped, listed)
 
     def test_every_sheet_page_carries_the_printing_line(self):
         with tempfile.TemporaryDirectory() as d:
@@ -672,7 +737,9 @@ class TestFoldoutRender(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             _, _, info = self.render(d, self.music(40, rests={9, 17, 25, 33}))
             self.assertIsNone(info["assemble"])
+            self.assertIsNone(info["flaps"])
             self.assertFalse(Path(d, "p-assemble.txt").exists())
+            self.assertFalse(Path(d, "p-foldout-flaps.pdf").exists())
 
     def test_the_dotted_guides_are_on_the_front_only(self):
         for side in ("right", "left"):
@@ -690,6 +757,8 @@ class TestFoldoutRender(unittest.TestCase):
         self.assertEqual(pt.sheet_text("letter", 0), "")
         self.assertIn("1 fold-out sheet (17 x 11 in", pt.sheet_text("letter", 1))
         self.assertIn("2 fold-out sheets (A3", pt.sheet_text("a4", 2))
+        self.assertIn("or 2 Letter flaps to tape", pt.sheet_text("a4", 2))
+        self.assertIn("or 1 Letter flap to tape", pt.sheet_text("letter", 1))
 
     def test_folio_numbers_count_leaves_and_the_flap_is_b(self):
         with tempfile.TemporaryDirectory() as d:
@@ -728,11 +797,10 @@ class TestFoldoutRender(unittest.TestCase):
             self.assertEqual(sorted(word(sh[0], r"\d+[ab]/\d+")), sorted([f"3a/{total}", f"3b/{total}"]))
             self.assertEqual(word(sh[1], r"\d+/\d+")[:1] or [], [f"2/{total}"])      # the previous recto
             main = pymupdf.open(out)
-            labels = {w for pg in main for w in word(pg, r"\d+/\d+")}
-            self.assertIn(f"1/{total}", labels)
-            self.assertIn(f"4/{total}", labels)
-            self.assertNotIn(f"2/{total}", labels)                                  # both are on the sheet
-            self.assertNotIn(f"3/{total}", labels)
+            labels = {w for pg in main for w in word(pg, r"\d+[ab]?/\d+")}
+            for lab in (f"1/{total}", f"2/{total}", f"3b/{total}", f"4/{total}"):    # the part file is complete
+                self.assertIn(lab, labels)
+            self.assertNotIn(f"3a/{total}", labels)                                  # but for the flap
 
     def test_the_left_flap_is_on_the_left_inside_the_trimmed_edge(self):
         with tempfile.TemporaryDirectory() as d:

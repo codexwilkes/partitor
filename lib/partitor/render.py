@@ -885,16 +885,19 @@ def flap_margins(opts: dict, width: float, flap_width: float) -> tuple[float, fl
 def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict,
                 out: Path, pages: list, title_page: bool, plan, breaks: list[int]) -> int:
     """render_plan -> physical page count of the part PDF. The part of a plan
-    with fold-outs (DESIGN.md §5.7): out holds the Letter pages; the sheets of
-    the fold-outs are in <out>-foldout-sheets.pdf, one ledger sheet (two pages: front
-    and back) per fold-out. A sheet is one leaf with a flap on its outer edge.
+    with fold-outs (DESIGN.md §5.7): out holds every leaf as Letter pages
+    except the flaps. A fold-out has two ways to be made, and both files are
+    written: <out>-foldout-sheets.pdf holds one ledger sheet (two pages: front
+    and back) per fold-out, to replace the two part pages of its leaf; and
+    <out>-foldout-flaps.pdf holds each flap on a Letter page, to cut and tape to
+    its page. A sheet is one leaf with a flap on its outer edge.
     Right fold-out (verso, recto, flap): the front of the sheet is the recto and
     the flap, its back the verso of the next group. Left fold-out (flap, verso,
     recto): one side is the flap and the verso, the other the last recto of the
     previous group. Page numbers count leaves: the recto is 7a and the flap 7b
     (right); the flap 6a and the verso 6b (left). The flap is trimmed 1/2 in at
     its free edge and folds forward over its page. <out>-assemble.txt says how to
-    print the two files and where each sheet goes."""
+    print the files and how each fold-out is made."""
     pw, ph = PAPER[opts["paper"]]
     k = 72.0 / dpi * (opts.get("scale") or 1.0)
     left_ink = max(anchor(s) for s in strips)
@@ -942,7 +945,7 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
                  head_right: bool) -> Face:
         return Face(x0=x0, width=width, height=ph, ml=ml, mr=mr, mt=mt, mb=mb,
                     title_band=(f["idx"] == 0 and not title_page), head_right=head_right,
-                    folio=f["label"], last=(f["idx"] == nfaces - 1 and f["sheet"] is None))
+                    folio=f["label"], last=(f["idx"] == nfaces - 1 and f["role"] != "flap"))
 
     def put(sheet: pymupdf.Page, f: dict, x0: float, width: float | None = None,
             margins: tuple | None = None) -> None:
@@ -958,10 +961,11 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
         page = doc.new_page(width=pw, height=ph)
         _title_page(page, name, meta, page_box(opts, 0, True), logo_wanted(opts), opts)
     for f in faces:
-        if f["sheet"] is not None:
+        if f["role"] == "flap":                  # a flap is on a sheet or in the flaps file
             continue
         page = doc.new_page(width=pw, height=ph)
         put(page, f, 0.0)
+        f["pdf"] = len(doc)
     if plan.folds and len(doc) % 2:
         doc.new_page(width=pw, height=ph)          # a blank back: the leaves print in pairs
     doc.save(out, garbage=3, deflate=True)
@@ -1004,16 +1008,37 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
                           "Back of the sheet (outside of the flap: blank). Cut and fold on the front lines.",
                           hint, lines=False)
         sheets.save(foldout, garbage=3, deflate=True)
+        flaps_pdf = out.with_name(out.stem + FLAPS_TAIL)
+        flaps = pymupdf.open()
+        for gi, g in enumerate(plan.groups):       # one Letter page per flap, for the tape route
+            if not g.fold:
+                continue
+            ff = next(f for f in faces if f["group"] == gi and f["role"] == "flap")
+            left = g.side == "left"
+            pl = places[gi]
+            pg = flaps.new_page(width=pw, height=ph)
+            if left:                 # the flap's fold edge is the right edge of the page
+                put(pg, ff, TRIM_PT, flap_w, (em, fm))
+            else:                    # the fold edge is the left edge of the page
+                put(pg, ff, 0.0, flap_w, (fm, em))
+            _flap_guides(pg, TRIM_PT if left else flap_w, pw if left else 0.0, ph, mt,
+                         f"{name}: flap {ff['label']}. Cut at the dotted line.",
+                         f"Flap {pl['sheet']} of {len(places)}. Print on one side only. Tape the "
+                         f"{'right' if left else 'left'} edge of this page to the {pl['edge']} edge of "
+                         f"page {pl['bound_label']}.")
+        flaps.save(flaps_pdf, garbage=3, deflate=True)
         assemble = out.with_name(out.stem + ASSEMBLE_TAIL)
-        assemble.write_text(assemble_text(name, out.name, foldout.name, pw, ph, places, total, title_page),
-                            encoding="utf-8")
+        assemble.write_text(assemble_text(name, out.name, foldout.name, flaps_pdf.name, pw, ph, places,
+                                          len(doc)), encoding="utf-8")
     LAST_RENDER.update(content=nfaces, title_page=title_page, foldouts=plan.folds,
                        foldout=foldout.name if foldout else None,
+                       flaps=flaps_pdf.name if foldout else None,
                        assemble=assemble.name if foldout else None)
     return len(doc)
 
 
 FOLDOUT_TAIL = "-foldout-sheets.pdf"      # <part>.pdf -> <part>-foldout-sheets.pdf
+FLAPS_TAIL = "-foldout-flaps.pdf"         # <part>.pdf -> <part>-foldout-flaps.pdf
 ASSEMBLE_TAIL = "-assemble.txt"           # <part>.pdf -> <part>-assemble.txt
 
 
@@ -1022,31 +1047,50 @@ def sheet_text(paper: str, folds: int) -> str:
     if not folds:
         return ""
     big = {"letter": "17 x 11 in", "a4": "A3"}.get(paper, "double width")
-    return f"{folds} fold-out sheet{'s' if folds != 1 else ''} ({big}, a second file)"
+    return (f"{folds} fold-out sheet{'s' if folds != 1 else ''} ({big}), or {folds} Letter "
+            f"flap{'s' if folds != 1 else ''} to tape")
 
 
 def sheet_places(faces: list[dict], plan, title_page: bool) -> dict:
-    """sheet_places -> {group index: {sheet, leaves, where}} for each fold-out sheet, in book order.
-    leaves: the leaf numbers the sheet replaces. where: the place in the part file."""
+    """sheet_places -> {group index: place} for each fold-out, in book order. place:
+    sheet (number), leaves (the leaf numbers the sheet replaces), pdf (the part
+    file pages the sheet replaces, 1-based), labels (their page labels), where
+    (text), bound_label (page the flap is taped to), edge (of that page: left or
+    right)."""
     out = {}
-    loose = [f for f in faces if f["sheet"] is None]          # the faces of the part file
     for gi, g in enumerate(plan.groups):
         if not g.fold:
             continue
-        mine = [f for f in faces if f["sheet"] == gi]
-        leaves = sorted({f["leaf"] for f in mine})
-        before = [f for f in loose if f["leaf"] < leaves[0]]
-        if before:
-            where = f"after page {before[-1]['label']} of the part file"
-        else:
-            where = "at the start of the part file" + (", after the title page" if title_page else "")
-        out[gi] = {"sheet": len(out) + 1, "leaves": leaves, "where": where}
+        mine = [f for f in faces if f["sheet"] == gi and f["role"] != "flap"]
+        mine.sort(key=lambda f: f["pdf"])
+        fb = next(f for f in faces if f["group"] == gi and f["role"] == "bound")
+        pdf = [f["pdf"] for f in mine]
+        out[gi] = {"sheet": len(out) + 1, "leaves": sorted({f["leaf"] for f in mine}), "pdf": pdf,
+                   "labels": [f["label"] for f in mine], "bound_label": fb["label"], "bound_pdf": fb["pdf"],
+                   "edge": "left" if g.side == "left" else "right",
+                   "where": ("in place of page" + ("s " if len(pdf) > 1 else " ")
+                             + " and ".join(str(x) for x in pdf) + " of the part file")}
     return out
 
 
-def assemble_text(name: str, part_file: str, sheet_file: str, pw: float, ph: float,
-                  places: dict, total: int, title_page: bool) -> str:
-    """assemble_text -> the text of <part>-assemble.txt: what to print and where each sheet goes."""
+def page_ranges(pages: list[int], total: int) -> str:
+    """page_ranges -> '1-4, 7-9' for the pages 1..total without `pages`."""
+    skip = set(pages)
+    out, a = [], None
+    for n in range(1, total + 2):
+        keep = n <= total and n not in skip
+        if keep and a is None:
+            a = n
+        elif not keep and a is not None:
+            out.append(str(a) if n - 1 == a else f"{a}-{n - 1}")
+            a = None
+    return ", ".join(out)
+
+
+def assemble_text(name: str, part_file: str, sheet_file: str, flap_file: str, pw: float, ph: float,
+                  places: dict, total: int) -> str:
+    """assemble_text -> the text of <part>-assemble.txt: the two ways to make the
+    fold-outs, what to print for each, and where each one goes."""
     if (pw, ph) == PAPER["letter"]:
         big = "ledger paper (17 x 11 in)"
     elif (pw, ph) == PAPER["a4"]:
@@ -1055,23 +1099,40 @@ def assemble_text(name: str, part_file: str, sheet_file: str, pw: float, ph: flo
         big = f"paper {2 * pw / 72:.1f} x {ph / 72:.1f} in"
     small = {PAPER["letter"]: "Letter paper (8.5 x 11 in)", PAPER["a4"]: "A4 paper"}.get((pw, ph), "the part paper")
     n = len(places)
+    plural = "s" if n != 1 else ""
+    every = sorted(x for p in places.values() for x in p["pdf"])
+    rng = page_ranges(every, total)
     out = [f"{name}: print and assemble", "",
-           f"This part has {n} fold-out sheet{'s' if n != 1 else ''}. A fold-out gives the player "
-           "three pages with no page turn.", "",
+           f"This part has {n} fold-out{plural}. A fold-out gives the player three pages with no page turn.",
+           "Make each fold-out in one of two ways. Both ways give the same pages.", "",
+           "A. With a ledger printer (cut and fold)", "",
            "1. Print the part file", f"   {part_file}",
            f"   on {small}, double-sided. Flip on the long edge.",
+           f"   Print only these pages: {rng}. The other pages come from the sheets.",
            "2. Print the sheet file", f"   {sheet_file}",
            f"   on {big}, double-sided. Flip on the short edge.",
            "   Each sheet is two PDF pages: the front, then the back.",
            "3. On each sheet, cut at the dotted line marked 'cut'. This takes 1/2 in off the flap.",
            "4. Fold each sheet at the dotted line in the middle. The flap folds forward over its page.",
-           "5. Put each sheet in its place. The part file has no page for these leaves.",
-           "   The page numbers show the gap.", ""]
+           "5. Put each sheet in its place in the printed stack:", ""]
     for gi in sorted(places):
         p = places[gi]
-        lv = " and ".join(str(x) for x in p["leaves"])
-        out.append(f"   Sheet {p['sheet']} of {n}: {p['where']}. It replaces {'leaves' if len(p['leaves']) > 1 else 'leaf'} {lv} of {total}.")
-    out += ["", "6. Punch or bind the stack.", "",
+        out.append(f"   Sheet {p['sheet']} of {n}: {p['where']} (pages {' and '.join(p['labels'])}).")
+    out += ["", "B. With a Letter printer only (cut and tape)", "",
+            "1. Print the part file", f"   {part_file}",
+            f"   on {small}, double-sided, all pages. Flip on the long edge.",
+            "2. Print the flap file", f"   {flap_file}",
+            f"   on {small}, one side only. Each page is one flap.",
+            "3. On each flap page, cut at the dotted line marked 'cut'. This takes 1/2 in off the flap.",
+            "4. Put the flap next to its page, edge to edge, the printed sides up. Tape the joint on",
+            "   the back with narrow tape. Fold the flap forward over its page.",
+            "5. Join each flap to its page:", ""]
+    for gi in sorted(places):
+        p = places[gi]
+        out.append(f"   Flap {p['sheet']} of {n}: tape its {'left' if p['edge'] == 'right' else 'right'} "
+                   f"edge to the {p['edge']} edge of page {p['bound_label']} (page {p['bound_pdf']} "
+                   "of the part file).")
+    out += ["", "Then punch or bind the stack.", "",
             "A fold-out needs a rest at both ends: unfold the flap at the start, fold it in before the turn."]
     return "\n".join(out) + "\n"
 
@@ -1088,6 +1149,19 @@ def _sheet_guides(page: pymupdf.Page, fold_x: float, ph: float, cut_x: float, mt
     put_text(page, (fold_x - text_len(note, "italic", 7) / 2, max(mt - 10, 10)), note, "italic", 7)
     if hint:
         put_text(page, (fold_x - text_len(hint, "italic", 7) / 2, ph - 16), hint, "italic", 7)
+
+
+def _flap_guides(page: pymupdf.Page, cut_x: float, tape_x: float, ph: float, mt: float,
+                 note: str, hint: str) -> None:
+    """Dotted cut line of a flap on a Letter page (the 1/2 in beyond it is cut off), a mark
+    at the tape edge, a note and a line for the printer at the foot."""
+    page.draw_line((cut_x, 0), (cut_x, ph), color=(0.5, 0.5, 0.5), width=0.6, dashes="[4 3] 0")
+    put_text(page, (cut_x + (3 if cut_x < tape_x else -34), 10), "cut 1/2 in", "regular", 6.5)
+    on_left = tape_x < cut_x
+    put_text(page, (tape_x + (3 if on_left else -34), ph - 6), "tape edge", "regular", 6.5)
+    mid = (cut_x + tape_x) / 2
+    put_text(page, (mid - text_len(note, "italic", 7) / 2, max(mt - 10, 10)), note, "italic", 7)
+    put_text(page, (mid - text_len(hint, "italic", 7) / 2, ph - 16), hint, "italic", 7)
 
 
 def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,

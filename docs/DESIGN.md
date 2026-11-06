@@ -760,17 +760,24 @@ the cost. The pure planner is in `turnplan`; `render` feeds it (`plan_faces`, `l
 - Pages and fold-outs are chosen for the whole part at once (dynamic programming), with the page
   costs of §5.4 (`PAGE_COST`, `REPAGE_FILL`, `SHORT_LAST`). Manual breaks (`breaks`) end a page.
 
-Print of a part with fold-outs (`render_plan`). Three files per part:
+Print of a part with fold-outs (`render_plan`). Four files per part (0.8.12). A fold-out is made in
+one of two ways, by the printer the person has; both give the same pages:
 
-- `NN-part.pdf`: the pages on the part's paper (Letter). Print double-sided and bind. It has no
-  recto and no flap of a fold-out and no verso that follows a fold-out; a blank page is added when
-  the count would be odd, so the leaves print in pairs.
-- `NN-part-foldout-sheets.pdf`: one ledger sheet (17 x 11 in) per fold-out, two PDF pages: print double-sided
-  (flip on the short edge), cut, fold, and bind it in place of the leaf it replaces. The front of
-  each sheet has a line for the printer: sheet number, flip edge and the place in the part file.
-- `NN-part-assemble.txt`: the steps to print and assemble, and for each sheet the place in the part
-  file (`after page 3/32 of the part file`) and the leaves it replaces. Written only when a part has
-  fold-outs, with the two PDF files; the build and `plan N` name the sheets and the text.
+- `NN-part.pdf`: every leaf on the part's paper (Letter), except the flaps. It is complete: print
+  it all for the tape route. A blank page is added when the count would be odd, so the leaves
+  print in pairs. Print double-sided and bind.
+- `NN-part-foldout-sheets.pdf` (ledger route): one ledger sheet (17 x 11 in) per fold-out, two PDF
+  pages: print double-sided (flip on the short edge), cut, fold, and bind it in place of the leaf it
+  replaces. The leaf is two consecutive pages of the part file; the assemble text lists the pages
+  to print (`Print only these pages: 1-2, 5-32`). The front of each sheet has a line for the
+  printer: sheet number, flip edge and the place in the part file.
+- `NN-part-foldout-flaps.pdf` (tape route, Letter only): one Letter page per flap, printed on one
+  side. The flap sits at the page edge that is its fold edge (left for a right fold-out, right for a
+  left one); a dotted line marks the cut, 1/2 in off the free edge, and `tape edge` marks the edge to
+  tape to the outer edge of its page in the part file. The same text width and margins as on the sheet.
+- `NN-part-assemble.txt`: both ways, step by step, and for each fold-out the part file pages a sheet
+  replaces and the page and edge a flap is taped to. Written only when a part has fold-outs, with
+  the PDF files; the build and `plan N` name them.
   - The dotted lines are on the front only: a second set on the back would not meet the first on paper.
   - Right fold-out. Front: the bound face (the recto, spine at the left) and the flap. A dotted line
     marks the fold (the middle) and a dotted line the cut: 1/2 in off the flap's free edge, so the
@@ -788,9 +795,9 @@ Print of a part with fold-outs (`render_plan`). Three files per part:
     for the trimmed flap (lower `binding` or `margin_side`).
   - Page numbers count leaves, not faces: right fold-out, the recto is `7a` and the flap `7b` (`7a/18`,
     `7b/18`), and the next verso is 8; left fold-out, the flap is `6a` and the verso `6b`, and the previous
-    recto is 5. Each sheet is one leaf: the Letter file leaves out its two pages.
-- The record of the part in `score.yaml` (`built`) has `foldout` (the sheet file), `foldouts` (the count) and
-  `assemble` (the text file).
+    recto is 5. Each sheet is one leaf: it replaces two consecutive pages of the part file.
+- The record of the part in `score.yaml` (`built`) has `foldout` (the sheet file), `foldouts` (the count),
+  `flaps` (the flap file) and `assemble` (the text file).
   `repage` applies `foldouts` without a rebuild.
 - Fold-outs need a sheet of two pages side by side: Letter (ledger sheet) and A4 (A3 sheet). On
   ledger paper `foldouts: on` plans the turns with `turnplan` but makes no fold-out.
