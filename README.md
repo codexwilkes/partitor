@@ -34,7 +34,7 @@ If you write your own publishing, use the documented, stable file layout
 ```bash
 sudo apt install git python3-venv tesseract-ocr
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.8.9
+cd /opt/partitor && sudo git checkout --detach 0.8.10
 sudo bin/partitor-init                      # guided; --yes takes the defaults
 sudo usermod -aG partitor "$USER"          # log in again afterwards
 cp score.pdf /var/lib/partitor/library/inbox/
@@ -54,6 +54,7 @@ removal.
 | `docs/OPERATING.md`, `docs/operator-flow.html` | Daily use |
 | `docs/SANDBOX.md`, `SECURITY.md` | What the sandbox does; reporting problems |
 | `docs/LIBRARY-LAYOUT.md` | The stable folder and file-name contract |
+| `docs/PLAN-AND-FOLDOUTS.md` | Plan paper, staff size, page turns, fold-outs; print and assemble |
 | `docs/KNOWN-LIMITS.md` | What the engine gets wrong |
 | `docs/DESIGN.md` | Rules and algorithms |
 | `docs/OVERLAYS.md` | Wrap the installer for a site |

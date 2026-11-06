@@ -434,6 +434,22 @@ class TestEngravedLook(unittest.TestCase):
         self.assertGreater(out.bars_x[0], s.bars_x[0])
         self.assertEqual(pt.justify(s, 150), s)                  # long enough already
 
+    def test_justify_keeps_a_final_barline_together(self):
+        """A thin line, a small gap and a thick line (final barline) are not pulled apart."""
+        s = self.line([(70, 44), (110, 60)], [100, 150], width=160)
+        top, bot = int(s.staff_top), int(s.staff_top + 4 * s.sp) + 1
+        end = pt.staff_end(s)
+        s.img[top:bot, end - 10:end - 8] = True                   # thin line
+        s.img[top:bot, end - 3:end + 1] = True                    # thick line, a gap of 5 px
+        s.img[top + 8:bot - 8, end - 4] = True                    # a partly inked edge column
+        s = pt.dc_replace(s, img=s.img[:, :end + 1].copy()) if hasattr(pt, "dc_replace") else s
+        bars = lambda st: [x for x in range(st.img.shape[1]) if st.img[top:bot, x].mean() > 0.9]
+        before = bars(s)
+        out = pt.justify(s, 250)
+        self.assertGreater(pt.staff_end(out) - out.staff_x0, pt.staff_end(s) - s.staff_x0)   # it was stretched
+        after = bars(out)
+        self.assertEqual(after[-1] - after[-5], before[-1] - before[-5])       # thin to thick: same distance
+
     def test_finish_lines_indent_name_and_ragged_last(self):
         a = self.line([(70, 44), (110, 60), (300, 52)], [100, 250, 500], width=510)
         b = self.line([(75, 60), (120, 52), (400, 44)], [105, 300, 598], width=600)

@@ -43,6 +43,12 @@ def _font(kind: str) -> tuple[str, str | None, object]:
     return _FONTS[kind]
 
 
+def missing_fonts() -> list[str]:
+    """missing_fonts -> the font files that are not found (the text then uses the built-in
+    Times, which has no music glyphs: no clef in an ambitus, no digits in a multi-bar rest)."""
+    return [FONT_FILES[k][0] for k in FONT_FILES if _font(k)[1] is None]
+
+
 def text_len(text: str, kind: str, size: float) -> float:
     return _font(kind)[2].text_length(text, fontsize=size)
 

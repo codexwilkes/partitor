@@ -200,6 +200,18 @@ def options(src: Source, opts: dict, papers: tuple, sizes: tuple = SIZES,
     return out
 
 
+def best_rows(rows: list[Option]) -> set[int]:
+    """best_rows -> the numbers of the best row of each paper: the fewest turns while playing,
+    then the largest staff, then the fewest fold-outs, then the fewest pages."""
+    out = set()
+    for paper in dict.fromkeys(o.paper for o in rows):
+        ok = [o for o in rows if o.paper == paper and o.ok]
+        if ok:
+            out.add(min(ok, key=lambda o: (o.counts.get("bad", 0) + o.counts.get("bridge", 0),
+                                           -o.staff_mm, o.folds, o.pages)).n)
+    return out
+
+
 def set_pairs(name: str, o: Option) -> list[str]:
     """set_pairs -> the `set` pairs that make a build follow option o: the
     paper, the largest staff, re-flow, the planner (fold-outs) and a page

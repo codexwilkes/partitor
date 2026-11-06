@@ -250,6 +250,8 @@ def plan_args(argv: list[str]) -> argparse.Namespace:
     pn.add_argument("--group", action="append", default=[], metavar="NAME=PARTS",
                     help="try a group the item does not have, e.g. AltTen=Alto,Tenor (part names "
                          "or numbers): built in a temporary copy and shown; repeat for more groups")
+    pn.add_argument("--all", action="store_true",
+                    help="show every option (default: the option as built and the best of each paper)")
     return pn.parse_args(argv)
 
 

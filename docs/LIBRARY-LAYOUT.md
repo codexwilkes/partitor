@@ -21,6 +21,9 @@ and needs a minor version at least (a major version after 1.0.0).
   - `NN`: two digits, the part number in score order. Groups come after the
     parts.
   - The large-print copy adds a suffix before `.pdf`: `-11x17` or `-A3`.
+  - A part with fold-outs has two more files with the same stem:
+    `...--<id>-foldout-sheets.pdf` (the sheets) and `...--<id>-assemble.txt`
+    (print and assembly steps). They do not match `*--<id>.pdf`.
 - To find a piece: match the folder by the prefix `<id>-`. To find its part
   files: match `*--<id>.pdf` (normal copy) and `*--<id>-11x17.pdf` /
   `*--<id>-A3.pdf` (large copy).

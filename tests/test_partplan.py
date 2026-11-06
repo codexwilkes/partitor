@@ -221,6 +221,37 @@ class TestOptions(unittest.TestCase):
         rows = pt.options(s, OPTS, ("letter",), floor_mm=6.0)
         self.assertTrue(all(r.staff_mm >= 6.0 for r in rows))
 
+    @staticmethod
+    def fake(n, paper, staff, bad, folds=0, pages=20, ok=True):
+        plan = SimpleNamespace(folds=folds, playing=bad, counts=lambda: {"bad": bad})
+        return pt.Option(paper, staff, ok, "" if ok else "x", pages, True, plan if ok else None, False, n)
+
+    def test_best_row_per_paper_has_the_fewest_bad_turns_then_the_largest_staff(self):
+        rows = [self.fake(1, "letter", 8.0, 3), self.fake(2, "ledger", 8.0, 0),
+                self.fake(3, "letter", 7.0, 1), self.fake(4, "letter", 6.5, 0, folds=1),
+                self.fake(5, "letter", 6.0, 0, folds=0), self.fake(6, "ledger", 7.5, 0),
+                self.fake(7, "letter", 5.0, 0, ok=False)]
+        self.assertEqual(pt.best_rows(rows), {2, 4})
+        rows[3] = self.fake(4, "letter", 6.5, 0, folds=2)           # same staff size: fewer fold-outs
+        rows.append(self.fake(8, "letter", 6.5, 0, folds=1))
+        self.assertEqual(pt.best_rows(rows), {2, 8})
+        self.assertEqual(pt.best_rows([self.fake(1, "letter", 8.0, 0, ok=False)]), set())
+
+    def test_plan_rows_short_view_shows_built_and_best_rows_and_says_how_to_see_all(self):
+        rows = [self.fake(i, "letter", 8.0 - 0.5 * i, 5 - i) for i in range(1, 5)]    # best: #4
+        old, lay = {"staff_mm": 7.5}, {"paper": "letter"}                              # built: #1
+        short = pt.plan_rows(rows, old, lay, show_all=False)
+        self.assertIn("short", short[0])
+        self.assertNotIn("1 bar", short[0])
+        body = [x for x in short[1:] if "more options" not in x and (x.strip()[0:1].isdigit() or x[:1] == "*")]
+        self.assertEqual([x.split()[1 if x[:1] == "*" else 0] for x in body], ["1", "4"])
+        self.assertTrue(body[0].startswith("*"))
+        self.assertIn("best", body[1])
+        self.assertIn("2 more options: add --all", short[-1])
+        full = pt.plan_rows(rows, old, lay)
+        self.assertEqual(len(full), 5)                                  # header and four rows
+        self.assertNotIn("more options", " ".join(full))
+
     def test_set_pairs_follow_the_option(self):
         o = pt.Option("letter", 6.5, True, "", 29, True, None, True, 7)
         self.assertEqual(pt.set_pairs("Trombones", o),

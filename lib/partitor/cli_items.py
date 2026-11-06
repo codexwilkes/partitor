@@ -618,20 +618,30 @@ def plan_names(data: dict, built: dict, words: list[str]) -> list[str]:
     return [nm for nm in names if built[nm].get("group") or built[nm].get("bad_turns")]
 
 
-def plan_rows(opts_list: list, old: dict, lay: dict) -> list[str]:
-    """plan_rows -> the table of options of one part, as text lines."""
-    out = [f"  {'#':>2}  {'paper':<6} {'staff':>7} {'pages':>5} {'rest':>5} {'1 bar':>5} {'attacca':>7} "
+def plan_rows(opts_list: list, old: dict, lay: dict, show_all: bool = True) -> list[str]:
+    """plan_rows -> the table of options of one part, as text lines. show_all False: only the
+    row as built and the best row of each paper (the numbers of the rows stay)."""
+    from .partplan import best_rows
+    best = best_rows(opts_list)
+    out = [f"  {'#':>2}  {'paper':<6} {'staff':>7} {'pages':>5} {'rest':>5} {'short':>5} {'attacca':>7} "
            f"{'fold-out':>8} {'bad':>4}  note"]
+    shown = 0
     for o in opts_list:
         mark = "*" if (o.paper == lay.get("paper") and abs(o.staff_mm - old.get("staff_mm", 0)) <= 0.25) else " "
+        if not show_all and mark == " " and o.n not in best:
+            continue
+        shown += 1
         if not o.ok:
             out.append(f"{mark} {o.n:>2}  {o.paper:<6} {o.staff_mm:>4.1f} mm {'-':>5}  {o.note}")
             continue
         c = o.counts
-        note = ", ".join(x for x in ("re-flow" if o.reflow else "", "no title page" if not o.title_page else "") if x)
+        note = ", ".join(x for x in ("best" if o.n in best else "", "re-flow" if o.reflow else "",
+                                     "no title page" if not o.title_page else "") if x)
         out.append(f"{mark} {o.n:>2}  {o.paper:<6} {o.staff_mm:>4.1f} mm {o.pages:>5} {c.get('rest', 0):>5} "
                    f"{c.get('rest1', 0):>5} {c.get('attacca', 0):>7} {o.folds:>8} "
                    f"{c.get('bad', 0) + c.get('bridge', 0):>4}  {note}")
+    if shown < len(opts_list):
+        out.append(f"  {len(opts_list) - shown} more options: add --all")
     return out
 
 
@@ -674,7 +684,7 @@ def trial_data(data: dict, specs: list[str]) -> tuple[dict, list[str]]:
     return out, names
 
 
-def plan_table(item: Path, data: dict, built: dict, nm: str, trial: bool = False):
+def plan_table(item: Path, data: dict, built: dict, nm: str, trial: bool = False, show_all: bool = True):
     """plan_table -> the option rows of part (or group) nm, printed as a table; None if
     there is nothing to plan (the reason is printed)."""
     from .lines import lines_path, load_lines
@@ -712,7 +722,7 @@ def plan_table(item: Path, data: dict, built: dict, nm: str, trial: bool = False
           f"{o['paper']}, staff {old['staff_mm']} mm, {c0} pages of music, "
           f"{old.get('turns', 0)} turns, {old.get('bad_turns', 0)} while playing"
           + (f"; the estimate for it: {est.pages} pages" if est.ok else ""))
-    for line in plan_rows(rows, old, lay):
+    for line in plan_rows(rows, old, lay, show_all):
         print(line)
     return rows
 
@@ -769,7 +779,7 @@ def cmd_plan(a: argparse.Namespace) -> int:
             tbuilt = {r["part"]: r for r in (tdata.get("built") or {}).get("parts") or []}
             for nm in names:
                 if nm in tbuilt:
-                    plan_table(tmp / item.name, tdata, tbuilt, nm, trial=True)
+                    plan_table(tmp / item.name, tdata, tbuilt, nm, trial=True, show_all=getattr(a, 'all', False))
                 else:
                     _warn(f"plan:  {nm}: not built in the trial (see the build report: partitor rebuild)")
         finally:
@@ -788,10 +798,16 @@ def cmd_plan(a: argparse.Namespace) -> int:
     if pick is not None and len(names) != 1:
         _die("plan: name one part to set an option", f"partitor plan {data['id']} Trombones {pick}")
     print(f"{BOLD}partitor {VERSION} — plan{RST}\n{time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+    eg = None                                   # a part and the number of its best row, for the hint
     for nm in names:
-        rows = plan_table(item, data, built, nm)
+        rows = plan_table(item, data, built, nm, show_all=getattr(a, 'all', False))
+        if rows and eg is None:
+            from .partplan import best_rows
+            good = sorted(best_rows(rows))
+            eg = (nm, good[0]) if good else None
         if rows is not None and pick is not None:
             from .partplan import set_pairs
+            from .render import sheet_text
             chosen = next((r for r in rows if r.n == pick), None)
             if chosen is None or not chosen.ok:
                 _die(f"plan: option {pick}: " + ("no such option" if chosen is None else chosen.note))
@@ -802,11 +818,17 @@ def cmd_plan(a: argparse.Namespace) -> int:
             mark_pending(data, *(c.split(": ")[0] for c in changes))
             save_item(item, data)
             _ok(f"plan:  {nm}: option {pick} ({chosen.paper}, staff {chosen.staff_mm:g} mm, about "
-                f"{chosen.pages} pages, {chosen.folds} fold-out(s)); " + "; ".join(changes))
+                f"{chosen.pages} pages); " + "; ".join(changes))
+            if chosen.folds:
+                _note(f"plan:  {nm}: needs " + sheet_text(chosen.paper, chosen.folds)
+                      + "; the build writes the print and assembly steps to a text file next to the PDFs")
     if pick is None:
         _note("estimates from the lines of the last build (no per-staff rests: bridgeable turns are not "
-              "counted); a build gives the real numbers. * = as built")
+              "counted); a build gives the real numbers. * = as built; best = fewest turns while playing, "
+              "then the largest staff, then the fewest fold-outs (one per paper)")
         _note(f"Set an option: partitor plan {data['id']} PART N    then: partitor rebuild {data['id']}")
+        if eg:
+            _note(f"For example: partitor plan {data['id']} {eg[0]} {eg[1]}")
         return _summary(start)
     return saved(item, a, start)
 
@@ -817,7 +839,7 @@ def cmd_repage(a: argparse.Namespace) -> int:
     parts (kept by later builds); breaks, duplex and title_page are taken
     from the layout. Writes through parts.new/ like a build."""
     from .lines import count_bad_turns, lines_path, load_lines, turn_text
-    from .render import LARGE, LAST_RENDER, large_copy, render_part, turns
+    from .render import LARGE, LAST_RENDER, large_copy, render_part, sheet_text, turns
     start = time.monotonic()
     item = _item_or_die(a.id)
     recover_parts(item)
@@ -870,16 +892,18 @@ def cmd_repage(a: argparse.Namespace) -> int:
         nbad = count_bad_turns(tl, o)
         big = (large_copy(fn, o["paper"])
                if o.get("large") == "on" and o["paper"] in LARGE else None)
-        rec = {k: v for k, v in old.items() if k not in ("large", "foldout", "foldouts")}
+        rec = {k: v for k, v in old.items() if k not in ("large", "foldout", "foldouts", "assemble")}
         rec.update(pages=n, content_pages=LAST_RENDER.get("content", n),
                    title_page=bool(LAST_RENDER.get("title_page")), turns=len(tl),
                    bad_turns=nbad, **({"large": big.name} if big else {}),
-                   **({"foldout": LAST_RENDER["foldout"], "foldouts": LAST_RENDER["foldouts"]}
-                      if LAST_RENDER.get("foldout") else {}))
+                   **({"foldout": LAST_RENDER["foldout"], "foldouts": LAST_RENDER["foldouts"],
+                       "assemble": LAST_RENDER["assemble"]} if LAST_RENDER.get("foldout") else {}))
         recs[nm] = rec
         c0 = old.get("content_pages", old["pages"])
         _ok(f"{nm}:  pages of music {c0} -> {rec['content_pages']}  "
             f"turns {old.get('turns', turns(c0))} -> {len(tl)}  while playing {nbad}")
+        if rec.get("foldout"):
+            _note(f"{nm}:  {sheet_text(o['paper'], rec['foldouts'])}: print and assemble as in {rec['assemble']}")
         report.append((nm, tl))
         done.append(nm)
     if not done:

@@ -63,7 +63,9 @@ def justify(s: Strip, target: int) -> Strip:
     """justify -> the line stretched so its staff is target px long (from
     the staff start). Space is added only in blank gaps between glyphs
     (columns with staff lines only, 0.25 sp or wider), the same amount in
-    each gap, after the clef; engraved glyphs are never stretched. A
+    each gap, after the clef; engraved glyphs are never stretched, and the gap
+    inside a final barline or a double bar (barlines on both sides, under 1 sp)
+    stays as it is. A
     multi-bar rest line is drawn again at the width."""
     if s.rest_src is not None:
         src, cw, run = s.rest_src
@@ -98,6 +100,13 @@ def justify(s: Strip, target: int) -> Strip:
     d = np.diff(np.concatenate(([0], elig.astype(np.int8), [0])))
     runs = [(a, b) for a, b in zip(np.flatnonzero(d == 1), np.flatnonzero(d == -1))
             if b - a >= max(2, int(0.25 * sp))]
+    # a gap that closes a barline cluster (thin + thick final barline, double bar) is not a gap:
+    # staff-height ink stands on both sides and the gap is narrower than 1 sp
+    t0, t1 = int(s.staff_top), int(s.staff_top + 4 * sp) + 1
+    bar = lambda xs: any(0 <= x < s.img.shape[1] and s.img[t0:t1, x].mean() > 0.9 for x in xs)
+    # (the edge column of a thick line is often only partly inked: look 3 columns in)
+    runs = [(a, b) for a, b in runs
+            if not (b - a < sp and bar(range(a - 3, a)) and bar(range(b, b + 4)))]
     if not runs:
         return s
     counts = np.ones(s.img.shape[1], np.int64)

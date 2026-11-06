@@ -39,11 +39,12 @@ from .lines import count_bad_turns, fill_rests, finish_lines, label_column, line
 from .partplan import read_source
 from .mapping import assign_maps
 from .model import PageResult, RestRun, Strip
+from .typography import missing_fonts
 from .parallel import RENDER_WORKER_GB, job_count, page_worker_gb, worker_peak_mb
 from .reflow import find_prefixes, reflow_report
 from .render import (
     GROUP_REFLOW_PAGES, LARGE, LAST_RENDER, choose_layout, choose_reflow, fit_scale, large_copy,
-    render_part, turns,
+    render_part, sheet_text, turns,
 )
 from .strips import group_strip, make_strip, own_group_gap, set_bar_geometry
 
@@ -721,12 +722,15 @@ def cmd_build(a: argparse.Namespace) -> int:
                "staff_max_mm": round(h_max, 2), "gap": round(g, 2),
                "turns": len(tl), "bad_turns": nbad,
                "file": fn.name, **({"large": big.name} if big else {}),
-               **({"foldout": LAST_RENDER["foldout"], "foldouts": LAST_RENDER["foldouts"]}
-                  if LAST_RENDER.get("foldout") else {}),
+               **({"foldout": LAST_RENDER["foldout"], "foldouts": LAST_RENDER["foldouts"],
+                   "assemble": LAST_RENDER["assemble"]} if LAST_RENDER.get("foldout") else {}),
                **({"group": True} if extra.get("members") else {})}
         flow = f" (re-flowed from {nsrc})" if opts.get("reflow") == "on" else ""
         _ok(f"{name}:  {len(strips)} lines{flow}  {n} page(s)  staff {h_mm:.1f} mm  "
             f"gap {g:.2f} sp  -> {fn}")
+        if rec.get("foldout"):
+            _note(f"{name}: {sheet_text(opts['paper'], rec['foldouts'])}: print and assemble as in "
+                  f"{rec['assemble']}")
         if (opts.get("reflow_offer") == "on" and opts.get("reflow") != "on"
                 and h_mm < opts["small_mm"] and h_width < opts["small_mm"]):
             _note(f"{name}: small print ({h_mm:.1f} mm, held by the source line width): "
@@ -736,6 +740,10 @@ def cmd_build(a: argparse.Namespace) -> int:
     # the steps in part order: messages, and the parts to render (one worker
     # each when jobs > 1; the numbers NN are those of all parts, also when only
     # some are built)
+    gone = missing_fonts()
+    if gone:
+        _warn("fonts:  not found: " + ", ".join(gone) + "  (PARTITOR_FONTS, share/fonts); the parts "
+              "use a fallback: an ambitus has no clef, rest counts and noteheads may be wrong")
     steps: list[tuple] = []
     for num, (part, strips) in enumerate(part_strips.items(), 1):
         if only and part not in only:

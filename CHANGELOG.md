@@ -8,6 +8,28 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.10 — 2026-11-06
+
+Change: `partitor plan` and the fold-out print are easier to follow (DESIGN.md §5.7, §5.8).
+
+- `plan` shows a short table: the row as built and the best row of each paper (the fewest turns while
+  playing, then the largest staff, then the fewest fold-outs). `--all` shows every row. The row numbers
+  do not change. The column `1 bar` is now `short`.
+- `plan` ends with a real example command (`plan ID PART N`, the best row).
+- `plan PART N` says how many fold-out sheets the option needs, and the build says so too.
+- A part with fold-outs gets `NN-...-assemble.txt`: what to print, the flip edge of each file, how to
+  cut and fold, and for each sheet its place in the part file.
+- Each sheet page has a line for the printer: the sheet number, the flip edge and the place.
+- The sheet file is now `NN-...-foldout-sheets.pdf` (was `-foldout.pdf`). Build records have a new key,
+  `assemble`.
+- The dotted fold and cut lines are on the front of a sheet only. A second set on the back never met the
+  first when printed (duplex registration).
+- Fix: a justified line no longer pulls a final barline or double bar apart (the gap between the thin and
+  the thick line was stretched, so the last bar looked as if it had an extra barline).
+- The build warns when a font file is not found (the fallback has no music glyphs: an ambitus then has no clef).
+- New guide `docs/PLAN-AND-FOLDOUTS.md`: use `plan`, print and assemble.
+
+
 ## 0.8.9 — 2026-11-05
 
 Add: `partitor plan ID --group Name=Alto,Tenor`: the options of a group of parts that the item does not

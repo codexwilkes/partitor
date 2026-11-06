@@ -602,7 +602,7 @@ class TestLedger(unittest.TestCase):
 @needs_deps
 class TestFoldoutRender(unittest.TestCase):
     """foldouts=on (0.8.5): turnplan chooses spreads and fold-outs; the part PDF holds
-    the Letter pages, <part>-foldout.pdf one ledger sheet per fold-out (DESIGN.md §5.7)."""
+    the Letter pages, <part>-foldout-sheets.pdf one ledger sheet per fold-out (DESIGN.md §5.7)."""
 
     OPTS = {**pt.LAYOUT_DEFAULTS, "paper": "letter", "scale": 1.0, "foldouts": "on",
             "margin_side": 8.0, "binding": 12.7, "turns": "rest"}
@@ -622,10 +622,10 @@ class TestFoldoutRender(unittest.TestCase):
     def test_a_stretch_of_three_pages_without_a_rest_gets_a_fold_out(self):
         with tempfile.TemporaryDirectory() as d:
             out, n, info = self.render(d, self.music(56))
-            sheet = Path(d, "p-foldout.pdf")
+            sheet = Path(d, "p-foldout-sheets.pdf")
             self.assertTrue(sheet.is_file())
             self.assertEqual(info["foldouts"], 1)
-            self.assertEqual(info["foldout"], "p-foldout.pdf")
+            self.assertEqual(info["foldout"], "p-foldout-sheets.pdf")
             sh = pymupdf.open(sheet)
             self.assertEqual(len(sh), 2)                              # front and back
             self.assertEqual([(round(p.rect.width), round(p.rect.height)) for p in sh],
@@ -635,10 +635,66 @@ class TestFoldoutRender(unittest.TestCase):
             self.assertIn("2b/2", txt)                                # the flap
             self.assertEqual(len(pymupdf.open(out)) % 2, 0)           # leaves print in pairs
 
+    def test_assemble_text_says_how_to_print_and_where_each_sheet_goes(self):
+        import re
+        for side in ("right", "left"):
+            with tempfile.TemporaryDirectory() as d:
+                _, _, info = self.render(d, self.music(120, rests={38, 95}), foldside=side)
+                self.assertEqual(info["assemble"], "p-assemble.txt")
+                txt = Path(d, "p-assemble.txt").read_text(encoding="utf-8")
+                n = info["foldouts"]
+                self.assertIn(f"{n} fold-out sheet", txt)
+                self.assertIn("p.pdf", txt)
+                self.assertIn("p-foldout-sheets.pdf", txt)
+                self.assertIn("flip on the long edge", txt.lower())
+                self.assertIn("flip on the short edge", txt.lower())
+                self.assertIn("17 x 11 in", txt)
+                places = re.findall(r"Sheet (\d+) of (\d+): (after page \d+/\d+ of the part file|at the start"
+                                    r"[^.]*)\. It replaces leaves? ([\d and]+) of (\d+)\.", txt)
+                self.assertEqual(len(places), n, txt)
+                self.assertEqual([int(x[0]) for x in places], list(range(1, n + 1)))
+                for _, _, where, _, total in places:                # the gap really is where the text says
+                    m = re.search(r"after page (\d+)/(\d+)", where)
+                    if m:
+                        self.assertEqual(m.group(2), total)
+                pdf = " ".join(pg.get_text() for pg in pymupdf.open(Path(d, "p.pdf")))
+                self.assertIn("/" + places[0][4], pdf)
+
+    def test_every_sheet_page_carries_the_printing_line(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.render(d, self.music(56))
+            for page in pymupdf.open(Path(d, "p-foldout-sheets.pdf")):
+                t = " ".join(page.get_text().split())
+                self.assertIn("Sheet 1 of 1. Print double-sided, flip on the short edge. Bind", t)
+            self.assertIn("Sheet 1 of 1", Path(d, "p-assemble.txt").read_text(encoding="utf-8"))
+
+    def test_no_fold_out_means_no_sheet_file_and_no_assemble_text(self):
+        with tempfile.TemporaryDirectory() as d:
+            _, _, info = self.render(d, self.music(40, rests={9, 17, 25, 33}))
+            self.assertIsNone(info["assemble"])
+            self.assertFalse(Path(d, "p-assemble.txt").exists())
+
+    def test_the_dotted_guides_are_on_the_front_only(self):
+        for side in ("right", "left"):
+            with tempfile.TemporaryDirectory() as d:
+                self.render(d, self.music(120, rests={38, 95}), foldside=side)
+                sh = pymupdf.open(Path(d, "p-foldout-sheets.pdf"))
+                dashed = lambda pg: [x for x in pg.get_drawings() if x.get("dashes") and "[" in x["dashes"]]
+                self.assertEqual(len(dashed(sh[0])), 2, side)             # the fold and the cut
+                self.assertEqual(len(dashed(sh[1])), 0, side)             # none on the back
+                self.assertIn("cut", sh[0].get_text())
+                self.assertNotIn("cut 1/2 in", sh[1].get_text())
+                self.assertIn("front lines", sh[1].get_text())
+
+    def test_sheet_text_names_the_sheet_size(self):
+        self.assertEqual(pt.sheet_text("letter", 0), "")
+        self.assertIn("1 fold-out sheet (17 x 11 in", pt.sheet_text("letter", 1))
+        self.assertIn("2 fold-out sheets (A3", pt.sheet_text("a4", 2))
+
     def test_folio_numbers_count_leaves_and_the_flap_is_b(self):
         with tempfile.TemporaryDirectory() as d:
             _, _, info = self.render(d, self.music(56))
-            sh = pymupdf.open(Path(d, "p-foldout.pdf"))
+            sh = pymupdf.open(Path(d, "p-foldout-sheets.pdf"))
             import re
             labels = [w[4] for w in sh[0].get_text("words") if re.fullmatch(r"\d+[ab]/\d+", w[4])]
             total = int(labels[0].split("/")[1])
@@ -647,7 +703,7 @@ class TestFoldoutRender(unittest.TestCase):
     def test_the_flap_holds_the_same_text_width_inside_the_trimmed_edge(self):
         with tempfile.TemporaryDirectory() as d:
             self.render(d, self.music(56))
-            front = pymupdf.open(Path(d, "p-foldout.pdf"))[0]
+            front = pymupdf.open(Path(d, "p-foldout-sheets.pdf"))[0]
             boxes = [pymupdf.Rect(b["bbox"]) for b in front.get_image_info()]
             left = [b for b in boxes if b.x1 <= 612.5]
             right = [b for b in boxes if b.x0 >= 611.5]
@@ -665,7 +721,7 @@ class TestFoldoutRender(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out, n, info = self.left(d)
             self.assertEqual(info["foldouts"], 1)
-            sh = pymupdf.open(Path(d, "p-foldout.pdf"))
+            sh = pymupdf.open(Path(d, "p-foldout-sheets.pdf"))
             self.assertEqual(len(sh), 2)
             word = lambda pg, rx: [w[4] for w in pg.get_text("words") if re.fullmatch(rx, w[4])]
             total = int(word(sh[0], r"\d+[ab]/\d+")[0].split("/")[1])
@@ -681,7 +737,7 @@ class TestFoldoutRender(unittest.TestCase):
     def test_the_left_flap_is_on_the_left_inside_the_trimmed_edge(self):
         with tempfile.TemporaryDirectory() as d:
             self.left(d)
-            front = pymupdf.open(Path(d, "p-foldout.pdf"))[0]
+            front = pymupdf.open(Path(d, "p-foldout-sheets.pdf"))[0]
             boxes = [pymupdf.Rect(b["bbox"]) for b in front.get_image_info()]
             flap = [b for b in boxes if b.x1 <= 612.5]
             verso = [b for b in boxes if b.x0 >= 611.5]
@@ -693,7 +749,7 @@ class TestFoldoutRender(unittest.TestCase):
     def test_the_left_sheet_back_has_the_recto_on_the_left_and_a_blank_flap_outside(self):
         with tempfile.TemporaryDirectory() as d:
             self.left(d)
-            back = pymupdf.open(Path(d, "p-foldout.pdf"))[1]
+            back = pymupdf.open(Path(d, "p-foldout-sheets.pdf"))[1]
             boxes = [pymupdf.Rect(b["bbox"]) for b in back.get_image_info()]
             self.assertTrue(boxes and all(b.x1 <= 612.5 for b in boxes))          # nothing on the right half
             self.assertGreaterEqual(min(b.x0 for b in boxes), pt.mm2pt(8.0 + 12.7) - 0.5)   # recto: spine at the left
@@ -701,7 +757,7 @@ class TestFoldoutRender(unittest.TestCase):
     def test_auto_takes_the_right_side_on_a_tie_and_the_sides_are_keys(self):
         with tempfile.TemporaryDirectory() as d:
             self.render(d, self.music(120, rests={38, 95}), foldside="auto")
-            front = pymupdf.open(Path(d, "p-foldout.pdf"))[0]
+            front = pymupdf.open(Path(d, "p-foldout-sheets.pdf"))[0]
             self.assertIn("a/", front.get_text())
         self.assertEqual(pt.fold_sides({}), ("right",))
         self.assertEqual(pt.fold_sides({"foldside": "left"}), ("left",))
@@ -712,7 +768,7 @@ class TestFoldoutRender(unittest.TestCase):
             st = self.music(40, rests={9, 17, 25, 33})
             _, _, info = self.render(d, st)
             self.assertEqual(info["foldouts"], 0)
-            self.assertFalse(Path(d, "p-foldout.pdf").exists())
+            self.assertFalse(Path(d, "p-foldout-sheets.pdf").exists())
             self.assertTrue(info["turns"] and all(t["cls"] == "rest" for t in info["turns"]))
 
     def test_turn_classes_are_listed_and_bad_turns_counted(self):
@@ -727,7 +783,7 @@ class TestFoldoutRender(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             _, _, info = self.render(d, self.music(56), foldouts="off")
             self.assertEqual(info["foldouts"], 0)
-            self.assertFalse(Path(d, "p-foldout.pdf").exists())
+            self.assertFalse(Path(d, "p-foldout-sheets.pdf").exists())
 
     def test_single_sided_print_never_uses_the_planner(self):
         with tempfile.TemporaryDirectory() as d:
@@ -952,12 +1008,25 @@ class TestRepage(unittest.TestCase):
             old_share = os.environ.get("PARTITOR_LIBRARY")
             os.environ["PARTITOR_LIBRARY"] = str(share)
 
-            def plan(*words):
+            def plan(*words, all_=False):
                 buf = io.StringIO()
                 with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
-                    rc = pt._engine_step(pt.cmd_plan, argparse.Namespace(id="2026-10-0001", words=list(words)))
+                    rc = pt._engine_step(pt.cmd_plan, argparse.Namespace(
+                        id="2026-10-0001", words=list(words), **({"all": True} if all_ else {})))
                 return rc, buf.getvalue()
             try:
+                rc, short = plan("Alto")                                        # the short view
+                self.assertEqual(rc, 0, short)
+                rc, out = plan("Alto", all_=True)
+                self.assertEqual(rc, 0, out)
+                nrow = lambda s: len(re.findall(r"^[* ]\s*\d+\s+(?:letter|ledger)\s", s, re.M))
+                self.assertLess(nrow(short), nrow(out))
+                self.assertIn("more options: add --all", short)
+                self.assertNotIn("more options", out)
+                self.assertIn("best", short)
+                self.assertRegex(short, r"For example: partitor plan 2026-10-0001 Alto \d+")
+                self.assertIn("short", short.splitlines()[next(i for i, x in enumerate(short.splitlines())
+                                                                 if "paper" in x and "staff" in x)])
                 rc, out = plan("Alto")
                 self.assertEqual(rc, 0, out)
                 self.assertIn("Plan: Alto", out)
@@ -967,14 +1036,14 @@ class TestRepage(unittest.TestCase):
                 self.assertIn("* = as built", out)
                 before = pt.load_item(item)
                 self.assertNotIn("Alto", (before["layout"].get(pt.PART_LAYOUT_KEY) or {}))   # read-only
-                rc, out = plan("Alto", "2")
+                rc, out = plan("Alto", "2", all_=True)
                 self.assertEqual(rc, 0, out)
                 self.assertIn("option 2", out)
                 own = pt.load_item(item)["layout"][pt.PART_LAYOUT_KEY]["Alto"]
                 self.assertEqual(own["foldouts"], "on")
                 self.assertIn(own["paper"], ("letter", "ledger"))
                 self.assertIn("page_count", own)
-                rc, again = plan("Alto")                                        # the numbers do not move
+                rc, again = plan("Alto", all_=True)                              # the numbers do not move
                 rows = lambda s: {m[0]: m[1:] for m in
                                   re.findall(r"^[* ]\s*(\d+)\s+(\w+)\s+([\d.]+) mm", s, re.M)}
                 self.assertTrue(rows(out))
@@ -1137,6 +1206,16 @@ class TestFonts(unittest.TestCase):
         self.assertEqual(dirs, [root / "share" / "fonts", Path("/opt/partitor/fonts"),
                                 root / "lib" / "fonts"])
         self.assertTrue((root / "share" / "fonts" / "EBGaramond-Regular.ttf").is_file())
+
+    def test_missing_fonts_lists_the_files_the_text_falls_back_from(self):
+        self.assertEqual(pt.missing_fonts(), [])                        # the repo has them all
+        saved = dict(pt._FONTS)
+        try:
+            pt._FONTS["music"] = ("tibo", None, pt._FONTS["music"][2])
+            self.assertEqual(pt.missing_fonts(), ["Bravura.otf"])
+        finally:
+            pt._FONTS.clear()
+            pt._FONTS.update(saved)
 
     def test_environment_folder_comes_first(self):
         old = os.environ.get("PARTITOR_FONTS")
