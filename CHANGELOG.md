@@ -8,6 +8,14 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.13 — 2026-11-06
+
+### Changed
+
+- The help of `--rests` and the comment on `rests` in `layout.yaml` and
+  `score.yaml` now say that a run of bars with only rests on every staff is also
+  merged into one multi-bar rest (0.8.11). Text only.
+
 ## 0.8.12 — 2026-11-06
 
 ### Added

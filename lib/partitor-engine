@@ -112,7 +112,10 @@
 #       noteheads, no stems; only rests) is made a multi-bar rest, as when
 #       the source leaves the staff out; a group score only when all its
 #       staves are empty. Systems with a rehearsal mark, or ink that is not
-#       a rest, stay as engraved (warned). keep: all staves as engraved.
+#       a rest, stay as engraved (warned). Inside a printed line, a run of 2
+#       bars or more with only measure rests on every staff is one multi-bar
+#       rest; a bar with a note or a mark is never merged. keep: all staves
+#       as engraved.
 #   --title-page auto|off
 #       auto: a title page when the music fills 3+ pages printed
 #       double-sided (the music then starts on a spread). Default auto.

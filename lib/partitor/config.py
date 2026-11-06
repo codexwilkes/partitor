@@ -109,7 +109,8 @@ LAYOUT_HELP = """\
 #     for a staff up to max_staff_mm when the source line width keeps it
 #     small; more pages (a group: at most 1.5 x the pages without re-flow
 #     when pages=auto). The CLI offers it (off; --reflow)
-#   rests: compress | keep; compress = empty staves become multi-bar rests
+#   rests: compress | keep; compress = empty staves, and runs of bars with only
+#     rests on every staff, become multi-bar rests
 #     (compress; --rests)
 #   title_page: auto | off; auto = a title page for 3+ pages of music
 #     printed double-sided (auto; --title-page)
