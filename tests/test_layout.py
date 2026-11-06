@@ -787,7 +787,7 @@ class TestGroupReflowReal(unittest.TestCase):
     its barlines, workers give the same file as the serial build, and a group
     that cannot be cut is the same as before."""
 
-    def run_build(self, d, systems, jobs, *args):
+    def run_build(self, d, systems, jobs, *args, layout=None):
         pdf = os.path.join(d, "s.pdf")
         make_score_pdf(pdf, systems=systems, staves=3, lyrics=False)
         env = dict(os.environ, PARTITOR_ALLOW_ROOT="1", PARTITOR_JOBS=str(jobs))
@@ -798,6 +798,8 @@ class TestGroupReflowReal(unittest.TestCase):
         lp = Path(d, "s.partitor", "layout.yaml")
         lay = yaml.safe_load(lp.read_text())
         lay["groups"] = {"G": ["Alto", "Tenor", "Bass"]}
+        if layout:
+            lay.setdefault("layout", {}).update(layout)
         lp.write_text(yaml.safe_dump(lay, sort_keys=False))
         r = run("build", pdf, "--large", "off", *args)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
@@ -816,6 +818,27 @@ class TestGroupReflowReal(unittest.TestCase):
             self.assertIn("G: re-flow: 2 of 2 lines can be cut", txt)
             _, f2 = self.run_build(b, 2, 2, *args)
             self.assertEqual(self.sig(f1), self.sig(f2))
+
+    def test_a_part_can_have_its_own_paper(self):
+        """0.8.4: the group on ledger while the item is on Letter."""
+        with tempfile.TemporaryDirectory() as a:
+            txt, f = self.run_build(a, 1, 1, layout={"parts": {"G": {"paper": "ledger"}}})
+            self.assertIn("G: own layout paper=ledger", txt)
+            r = pymupdf.open(str(f))[0].rect
+            self.assertEqual((round(r.width), round(r.height)), (1224, 792))
+        with tempfile.TemporaryDirectory() as b:
+            _, f = self.run_build(b, 1, 1)
+            self.assertEqual(round(pymupdf.open(str(f))[0].rect.width), 612)
+
+    def test_binding_narrows_the_text_and_the_staff(self):
+        def staff(d, *args, layout=None):
+            txt, _ = self.run_build(d, 1, 1, *args, layout=layout)
+            import re
+            return float(re.search(r"G:  .*staff ([0-9.]+) mm", txt).group(1))
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            wide = staff(a, "--margin-side", "8", "--duplex", "on")
+            bound = staff(b, "--margin-side", "8", "--duplex", "on", layout={"binding": 60.0})
+            self.assertLess(bound, wide)
 
     def test_group_budget_note_and_whole_line_report(self):
         with tempfile.TemporaryDirectory() as a:

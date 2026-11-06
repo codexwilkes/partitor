@@ -8,6 +8,20 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.4 — 2026-11-05
+
+Add: a part can have its own paper, and a binding allowance at the spine.
+
+- `Name:paper=letter|a4|ledger`: one part (a group) on its own paper while the item uses another. The
+  build already applied a part's layout over the item's; `set` now accepts the key per part. Also per
+  part: `margin_top`, `margin_bottom`, `margin_side`, `gutter`, `duplex`.
+- `binding` (mm, default 0 = off; `set binding=12.7`, no command-line option): in double-sided print the
+  outer margin stays `margin_side` and the spine margin is `binding` wider, for a punch or a comb
+  binding. `gutter` is not used then. The staff is sized for the text width that remains. Parts of 1
+  or 2 pages print single-sided without it. With the default 0, output is the same as 0.8.3.
+- `set` also checks the margins of each part's own layout.
+
+
 ## 0.8.3 — 2026-11-05
 
 Add: `turnplan`, a page-turn planner for bound parts. No user-visible change yet: the build does not

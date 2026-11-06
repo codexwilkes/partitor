@@ -50,6 +50,7 @@ SET_KEYS = {          # set key -> (layout key or None for metadata, parser)
     "min_staff_mm": ("min_staff_mm", float),
     "margin_top": ("margin_top", float), "margin_bottom": ("margin_bottom", float),
     "margin_side": ("margin_side", float), "gutter": ("gutter", float),
+    "binding": ("binding", float),
     "duplex": ("duplex", ("auto", "on", "off")),
     "bar_numbers": ("bar_numbers", ("start", "none")),
     "bar_raise": ("bar_raise", float), "bar_size": ("bar_size", float),
@@ -64,7 +65,8 @@ SET_KEYS = {          # set key -> (layout key or None for metadata, parser)
 }
 GAP_MAX = 14.0        # expand never sets a wider gap (sp)
 PART_SET_KEYS = {"pages", "gap", "min_gap", "scale", "min_staff_mm", "max_staff_mm", "group_gap",
-                 "reflow", "title_page", "bar_raise", "bar_size", "ink", "turns", "breaks"}
+                 "reflow", "title_page", "bar_raise", "bar_size", "ink", "turns", "breaks",
+                 "paper", "margin_top", "margin_bottom", "margin_side", "gutter", "binding", "duplex"}
 REPAGE_KEYS = ("turns", "breaks", "duplex", "title_page")   # `repage` applies these without a rebuild
 
 
@@ -646,7 +648,11 @@ def apply_set(data: dict, pairs: list[str]) -> list[str]:
             lay.pop(lk, None)
         else:
             lay[lk] = val
+    base = {k: v for k, v in lay.items() if k != PART_LAYOUT_KEY}
     err = check_margins({**LAYOUT_DEFAULTS, **lay})
+    for nm, pl in plays.items():              # a part's own margins (0.8.4)
+        e_ = check_margins({**LAYOUT_DEFAULTS, **base, **pl})
+        err = err or (f"{nm}: {e_}" if e_ else "")
     if err:
         raise ValueError(err)
     plays = {n: v for n, v in plays.items() if v}

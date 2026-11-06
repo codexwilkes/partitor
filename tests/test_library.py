@@ -460,6 +460,21 @@ class TestLibrary(unittest.TestCase):
                     pt.apply_set(data, bad)
                 self.assertEqual(data["layout"], before)
 
+    def test_apply_set_part_paper_and_binding(self):
+        data = {"title": "A", "layout": {}, "parts": ["Trombones"]}
+        pt.apply_set(data, ["Trombones:paper=letter", "Trombones:binding=12.7",
+                            "Trombones:margin_side=8", "paper=ledger", "binding=0"])
+        self.assertEqual(data["layout"]["paper"], "ledger")
+        self.assertEqual(data["layout"]["binding"], 0.0)
+        self.assertEqual(data["layout"][pt.PART_LAYOUT_KEY]["Trombones"],
+                         {"paper": "letter", "binding": 12.7, "margin_side": 8.0})
+        for bad in (["Trombones:paper=a3"], ["Trombones:binding=x"], ["Trombones:binding=-2"]):
+            with self.subTest(bad=bad):
+                before = repr(data["layout"])
+                with self.assertRaises(ValueError):
+                    pt.apply_set(data, bad)
+                self.assertEqual(repr(data["layout"]), before)
+
     def test_expand_contract_ladder(self):
         def d(pages, staff, smax, gap=10.0):
             return {"layout": {"gap": gap},
@@ -489,7 +504,7 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(pt.part_layout(data, "Tutti")["gap"], 9.0)
         pt.apply_set(data, ["Continuo:pages=auto"])
         self.assertNotIn("Continuo", data["layout"]["parts"])
-        for bad in (["Nobody:gap=9"], ["Canto:paper=a4"], ["Canto:title=x"]):
+        for bad in (["Nobody:gap=9"], ["Canto:large=off"], ["Canto:title=x"]):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 pt.apply_set(data, bad)
         with self.assertRaises(ValueError):

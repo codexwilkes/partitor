@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.8.3. Section numbers are stable: the code cites
+Status: describes partitor 0.8.4. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -620,7 +620,8 @@ as a rest to turn in; a group line counts as rest only when every staff rests.
   portrait. Duplex: the spine stays at the left edge of a recto (the 11 in
   short edge) and `gutter` is added there as on Letter; print double-sided,
   flip on the short edge (a printer driver may name the edge by the sheet:
-  check the preview). `Name:paper=` is not a per-part key. Open: the source
+  check the preview). `Name:paper=` sets the paper of one part (0.8.4; the item
+  paper is the default). Open: the source
   strips are 1-bit images enlarged about 2.2 x; not measured on a print.
 - Small left and right margins, to give the width to the staff. Top and
   bottom margins large enough for the title band and folio. Keys
@@ -632,6 +633,17 @@ as a rest to turn in; a group line counts as rest only when every staff rests.
   the spine, half taken from the outer side), so the text width and the staff
   size are the same on recto and verso. Page 1 is a recto (spine at the left).
   Running head at the outer side.
+- Binding allowance (`binding`, mm, default 0 = off; 0.8.4): for a punch or a
+  comb binding. The outer margin stays `margin_side` and the spine margin is
+  `binding` wider (`gutter` is not used then): `margin_side` 8 and `binding`
+  12.7 give 8 mm outside and 20.7 mm at the spine, a text width of 187.2 mm on
+  Letter (15 mm and `gutter` 5: 185.9 mm). A part of 3 pages or more is bound
+  (`duplex: auto`); a part of 1 or 2 pages prints single-sided, with no
+  allowance. The staff is sized as for a bound part unless `duplex` is off, so
+  a short part keeps its staff size. Per part: `Name:binding=12.7`,
+  `Name:margin_side=8`. The default stays 0, so old items print as before.
+  A punch of three holes has its outer holes 4.25 in apart, centred on the 11
+  in edge; a hole centred 12 mm from the edge and 8 mm wide ends at 16 mm.
 - Size targets: large noteheads. Floor `min_staff_mm` (5 mm), ceiling
   `max_staff_mm` (8 mm), staff height from top line to bottom line. The re-flow
   offer uses `small_mm` (6.5 mm). Estimates, not measured preferences.
@@ -800,9 +812,13 @@ Details:
   (not below `min_gap`).
 - `set` keys: title, subtitle, composer, composer_short, pages (auto or N), paper (letter, a4 or
   ledger), gap, min_gap, ink, scale, min_staff_mm, margin_top, margin_bottom,
-  margin_side, gutter, duplex, bar_numbers, bar_raise, bar_size, large, logo,
+  margin_side, gutter, binding, duplex, bar_numbers, bar_raise, bar_size, large, logo,
   reflow, reflow_offer, max_staff_mm, title_page, group_gap, rests, turns, and per part
-  breaks. Bad keys or values change nothing.
+  breaks
+  (per part, as `Name:key=value`: pages, gap, min_gap, scale, min_staff_mm, max_staff_mm,
+  group_gap, reflow, title_page, bar_raise, bar_size, ink, turns, breaks, and since 0.8.4
+  paper, margin_top, margin_bottom, margin_side, gutter, binding, duplex).
+  Bad keys or values change nothing.
 - `bars ID`: one line per system with its first bar and letters; `p N` pickup
   on/off (movement starts), `s N` split on/off (bars after a repeat), `f N=B`
   line N starts at bar B (`f N=` clears), `m B [B ...]` rehearsal marks on/off

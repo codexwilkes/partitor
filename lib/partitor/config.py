@@ -173,7 +173,7 @@ LAYOUT_DEFAULTS = {"paper": "letter", "scale": None, "gap": 10.0, "gap_min": 7.0
                    "clearance": 1.0, "page_count": None, "min_staff_mm": 5.0,
                    "ink": "normal", "bar_numbers": "start",
                    "margin_top": 15.0, "margin_bottom": 15.0, "margin_side": 15.0,
-                   "gutter": 5.0, "duplex": "auto",
+                   "gutter": 5.0, "binding": 0.0, "duplex": "auto",
                    "bar_raise": 1.0, "bar_size": 2.0, "large": "on", "logo": "on",
                    "title_page": "auto", "reflow": "off", "rests": "compress", "max_staff_mm": 8.0,
                    "small_mm": 6.5, "group_gap": None, "reflow_offer": "off",
@@ -257,7 +257,10 @@ def check_margins(opts: dict) -> str:
             return f"{k} {opts[k]} mm is below {MIN_MARGIN_MM} mm"
     if float(opts["gutter"]) < 0:
         return "gutter must not be negative"
-    if float(opts["margin_side"]) - float(opts["gutter"]) / 2 < MIN_MARGIN_MM:
+    if float(opts.get("binding") or 0) < 0:
+        return "binding must not be negative"
+    if not float(opts.get("binding") or 0) and \
+       float(opts["margin_side"]) - float(opts["gutter"]) / 2 < MIN_MARGIN_MM:
         return (f"gutter {opts['gutter']} mm leaves an outer margin below "
                 f"{MIN_MARGIN_MM} mm (margin_side {opts['margin_side']} mm)")
     if opts["duplex"] not in ("auto", "on", "off"):

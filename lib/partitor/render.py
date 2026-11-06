@@ -45,12 +45,23 @@ def page_box(opts: dict, pi: int, duplex: bool) -> tuple[float, float, float, fl
     """page_box -> (left, right, top, bottom) margins in pt for page index pi
     (0 = page 1, a recto). Double-sided: the spine margin (left on a recto,
     right on a verso) gains `gutter`/2 and the outer margin loses it, so
-    the text width, and with it the staff size, is the same on every page."""
+    the text width, and with it the staff size, is the same on every page.
+    With `binding` (0.8.4) the outer margin stays `margin_side` and the spine
+    margin is `binding` mm wider: room for a punch or a comb binding."""
     side = mm2pt(opts.get("margin_side", 15.0))
+    bind = mm2pt(opts.get("binding") or 0.0) if duplex else 0.0
     g = mm2pt(opts.get("gutter", 0.0)) / 2 if duplex else 0.0
-    inner, outer = side + g, side - g
+    inner, outer = (side + bind, side) if bind else (side + g, side - g)
     left, right = (inner, outer) if pi % 2 == 0 else (outer, inner)
     return left, right, mm2pt(opts.get("margin_top", 15.0)), mm2pt(opts.get("margin_bottom", 15.0))
+
+
+def usable_width(opts: dict, pw: float) -> float:
+    """usable_width -> text width (pt) of a page of width pw. The staff is
+    sized as for a bound part: `binding` is taken unless duplex is off, so a
+    part of 1 or 2 pages (single-sided, no spine) keeps its staff size."""
+    bind = 0.0 if opts.get("duplex", "auto") == "off" else mm2pt(opts.get("binding") or 0.0)
+    return pw - 2 * mm2pt(opts.get("margin_side", 15.0)) - bind
 
 
 def is_duplex(opts: dict, npages: int) -> bool:
@@ -165,7 +176,7 @@ def choose_reflow(strips: list[Strip], dpi: int, opts: dict, pre: list | None = 
     smallest scale tried, when lower than `min_staff_mm` gives (a page
     budget below the size of the source lines must still find a layout)."""
     pw, _ = PAPER[opts["paper"]]
-    usable = pw - 2 * mm2pt(opts.get("margin_side", 15.0))
+    usable = usable_width(opts, pw)
     sp = strips[0].sp
     pre = find_prefixes(strips) if pre is None else pre
     cap_px = reflow_caps(strips, pre)
@@ -211,7 +222,7 @@ def choose_reflow(strips: list[Strip], dpi: int, opts: dict, pre: list | None = 
 def fit_scale(strips: list[Strip], dpi: int, opts: dict) -> float:
     """Largest scale <= opts.scale whose widest strip fits the page width."""
     pw, _ = PAPER[opts["paper"]]
-    usable = pw - 2 * mm2pt(opts.get("margin_side", 15.0))
+    usable = usable_width(opts, pw)
     widest = max(s.img.shape[1] for s in strips) * 72.0 / dpi
     # ceiling: `scale` when set, else the size that gives max_staff_mm
     cap = opts.get("scale") or (opts.get("max_staff_mm", 8.0) * dpi

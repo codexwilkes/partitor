@@ -139,7 +139,9 @@
 #       Page margins (default 15 mm each; floor 5 mm).
 #   --gutter MM / --duplex auto|on|off
 #       Double-sided print: spine margin gutter mm wider than the outer
-#       margin (default 5). auto = double-sided above 2 pages.
+#       margin (default 5). auto = double-sided above 2 pages. For a punch or
+#       a comb binding use the layout key binding (set ID binding=12.7): the
+#       spine margin is that much wider and gutter is not used.
 #   --large on|off
 #       Also write a large-print copy of each part (default on): Letter ->
 #       11x17 (page scaled to the 11 in width, at the top, crop marks at

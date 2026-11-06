@@ -194,6 +194,47 @@ class TestLayoutModel(unittest.TestCase):
         l3, r3, _, _ = pt.page_box(o, 1, False)
         self.assertAlmostEqual(l3, r3)
 
+    def test_page_box_binding_adds_room_at_the_spine_only(self):
+        o = {**pt.LAYOUT_DEFAULTS, "margin_side": 8.0, "binding": 12.7}
+        l1, r1, _, _ = pt.page_box(o, 0, True)       # recto: spine left
+        l2, r2, _, _ = pt.page_box(o, 1, True)       # verso: spine right
+        self.assertAlmostEqual(r1, pt.mm2pt(8.0))    # outer margin as set
+        self.assertAlmostEqual(l1, pt.mm2pt(8.0 + 12.7))
+        self.assertAlmostEqual(l2, pt.mm2pt(8.0))
+        self.assertAlmostEqual(r2, pt.mm2pt(8.0 + 12.7))
+        self.assertAlmostEqual(l1 + r1, l2 + r2)     # the same text width on every page
+        l3, r3, _, _ = pt.page_box(o, 0, False)      # single-sided: no spine
+        self.assertAlmostEqual(l3, pt.mm2pt(8.0))
+        self.assertAlmostEqual(r3, pt.mm2pt(8.0))
+
+    def test_binding_replaces_the_gutter(self):
+        o = {**pt.LAYOUT_DEFAULTS, "margin_side": 8.0, "gutter": 5.0, "binding": 12.7}
+        l1, r1, _, _ = pt.page_box(o, 0, True)
+        self.assertAlmostEqual(r1, pt.mm2pt(8.0))    # the gutter does not shrink the outer margin
+        self.assertAlmostEqual(l1, pt.mm2pt(20.7))
+
+    def test_without_binding_the_gutter_model_is_unchanged(self):
+        o = {**pt.LAYOUT_DEFAULTS, "margin_side": 15.0, "gutter": 6.0, "binding": 0.0}
+        l1, r1, _, _ = pt.page_box(o, 0, True)
+        self.assertAlmostEqual(l1, pt.mm2pt(18.0))
+        self.assertAlmostEqual(r1, pt.mm2pt(12.0))
+
+    def test_usable_width_takes_the_binding_unless_duplex_is_off(self):
+        o = {**pt.LAYOUT_DEFAULTS, "margin_side": 8.0, "binding": 12.7}
+        pw = pt.PAPER["letter"][0]
+        self.assertAlmostEqual(pt.usable_width(o, pw), pw - pt.mm2pt(2 * 8.0 + 12.7))
+        self.assertAlmostEqual(pt.usable_width({**o, "duplex": "off"}, pw), pw - pt.mm2pt(16.0))
+        self.assertAlmostEqual(pt.usable_width({**pt.LAYOUT_DEFAULTS}, pw), pw - pt.mm2pt(30.0))
+
+    def test_check_margins_binding(self):
+        o = {**pt.LAYOUT_DEFAULTS}
+        self.assertEqual(pt.check_margins(o), "")
+        self.assertIn("binding", pt.check_margins({**o, "binding": -1.0}))
+        # with a binding the gutter is not used: a small side margin and the default gutter is fine
+        self.assertNotEqual(pt.check_margins({**o, "margin_side": 6.0}), "")
+        self.assertEqual(pt.check_margins({**o, "margin_side": 6.0, "binding": 12.7}), "")
+        self.assertIn("margin_side", pt.check_margins({**o, "margin_side": 3.0, "binding": 12.7}))
+
     def test_duplex_auto_over_two_pages(self):
         o = {**pt.LAYOUT_DEFAULTS}
         self.assertEqual([pt.is_duplex(o, n) for n in (1, 2, 3)], [False, False, True])
@@ -460,10 +501,14 @@ class TestLedger(unittest.TestCase):
             seen.append(cur)
         self.assertEqual(seen, ["a4", "ledger", "letter"])
 
-    def test_per_part_paper_stays_refused(self):
-        data = {"parts": ["Canto"], "layout": {}}
+    def test_paper_is_a_per_part_key(self):
+        """0.8.4: one part on Letter while the item is on ledger, and the other way round."""
+        data = {"parts": ["Canto"], "layout": {"paper": "ledger"}}
+        pt.apply_set(data, ["Canto:paper=letter"])
+        self.assertEqual(pt.part_layout(data, "Canto")["paper"], "letter")
+        self.assertEqual(pt.part_layout(data, None)["paper"], "ledger")
         with self.assertRaises(ValueError):
-            pt.apply_set(data, ["Canto:paper=ledger"])
+            pt.apply_set(data, ["Canto:paper=a3"])
 
     def test_width_fit_is_the_page_width_ratio(self):
         # a line 720 pt wide: Letter holds 527 pt, ledger 1139 pt (margins 15 mm)
