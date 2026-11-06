@@ -17,6 +17,7 @@
 1 parallel    test_parallel.py
 1 reflow      test_layout.py
 1 strips      test_layout.py
+1 turnplan    test_turnplan.py
 1 vision      test_analysis.py
 2 lines       test_layout.py,test_render.py
 2 ownership   test_analysis.py exempt

@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.8.2. Section numbers are stable: the code cites
+Status: describes partitor 0.8.3. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -704,6 +704,33 @@ PDF (`large: on`, default):
 
 ---
 
+### 5.7 Page-turn planner for bound parts (`turnplan`)
+
+Status: the planner exists and is tested; the build does not use it yet (it still uses
+`plan_pages`, §5.4). Pure functions, no strips and no drawing: `plan_turns` takes the height of a
+run of lines, the page height and, for each page break, a `Boundary` (bars of rest next to it, a
+movement start, bars one staff rests), and returns a `Plan`: groups of pages, the class of every
+turn, the cost.
+
+- A bound part (3 or more pages, printed double-sided) is read as spreads: a verso and a recto, a
+  turn after each recto. A part without a title page starts with a recto on its own.
+- Turn classes, cheapest that applies: `rest` (2 bars or more of rest, all staves; 0), `rest1` (one
+  bar; 100), `attacca` (a movement starts, no rest; 150), `bridge` (the player is playing, but one
+  staff rests next to the turn: tape a few notes over it; 800), `bad` (5000). A turn while playing
+  is high but finite: a rehearsal part with a bad turn beats no part. The costs are constants in
+  `typography` (`PLAN_*`, `TURN_MOVE`) and a `Costs` value.
+- A fold-out group has three faces with no turn between them: verso, recto and a flap that folds
+  out to the right of the recto (or flap, verso, recto). The stand holds three faces at most. The
+  flap is unfolded at the start of the spread and folded in over its page before the turn (an open
+  flap is never turned: it would hang off the stand and dip). So the turn before a fold-out group
+  and the turn after it must both be rest turns (`rest` or `rest1`); the group costs 300 more
+  (`PLAN_FOLD`). A fold-out is chosen only when it lowers the total cost. The first page of a part
+  without a title page never starts one.
+- Pages and fold-outs are chosen for the whole part at once (dynamic programming), with the page
+  costs of §5.4 (`PAGE_COST`, `REPAGE_FILL`, `SHORT_LAST`). Manual breaks (`breaks`) end a page.
+- Not done yet: the one-bar and per-staff rest data (`bridge_bars`) from the analysis, the
+  `plan` command, per-part paper, and the print of the fold-out sheets.
+
 ## 6. CLI
 
 ### 6.1 Principles
@@ -964,6 +991,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 1 | `parallel` | `fork_map`, job and memory sizing |
 | 1 | `reflow` | Re-flow of strips |
 | 1 | `strips` | Strip build, group strips, bar marks, rehearsal boxes |
+| 1 | `turnplan` | Page-turn planner: spreads, fold-outs, turn classes (§5.7) |
 | 2 | `ownership` | Ink ownership, safety gate, barline detect |
 | 2 | `lines` | Line fitting, labels, multi-bar rests, saved lines |
 | 2 | `stagecache` | Stage cache of the page analysis (§12.4) |
@@ -996,6 +1024,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | §4.4 parallel | `parallel` |
 | §12.4 stage cache | `stagecache`, `analysis` |
 | §5.1 to 5.4, 5.6 layout | `render` |
+| §5.7 page-turn planner | `turnplan` |
 | §5.5 typography | `typography`, `lines` |
 | §6 CLI | `cli_*` |
 | §8 security (sandbox check) | `cli_main` |

@@ -59,9 +59,16 @@ def put_text(page: pymupdf.Page, xy: tuple[float, float], text: str, kind: str,
 TURN_BAD = 100.0        # a page turn that does not fall at a section boundary
 PAGE_COST = 30.0        # each page of music
 SHORT_LAST = 50.0       # last page with fewer than MIN_LAST_LINES lines
+MIN_LAST_LINES = 3      # a part's last page holds at least this many lines
 FILL_COST = 10.0        # unfilled share of a page (squared), pages before the last
 # turns=rest (0.3.0-dev.37, `repage`): the player turns only while resting.
 TURN_HARD = 1000.0      # a turn while playing (always worse than any other cost)
 TURN_MOVE = 150.0       # turns=rest: a turn at a movement start, no rest (not always attacca)
 REPAGE_FILL = 40.0      # unfilled share of a page (squared); medium weight
 REST_TURN_MIN = 2       # a rest turn: a multi-bar rest of at least this many bars
+# turnplan (0.8.3): turn classes of the spread / fold-out planner. A turn while
+# playing is high but finite (a rehearsal part with a bad turn beats no part).
+PLAN_REST_ONE = 100.0   # a turn at a one-bar rest (two bars or more: 0)
+PLAN_FOLD = 300.0       # one fold-out (its two end turns are rest turns, counted apart)
+PLAN_BRIDGE = 800.0     # a turn while playing, but one staff rests next to it (tape a few notes)
+PLAN_BAD = 5000.0       # a turn while playing, no staff rests

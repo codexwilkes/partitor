@@ -8,6 +8,19 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.3 — 2026-11-05
+
+Add: `turnplan`, a page-turn planner for bound parts. No user-visible change yet: the build does not
+use it (DESIGN.md §5.7).
+
+- `turnplan.plan_turns`: spreads (verso and recto, a turn after each recto) and fold-out groups
+  (three faces, no turn between them), chosen for the whole part at once. Turn classes: rest (2
+  bars or more), rest1 (one bar), attacca, bridge (one staff rests next to the turn) and bad. A
+  fold-out must start and end at a rest turn: the flap is unfolded and folded in during the rest.
+- Turn costs `PLAN_REST_ONE`, `PLAN_FOLD`, `PLAN_BRIDGE` and `PLAN_BAD` in `typography`.
+- Output with the existing `plan_pages` is the same as 0.8.2.
+
+
 ## 0.8.2 — 2026-11-05
 
 Fix: re-flow cuts every music line of a group score, so the staff can grow when long source

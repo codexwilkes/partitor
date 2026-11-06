@@ -20,8 +20,8 @@ from .strips import (
     REH_PAD, ambitus_width, anchor, bar_mark, bar_x, pitches, reh_boxes, rest_box,
 )
 from .typography import (
-    FILL_COST, PAGE_COST, REPAGE_FILL, REST_TURN_MIN, SHORT_LAST, TURN_BAD, TURN_HARD,
-    TURN_MOVE, put_text, text_len,
+    FILL_COST, MIN_LAST_LINES, PAGE_COST, REPAGE_FILL, REST_TURN_MIN, SHORT_LAST, TURN_BAD,
+    TURN_HARD, TURN_MOVE, put_text, text_len,
 )
 
 
@@ -56,9 +56,6 @@ def page_box(opts: dict, pi: int, duplex: bool) -> tuple[float, float, float, fl
 def is_duplex(opts: dict, npages: int) -> bool:
     d = opts.get("duplex", "auto")
     return d == "on" or (d == "auto" and npages > 2)
-
-
-MIN_LAST_LINES = 3    # a part's last page holds at least this many lines
 
 
 def pack(strips: list[Strip], dpi: int, opts: dict
