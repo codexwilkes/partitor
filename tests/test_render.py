@@ -656,6 +656,57 @@ class TestFoldoutRender(unittest.TestCase):
             self.assertLessEqual(max(b.x1 for b in right), cut - pt.mm2pt(5.0) + 0.5)   # outside margin >= 5 mm
             self.assertAlmostEqual(left[0].width, right[0].width, places=1)           # same text width
 
+    def left(self, d, **extra):
+        return self.render(d, self.music(120, rests={38, 95}), foldside="left", **extra)
+
+    def test_a_left_fold_out_holds_the_flap_and_the_verso_and_the_previous_recto(self):
+        """Leaves 1-2 are a spread, 3-4 the left fold-out group (flap, verso 3, recto 4)."""
+        import re
+        with tempfile.TemporaryDirectory() as d:
+            out, n, info = self.left(d)
+            self.assertEqual(info["foldouts"], 1)
+            sh = pymupdf.open(Path(d, "p-foldout.pdf"))
+            self.assertEqual(len(sh), 2)
+            word = lambda pg, rx: [w[4] for w in pg.get_text("words") if re.fullmatch(rx, w[4])]
+            total = int(word(sh[0], r"\d+[ab]/\d+")[0].split("/")[1])
+            self.assertEqual(sorted(word(sh[0], r"\d+[ab]/\d+")), sorted([f"3a/{total}", f"3b/{total}"]))
+            self.assertEqual(word(sh[1], r"\d+/\d+")[:1] or [], [f"2/{total}"])      # the previous recto
+            main = pymupdf.open(out)
+            labels = {w for pg in main for w in word(pg, r"\d+/\d+")}
+            self.assertIn(f"1/{total}", labels)
+            self.assertIn(f"4/{total}", labels)
+            self.assertNotIn(f"2/{total}", labels)                                  # both are on the sheet
+            self.assertNotIn(f"3/{total}", labels)
+
+    def test_the_left_flap_is_on_the_left_inside_the_trimmed_edge(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.left(d)
+            front = pymupdf.open(Path(d, "p-foldout.pdf"))[0]
+            boxes = [pymupdf.Rect(b["bbox"]) for b in front.get_image_info()]
+            flap = [b for b in boxes if b.x1 <= 612.5]
+            verso = [b for b in boxes if b.x0 >= 611.5]
+            self.assertTrue(flap and verso)
+            self.assertGreaterEqual(min(b.x0 for b in flap), pt.TRIM_PT + pt.mm2pt(5.0) - 0.5)   # outside margin >= 5 mm
+            self.assertAlmostEqual(flap[0].width, verso[0].width, places=1)                      # same text width
+            self.assertLessEqual(max(b.x1 for b in verso), 1224.0 - pt.mm2pt(8.0 + 12.7) + 0.5)  # spine at the right edge
+
+    def test_the_left_sheet_back_has_the_recto_on_the_left_and_a_blank_flap_outside(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.left(d)
+            back = pymupdf.open(Path(d, "p-foldout.pdf"))[1]
+            boxes = [pymupdf.Rect(b["bbox"]) for b in back.get_image_info()]
+            self.assertTrue(boxes and all(b.x1 <= 612.5 for b in boxes))          # nothing on the right half
+            self.assertGreaterEqual(min(b.x0 for b in boxes), pt.mm2pt(8.0 + 12.7) - 0.5)   # recto: spine at the left
+
+    def test_auto_takes_the_right_side_on_a_tie_and_the_sides_are_keys(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.render(d, self.music(120, rests={38, 95}), foldside="auto")
+            front = pymupdf.open(Path(d, "p-foldout.pdf"))[0]
+            self.assertIn("a/", front.get_text())
+        self.assertEqual(pt.fold_sides({}), ("right",))
+        self.assertEqual(pt.fold_sides({"foldside": "left"}), ("left",))
+        self.assertEqual(pt.fold_sides({"foldside": "auto"}), ("right", "left"))
+
     def test_a_part_with_rests_needs_no_fold_out(self):
         with tempfile.TemporaryDirectory() as d:
             st = self.music(40, rests={9, 17, 25, 33})

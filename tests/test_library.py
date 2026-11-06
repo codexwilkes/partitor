@@ -468,7 +468,10 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(data["layout"]["binding"], 0.0)
         self.assertEqual(data["layout"][pt.PART_LAYOUT_KEY]["Trombones"],
                          {"paper": "letter", "binding": 12.7, "margin_side": 8.0})
-        for bad in (["Trombones:paper=a3"], ["Trombones:binding=x"], ["Trombones:binding=-2"]):
+        pt.apply_set(data, ["Trombones:foldside=left", "Trombones:foldouts=on"])
+        self.assertEqual(data["layout"][pt.PART_LAYOUT_KEY]["Trombones"]["foldside"], "left")
+        for bad in (["Trombones:paper=a3"], ["Trombones:binding=x"], ["Trombones:binding=-2"],
+                    ["Trombones:foldside=up"], ["foldside=up"]):
             with self.subTest(bad=bad):
                 before = repr(data["layout"])
                 with self.assertRaises(ValueError):

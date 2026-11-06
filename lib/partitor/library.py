@@ -62,14 +62,14 @@ SET_KEYS = {          # set key -> (layout key or None for metadata, parser)
     "group_gap": ("group_gap", "gapsp"),
     "rests": ("rests", ("compress", "keep")),
     "turns": ("turns", ("any", "rest")), "breaks": ("breaks", "breaks"),
-    "foldouts": ("foldouts", ("off", "on")),
+    "foldouts": ("foldouts", ("off", "on")), "foldside": ("foldside", ("right", "left", "auto")),
 }
 GAP_MAX = 14.0        # expand never sets a wider gap (sp)
 PART_SET_KEYS = {"pages", "gap", "min_gap", "scale", "min_staff_mm", "max_staff_mm", "group_gap",
                  "reflow", "title_page", "bar_raise", "bar_size", "ink", "turns", "breaks",
                  "paper", "margin_top", "margin_bottom", "margin_side", "gutter", "binding", "duplex",
-                 "foldouts"}
-REPAGE_KEYS = ("turns", "breaks", "duplex", "title_page", "foldouts")   # `repage` applies these without a rebuild
+                 "foldouts", "foldside"}
+REPAGE_KEYS = ("turns", "breaks", "duplex", "title_page", "foldouts", "foldside")   # `repage` applies these without a rebuild
 
 
 def set_name(layout_key: str) -> str:

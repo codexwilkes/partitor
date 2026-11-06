@@ -8,6 +8,20 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.8 — 2026-11-05
+
+Add: left fold-outs (DESIGN.md §5.7). Layout key `foldside`: `right` (default), `left` or `auto`.
+
+- A left fold-out has the flap to the left of the verso (flap, verso, recto). Its sheet holds the flap
+  and the verso on one side and the last recto of the previous group on the other. The flap is numbered
+  `6a`, the verso `6b`.
+- The planner follows the physical rules: a right fold-out cannot be followed by a left one, and a left
+  fold-out cannot open the part after a title page. `auto` takes the right side unless the rules
+  forbid it (the cost is the same).
+- The sheet file and its cut and fold lines are as for the right fold-out. `repage` applies `foldside`.
+- With `foldouts: off` or `foldside: right` output is the same as 0.8.7.
+
+
 ## 0.8.7 — 2026-11-05
 
 Fix: `plan` models the label column of a group score, so the staff of a row is the staff that is printed.

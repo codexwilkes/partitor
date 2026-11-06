@@ -177,7 +177,8 @@ LAYOUT_DEFAULTS = {"paper": "letter", "scale": None, "gap": 10.0, "gap_min": 7.0
                    "bar_raise": 1.0, "bar_size": 2.0, "large": "on", "logo": "on",
                    "title_page": "auto", "reflow": "off", "rests": "compress", "max_staff_mm": 8.0,
                    "small_mm": 6.5, "group_gap": None, "reflow_offer": "off",
-                   "turns": "any", "breaks": None, "foldouts": "off"}
+                   "turns": "any", "breaks": None, "foldouts": "off",
+                   "foldside": "right"}
 
 HEADER_CLEAR_SP = 2.5  # min clearance above header ink (staff spaces)
 

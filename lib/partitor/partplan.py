@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 from .config import PAPER
 from .reflow import _break_lines, find_prefixes
-from .render import LARGE, RUN_HEAD, TITLE_BAND, page_box, usable_width
+from .render import LARGE, RUN_HEAD, TITLE_BAND, fold_sides, page_box, usable_width
 from .strips import BAR_END_SP, pitches
 from .turnplan import Boundary, Plan, plan_turns
 
@@ -173,7 +173,7 @@ def estimate(src: Source, opts: dict, paper: str, staff_mm: float) -> Option:
         band = RUN_HEAD if title else TITLE_BAND
         return plan_turns(n, height(k), ph - mt - mb - RUN_HEAD, bounds,
                           avail_first=ph - mt - mb - band, title_page=title,
-                          allow_fold=fold, forced=forced)
+                          allow_fold=fold, forced=forced, fold_sides=fold_sides(opts))
     best, title = plan(False, k1), False
     if opts.get("title_page", "auto") == "auto" and best.pages >= 3:
         tp = plan(True, k1)

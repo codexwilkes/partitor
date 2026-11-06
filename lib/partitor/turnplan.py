@@ -11,7 +11,15 @@ A bound part is read as spreads: a verso and a recto (two content pages), a
 turn after each recto. A fold-out group has three faces (verso, recto, flap
 to the right of the recto; or flap, verso, recto) and one turn at its end.
 The flap is unfolded at the start of the spread and folded in before the
-turn, so both ends of a fold-out group must be rest turns."""
+turn, so both ends of a fold-out group must be rest turns.
+
+Where the faces sit on paper decides which groups may follow each other. A
+right fold-out is one leaf: its recto and flap on the front, the verso of the
+next group on the back. A left fold-out is one leaf too: the verso and the
+flap on one side, the last recto of the previous group on the other. So a
+right fold-out cannot be followed by a left one (they would need the same
+leaf with a flap on each edge), and a left fold-out cannot open the part
+after a title page (the title page would be on its back)."""
 from __future__ import annotations
 
 import functools
@@ -59,8 +67,9 @@ class Turn:
 class Group:
     """Pages read without a turn between them."""
     pages: tuple            # ((first line, end line), ...) per content page
-    fold: bool              # three faces, the third (flap) folds out
+    fold: bool              # three faces with a flap that folds out
     turn: Turn              # the turn after the group
+    side: str = ""          # a fold-out: "right" (verso, recto, flap) or "left" (flap, verso, recto)
 
     @property
     def faces(self) -> int:
@@ -79,6 +88,14 @@ class Plan:
     @property
     def folds(self) -> int:
         return sum(1 for g in self.groups if g.fold)
+
+    def sides(self) -> dict:
+        """Number of fold-outs per side."""
+        out: dict = {}
+        for g in self.groups:
+            if g.fold:
+                out[g.side] = out.get(g.side, 0) + 1
+        return out
 
     def counts(self) -> dict:
         """Number of turns per class (the end of the part is not a turn)."""
@@ -115,15 +132,17 @@ def classify(b: Boundary, costs: Costs) -> tuple[str, float]:
 def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
                bounds: list, *, avail_first: float | None = None,
                title_page: bool = True, allow_fold: bool = True,
-               forced: tuple = (), costs: Costs | None = None) -> Plan:
+               forced: tuple = (), costs: Costs | None = None,
+               fold_sides: tuple = ("right",)) -> Plan:
     """plan_turns -> Plan for n lines.
     used(i, j): height of lines i..j-1 on one page; avail: height of a page
     (avail_first: of the first content page); bounds[j]: Boundary before line
     j (0 < j < n). title_page: page 1 is a title page, so the music starts on
     a verso; else the first content page is a recto, alone, with a turn after
-    it. allow_fold: fold-out groups may be used. forced: line indices where a
-    page must end (no page runs past one). Page breaks and fold-outs are
-    chosen for the whole part at once (dynamic programming)."""
+    it. allow_fold: fold-out groups may be used, on the sides of fold_sides
+    ("right", "left"; the cheapest wins, right on a tie). forced: line indices
+    where a page must end (no page runs past one). Page breaks and fold-outs
+    are chosen for the whole part at once (dynamic programming)."""
     costs = costs or Costs()
     avail_first = avail if avail_first is None else avail_first
     forced = tuple(sorted(f for f in set(forced) if 0 < f < n))
@@ -158,10 +177,13 @@ def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
     def foldable(t: Turn) -> bool:
         return t.cls in ("rest", "rest1")
 
+    sides = tuple(s for s in fold_sides if s in ("right", "left")) if allow_fold else ()
+
     @functools.lru_cache(maxsize=None)
-    def best(i: int, entry_ok: bool):
+    def best(i: int, entry_ok: bool, prev_right: bool = False):
         """Lines i..n-1 as groups, the first group starting on a verso.
-        entry_ok: the turn before i is a rest turn (a fold-out may start)."""
+        entry_ok: the turn before i is a rest turn (a fold-out may start).
+        prev_right: the group before i is a right fold-out."""
         if i >= n:
             return 0.0, ()
         found = []
@@ -176,21 +198,24 @@ def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
                     found.append((cb, (Group(((i, a), (a, b)), False, turn(n)),)))
                     continue
                 t = turn(b)
-                sub, rest = best(b, foldable(t))
+                sub, rest = best(b, foldable(t), False)
                 found.append((cb + t.cost + sub, (Group(((i, a), (a, b)), False, t),) + rest))
-                if not (allow_fold and entry_ok):
+                if not (sides and entry_ok):
                     continue
                 for c in page_ends(b):
                     cc = cb + page_cost(b, c) + costs.fold
-                    if c == n:
-                        found.append((cc, (Group(((i, a), (a, b), (b, c)), True, turn(n)),)))
-                        continue
-                    t = turn(c)
-                    if not foldable(t):
-                        continue
-                    sub, rest = best(c, True)
-                    found.append((cc + t.cost + sub,
-                                  (Group(((i, a), (a, b), (b, c)), True, t),) + rest))
+                    for side in sides:
+                        if side == "left" and (prev_right or (i == 0 and title_page)):
+                            continue
+                        pages3 = ((i, a), (a, b), (b, c))
+                        if c == n:
+                            found.append((cc, (Group(pages3, True, turn(n), side),)))
+                            continue
+                        t = turn(c)
+                        if not foldable(t):
+                            continue
+                        sub, rest = best(c, True, side == "right")
+                        found.append((cc + t.cost + sub, (Group(pages3, True, t, side),) + rest))
         if not found:
             return INF, ()
         return min(found, key=lambda f: f[0])
@@ -207,7 +232,7 @@ def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
             found.append((page_cost(0, a), (Group(((0, a),), False, turn(n)),)))
             continue
         t = turn(a)
-        sub, rest = best(a, foldable(t))
+        sub, rest = best(a, foldable(t), False)
         found.append((page_cost(0, a) + t.cost + sub, (Group(((0, a),), False, t),) + rest))
     cost, groups = min(found, key=lambda f: f[0])
     return Plan(groups, cost)

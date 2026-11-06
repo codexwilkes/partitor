@@ -164,5 +164,53 @@ class TestFoldOuts(unittest.TestCase):
         self.assertEqual(run(12, allow_fold=False).folds, 0)
 
 
+
+class TestLeftFoldOuts(unittest.TestCase):
+    """A left fold-out (flap, verso, recto) and which groups may follow each other."""
+
+    def test_the_side_is_right_by_default_and_left_on_request(self):
+        p = run(12)
+        self.assertEqual([g.side for g in p.groups if g.fold], ["right"])
+        self.assertEqual(p.sides(), {"right": 1})
+        # a left fold-out after a spread: 8 lines, a rest, 12 lines (3 pages), a rest, 8 lines
+        b = {8: B(rest_bars=3), 20: B(rest_bars=3)}
+        p = run(28, b, fold_sides=("left",))
+        folds = [g for g in p.groups if g.fold]
+        self.assertEqual([g.side for g in folds], ["left"])
+        self.assertEqual(folds[0].pages[0][0], 8)
+
+    def test_both_sides_allowed_the_right_one_wins_a_tie(self):
+        p = run(12, fold_sides=("right", "left"))
+        self.assertEqual([g.side for g in p.groups if g.fold], ["right"])
+
+    def test_a_left_fold_out_cannot_open_the_part_after_a_title_page(self):
+        p = run(12, fold_sides=("left",))
+        self.assertEqual(p.folds, 0)                        # the title page would be on its back
+        self.assertEqual(p.counts(), {"bad": 1})
+
+    def test_without_a_title_page_a_left_fold_out_may_follow_the_first_recto(self):
+        p = run(16, {4: B(rest_bars=3)}, title_page=False, fold_sides=("left",))
+        self.assertEqual([g.side for g in p.groups if g.fold], ["left"])
+        self.assertEqual(p.groups[0].faces, 1)
+
+    def test_a_right_fold_out_is_never_followed_by_a_left_one(self):
+        # two 3-page stretches, a rest between them and at the end of the first
+        b = {12: B(rest_bars=3)}
+        p = run(24, b, fold_sides=("left", "right"))      # left first: it would win a tie
+        sides = [g.side for g in p.groups if g.fold]
+        for a, c in zip(sides, sides[1:]):
+            self.assertFalse(a == "right" and c == "left")
+        self.assertEqual(sides, ["right", "right"])         # the second one must be right too
+
+    def test_a_left_fold_out_may_follow_a_left_one(self):
+        b = {8: B(rest_bars=3), 20: B(rest_bars=3), 32: B(rest_bars=3)}
+        p = run(40, b, fold_sides=("left",))
+        self.assertEqual([g.side for g in p.groups if g.fold], ["left", "left"])
+
+    def test_no_sides_no_fold_outs(self):
+        self.assertEqual(run(12, fold_sides=()).folds, 0)
+        self.assertEqual(run(12, allow_fold=False, fold_sides=("right", "left")).folds, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

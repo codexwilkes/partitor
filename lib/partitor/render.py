@@ -454,6 +454,12 @@ def plan_pages(strips: list[Strip], dpi: int, opts: dict, title_page: bool
 TRIM_PT = 36.0         # 1/2 in cut off the free edge of a fold-out flap
 
 
+def fold_sides(opts: dict) -> tuple:
+    """fold_sides -> the sides fold-outs may take: the key `foldside` (right, left,
+    auto = either, the cheaper one; right on a tie)."""
+    return {"left": ("left",), "auto": ("right", "left")}.get(opts.get("foldside", "right"), ("right",))
+
+
 def folds_wanted(opts: dict) -> bool:
     """The planner of turnplan (spreads, fold-outs) runs for double-sided parts
     with `foldouts: on`; single-sided print has a turn after every page."""
@@ -487,7 +493,8 @@ def plan_faces(strips: list[Strip], dpi: int, opts: dict, title_page: bool):
                                 if strips[t].rest_src is not None), default=0),
                  movement=bool(strips[j].movement)) for j in range(1, n)]
     plan = plan_turns(n, height, availn, bounds, avail_first=avail1, title_page=title_page,
-                      allow_fold=opts["paper"] in LARGE, forced=tuple(opts.get("_breaks") or []))
+                      allow_fold=opts["paper"] in LARGE, forced=tuple(opts.get("_breaks") or []),
+                      fold_sides=fold_sides(opts))
     flat = [pg for g in plan.groups for pg in g.pages]
     pages = []
     for c, (i, j) in enumerate(flat):
@@ -881,35 +888,53 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
     """render_plan -> physical page count of the part PDF. The part of a plan
     with fold-outs (DESIGN.md §5.7): out holds the Letter pages; the sheets of
     the fold-outs are in <out>-foldout.pdf, one ledger sheet (two pages: front
-    and back) per fold-out. A right fold-out group is verso, recto, flap: the
-    recto and the flap are the front of a sheet, its back is the verso of the
-    next group (the leaf of the recto). Page numbers count leaves: the recto
-    is 7a and the flap 7b. The flap is trimmed 1/2 in at its free edge."""
+    and back) per fold-out. A sheet is one leaf with a flap on its outer edge.
+    Right fold-out (verso, recto, flap): the front of the sheet is the recto and
+    the flap, its back the verso of the next group. Left fold-out (flap, verso,
+    recto): one side is the flap and the verso, the other the last recto of the
+    previous group. Page numbers count leaves: the recto is 7a and the flap 7b
+    (right); the flap 6a and the verso 6b (left). The flap is trimmed 1/2 in at
+    its free edge and folds forward over its page."""
     pw, ph = PAPER[opts["paper"]]
     k = 72.0 / dpi * (opts.get("scale") or 1.0)
     left_ink = max(anchor(s) for s in strips)
     faces, leaf, idx = [], 0, 0
     for gi, g in enumerate(plan.groups):
+        order = ("flap", "bound", "normal") if g.fold and g.side == "left" else \
+                ("normal", "bound", "flap") if g.fold else ("normal", "normal")
         for fi in range(g.faces):
-            role = "normal" if not g.fold or fi == 0 else ("bound" if fi == 1 else "flap")
+            role = order[fi]
             if role != "flap":
                 leaf += 1
             faces.append({"group": gi, "role": role, "leaf": leaf, "page": pages[idx], "idx": idx,
-                          "book": leaf + (1 if title_page else 0), "sheet": None})
+                          "book": leaf + (1 if title_page else 0), "sheet": None, "side": g.side})
             idx += 1
+    for gi, g in enumerate(plan.groups):         # a left flap precedes its verso: same leaf number
+        if g.fold and g.side == "left":
+            fl = next(f for f in faces if f["group"] == gi and f["role"] == "flap")
+            fl["leaf"] = next(f for f in faces if f["group"] == gi and f["role"] == "bound")["leaf"]
     total = leaf
     for gi, g in enumerate(plan.groups):
         if not g.fold:
             continue
-        nxt = next((f for f in faces if f["group"] == gi + 1 and f["role"] == "normal"), None)
         for f in faces:
             if f["group"] == gi and f["role"] in ("bound", "flap"):
                 f["sheet"] = gi
-        if nxt is not None and nxt["sheet"] is None:
-            nxt["sheet"] = gi
+        if g.side == "left":                     # the sheet's other side: the previous recto
+            prev = [f for f in faces if f["group"] == gi - 1 and f["role"] != "flap"]
+            if prev and prev[-1]["sheet"] is None:
+                prev[-1]["sheet"] = gi
+        else:                                    # the verso of the next group
+            nxt = next((f for f in faces if f["group"] == gi + 1 and f["role"] == "normal"), None)
+            if nxt is not None and nxt["sheet"] is None:
+                nxt["sheet"] = gi
     for f in faces:
-        f["label"] = {"normal": f"{f['leaf']}/{total}", "bound": f"{f['leaf']}a/{total}",
-                      "flap": f"{f['leaf']}b/{total}"}[f["role"]]
+        if f["role"] == "normal":
+            f["label"] = f"{f['leaf']}/{total}"
+        elif f["side"] == "left":
+            f["label"] = f"{f['leaf']}{'a' if f['role'] == 'flap' else 'b'}/{total}"
+        else:
+            f["label"] = f"{f['leaf']}{'a' if f['role'] == 'bound' else 'b'}/{total}"
     LAST_RENDER["turns"] = plan_turn_list(strips, plan, faces, breaks)
     nfaces = len(faces)
 
@@ -919,6 +944,15 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
                     title_band=(f["idx"] == 0 and not title_page), head_right=head_right,
                     folio=f["label"], last=(f["idx"] == nfaces - 1 and f["sheet"] is None))
 
+    def put(sheet: pymupdf.Page, f: dict, x0: float, width: float | None = None,
+            margins: tuple | None = None) -> None:
+        """Draw face f on a sheet page: a leaf face at x0 with its own margins, or a flap."""
+        ml, mr, mt, mb = page_box(opts, f["book"] - 1, True)
+        if margins is not None:
+            ml, mr = margins
+        draw_face(sheet, f["page"], strips, name, meta, opts, k, left_ink,
+                  face_for(f, x0, pw if width is None else width, ml, mr, mt, mb, f["book"] % 2 == 1))
+
     doc = pymupdf.open()
     if title_page:
         page = doc.new_page(width=pw, height=ph)
@@ -927,9 +961,7 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
         if f["sheet"] is not None:
             continue
         page = doc.new_page(width=pw, height=ph)
-        ml, mr, mt, mb = page_box(opts, f["book"] - 1, True)
-        draw_face(page, f["page"], strips, name, meta, opts, k, left_ink,
-                  face_for(f, 0.0, pw, ml, mr, mt, mb, f["book"] % 2 == 1))
+        put(page, f, 0.0)
     if plan.folds and len(doc) % 2:
         doc.new_page(width=pw, height=ph)          # a blank back: the leaves print in pairs
     doc.save(out, garbage=3, deflate=True)
@@ -938,28 +970,34 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
         foldout = out.with_name(out.stem + "-foldout.pdf")
         sheets = pymupdf.open()
         flap_w = pw - TRIM_PT
+        fm, em = flap_margins(opts, pw, flap_w)        # fold side, free edge
+        mt = page_box(opts, 0, True)[2]
         for gi, g in enumerate(plan.groups):
             if not g.fold:
                 continue
             fb = next(f for f in faces if f["group"] == gi and f["role"] == "bound")
             ff = next(f for f in faces if f["group"] == gi and f["role"] == "flap")
-            nx = next((f for f in faces if f["sheet"] == gi and f["role"] == "normal"), None)
+            other = next((f for f in faces if f["sheet"] == gi and f["role"] == "normal"), None)
+            left = g.side == "left"
+            # a page object is only valid until the next page is added: draw each page at once
             front = sheets.new_page(width=2 * pw, height=ph)
-            ml, mr, mt, mb = page_box(opts, fb["book"] - 1, True)
-            draw_face(front, fb["page"], strips, name, meta, opts, k, left_ink,
-                      face_for(fb, 0.0, pw, ml, mr, mt, mb, True))
-            fm, em = flap_margins(opts, pw, flap_w)
-            draw_face(front, ff["page"], strips, name, meta, opts, k, left_ink,
-                      face_for(ff, pw, flap_w, fm, em, mt, mb, True))
-            _sheet_guides(front, pw, ph, 2 * pw - TRIM_PT, mt,
-                          f"{name}: fold-out {fb['leaf']}a / {fb['leaf']}b. Cut at the right dotted "
-                          f"line, fold at the middle, flap forward over {fb['leaf']}a.")
+            if left:                 # flap | verso (spine at the right edge)
+                put(front, ff, TRIM_PT, flap_w, (em, fm))
+                put(front, fb, pw)
+                _sheet_guides(front, pw, ph, TRIM_PT, mt,
+                              f"{name}: fold-out {ff['leaf']}a / {fb['leaf']}b. Cut at the left dotted "
+                              f"line, fold at the middle, flap forward over {fb['leaf']}b.")
+            else:                    # recto (spine at the left edge) | flap
+                put(front, fb, 0.0)
+                put(front, ff, pw, flap_w, (fm, em))
+                _sheet_guides(front, pw, ph, 2 * pw - TRIM_PT, mt,
+                              f"{name}: fold-out {fb['leaf']}a / {fb['leaf']}b. Cut at the right dotted "
+                              f"line, fold at the middle, flap forward over {fb['leaf']}a.")
             back = sheets.new_page(width=2 * pw, height=ph)
-            if nx is not None:
-                ml, mr, mt, mb = page_box(opts, nx["book"] - 1, True)
-                draw_face(back, nx["page"], strips, name, meta, opts, k, left_ink,
-                          face_for(nx, pw, pw, ml, mr, mt, mb, False))
-            _sheet_guides(back, pw, ph, TRIM_PT, mt, "Back of the sheet (outside of the flap: blank).")
+            if other is not None:    # left: previous recto | flap outside; right: flap outside | next verso
+                put(back, other, 0.0 if left else pw)
+            _sheet_guides(back, pw, ph, 2 * pw - TRIM_PT if left else TRIM_PT, mt,
+                          "Back of the sheet (outside of the flap: blank).")
         sheets.save(foldout, garbage=3, deflate=True)
     LAST_RENDER.update(content=nfaces, title_page=title_page, foldouts=plan.folds,
                        foldout=foldout.name if foldout else None)

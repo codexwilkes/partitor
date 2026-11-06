@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.8.7. Section numbers are stable: the code cites
+Status: describes partitor 0.8.8. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -735,11 +735,17 @@ the cost. The pure planner is in `turnplan`; `render` feeds it (`plan_faces`, `l
   `typography` (`PLAN_*`, `TURN_MOVE`) and a `Costs` value. Today the build gives `rest`, `attacca`
   and `bad` only: `rest1` and `bridge` need rest data the analysis does not keep per staff or per bar.
 - A fold-out group has three faces with no turn between them: verso, recto and a flap that folds
-  out to the right of the recto. The stand holds three faces at most. The flap is unfolded at the
+  out to the right of the recto (a right fold-out), or flap, verso, recto with the flap to the left
+  of the verso (a left fold-out). The stand holds three faces at most. The flap is unfolded at the
   start of the spread and folded in over its page before the turn (an open flap is never turned: it
   would hang off the stand and dip). So the turn before a fold-out group and the turn after it must
   both be rest turns (`rest` or `rest1`); the group costs 300 more (`PLAN_FOLD`). A fold-out is
   chosen only when it lowers the total cost.
+- The side is the key `foldside` (`right` default, `left`, `auto`; per part too). `auto` lets the planner
+  take either side; the cost is the same, so it takes the right one unless the rules below rule it out.
+  A sheet is one leaf, so which faces share it fixes which groups may follow each other: a right
+  fold-out cannot be followed by a left one (one leaf would need a flap on each edge), and a left
+  fold-out cannot be the first group after a title page (the title page would be on its back).
 - Pages and fold-outs are chosen for the whole part at once (dynamic programming), with the page
   costs of §5.4 (`PAGE_COST`, `REPAGE_FILL`, `SHORT_LAST`). Manual breaks (`breaks`) end a page.
 
@@ -750,24 +756,27 @@ Print of a part with fold-outs (`render_plan`). Two files per part:
   the count would be odd, so the leaves print in pairs.
 - `NN-part-foldout.pdf`: one ledger sheet (17 x 11 in) per fold-out, two PDF pages: print double-sided
   (flip on the short edge), cut, fold, and bind it in place of the leaf it replaces.
-  - Front: the bound face (the recto, spine at the left) and the flap. A dotted line marks the fold
-    (the middle) and a dotted line the cut: 1/2 in off the flap's free edge, so the folded flap does
-    not stand out. The staves stop inside the margins, so no dotted line crosses ink.
-  - Back: the outside of the flap is blank; behind the bound face is the verso that follows (spine at
+  - Right fold-out. Front: the bound face (the recto, spine at the left) and the flap. A dotted line
+    marks the fold (the middle) and a dotted line the cut: 1/2 in off the flap's free edge, so the
+    folded flap does not stand out. The staves stop inside the margins, so no dotted line crosses ink.
+    Back: the outside of the flap is blank; behind the bound face is the verso that follows (spine at
     the right edge), the first face of the next group. The flap folds forward over the bound face.
+  - Left fold-out. Front: the flap (free edge at the left, cut line 1/2 in from it) and the verso
+    (spine at the right edge). Back: the last recto of the previous group (spine at the left edge)
+    on the left half and the outside of the flap, blank, on the right half. The flap folds forward
+    over the verso. Before it is turned the flap is folded in, and the previous recto is read on the
+    back of the sheet, before the turn that opens the fold-out.
   - Text width: the flap holds the same text width as every other face. The trimmed panel is 8 in
     wide, so `binding` of about 12.7 mm (the trim) leaves the margin `margin_side` on both sides of the
     flap; a smaller binding leaves less, a larger one more. The build warns when the text is too wide
     for the trimmed flap (lower `binding` or `margin_side`).
-  - Page numbers count leaves, not faces: the recto is `7a` and the flap `7b` (`7a/18`, `7b/18`), and
-    the next verso is 8. The recto, its flap and the verso behind it are one sheet.
+  - Page numbers count leaves, not faces: right fold-out, the recto is `7a` and the flap `7b` (`7a/18`,
+    `7b/18`), and the next verso is 8; left fold-out, the flap is `6a` and the verso `6b`, and the previous
+    recto is 5. Each sheet is one leaf: the Letter file leaves out its two pages.
 - The record of the part in `score.yaml` (`built`) has `foldout` (the file) and `foldouts` (the count).
   `repage` applies `foldouts` without a rebuild.
 - Fold-outs need a sheet of two pages side by side: Letter (ledger sheet) and A4 (A3 sheet). On
   ledger paper `foldouts: on` plans the turns with `turnplan` but makes no fold-out.
-- Only right fold-outs are made (flap to the right of the recto). A left fold-out (flap, verso,
-  recto) would put the previous recto on the back of the sheet; the planner does not tell the two apart,
-  so the build always makes the right one.
 - Not done yet: the one-bar and per-staff rest data (`bridge_bars`) from the analysis, and the
   3-hole marks on the sheet.
 
@@ -875,11 +884,11 @@ Details:
 - `set` keys: title, subtitle, composer, composer_short, pages (auto or N), paper (letter, a4 or
   ledger), gap, min_gap, ink, scale, min_staff_mm, margin_top, margin_bottom,
   margin_side, gutter, binding, duplex, bar_numbers, bar_raise, bar_size, large, logo,
-  reflow, reflow_offer, max_staff_mm, title_page, group_gap, rests, turns, foldouts, and per part
+  reflow, reflow_offer, max_staff_mm, title_page, group_gap, rests, turns, foldouts, foldside, and per part
   breaks
   (per part, as `Name:key=value`: pages, gap, min_gap, scale, min_staff_mm, max_staff_mm,
   group_gap, reflow, title_page, bar_raise, bar_size, ink, turns, breaks, and since 0.8.4
-  paper, margin_top, margin_bottom, margin_side, gutter, binding, duplex, foldouts).
+  paper, margin_top, margin_bottom, margin_side, gutter, binding, duplex, foldouts, foldside).
   Bad keys or values change nothing.
 - `bars ID`: one line per system with its first bar and letters; `p N` pickup
   on/off (movement starts), `s N` split on/off (bars after a repeat), `f N=B`
