@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.8.5. Section numbers are stable: the code cites
+Status: describes partitor 0.8.6. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -58,7 +58,7 @@ in). The engine has no network access at all (§8).
       2026-10-0012-source.pdf              moved here from inbox/
       2026-10-0012-score.yaml              written by the CLI only
       2026-10-0012-proof.pdf               analysis preview
-      lines/                               saved finished lines (repage)
+      lines/                               saved finished lines and plan data (repage, plan)
       cache/                               page-analysis cache (§12.4); safe to delete
       parts/
         01-canto-Composer-Title--2026-10-0012.pdf
@@ -763,11 +763,41 @@ Print of a part with fold-outs (`render_plan`). Two files per part:
     the next verso is 8. The recto, its flap and the verso behind it are one sheet.
 - The record of the part in `score.yaml` (`built`) has `foldout` (the file) and `foldouts` (the count).
   `repage` applies `foldouts` without a rebuild.
+- Fold-outs need a sheet of two pages side by side: Letter (ledger sheet) and A4 (A3 sheet). On
+  ledger paper `foldouts: on` plans the turns with `turnplan` but makes no fold-out.
 - Only right fold-outs are made (flap to the right of the recto). A left fold-out (flap, verso,
   recto) would put the previous recto on the back of the sheet; the planner does not tell the two apart,
   so the build always makes the right one.
-- Not done yet: the `plan` command, the one-bar and per-staff rest data (`bridge_bars`) from the
-  analysis, and the 3-hole marks on the sheet.
+- Not done yet: the one-bar and per-staff rest data (`bridge_bars`) from the analysis, and the
+  3-hole marks on the sheet.
+
+### 5.8 Part planning (`partitor plan`, `partplan`)
+
+`partitor plan ID [PART ...]` shows the options of a part, a group score above all: a table with one
+row per paper (Letter, ledger) and staff height (8 to 5 mm, down to `min_staff_mm`), with the pages
+of music, the turns by class (§5.7) and the fold-outs. It is read-only and takes a fraction of a
+second: nothing is analysed or drawn. Without a part it lists the groups and the parts with a bad turn.
+
+- Source: the build saves the lines of each part before re-flow in its `lines/<part>.lines` file (key
+  `plan`; per line: the staff pitch, height, rest bars, movement start and, where the line can be cut, the width
+  of each bar and of the clef and key copy a continuation line carries). These are the real widths,
+  not estimated from justified lines. A part built before 0.8.6 has none: `plan` then reads its saved
+  `.lines` (bars taken as 93 % of their width) when they still hold barlines, else it asks for a
+  rebuild of the part.
+- Each row cuts the lines at barlines as re-flow does (`reflow._break_lines`) for the text width of
+  the paper (margins, `binding` and `gutter` as set for the part: set them first), at the staff
+  height of the row, and hands the lines to `turnplan` with and without a title page. A line that
+  cannot be cut narrow enough makes the row unavailable and the note says which line and how wide.
+  Fold-outs are planned for Letter and A4 only (§5.7).
+- The estimate of the built layout is printed above the table (`built: ... the estimate for it: N
+  pages`): the difference shows how far to trust the rows. Not counted: bridgeable turns (they need
+  per-staff rests, §5.7) and one-bar rests; both are 0 in the table.
+- `partitor plan ID PART N` sets option N for that part (saved, not built): `paper`,
+  `max_staff_mm`, `reflow` (on when the lines are cut), `foldouts=on` and `pages` (the planned
+  pages plus 2, at most 99). Then `partitor rebuild ID PART` makes it; the build reports the real pages and turns, and
+  a row can be chosen again. The numbers of the rows do not change when a choice is made.
+- Not done yet: joining parts (Alto + Tenor, Tenor + Bass) and the page-turn effect of fewer parts; `plan` in the
+  main `--help` (that text is part of the G0 golden: it needs a re-record with the operator's word).
 
 ## 6. CLI
 
@@ -793,6 +823,7 @@ partitor rename <id>           folder name follows title and composer
 partitor reid <id>             old YYYY-NNN item -> YYYY-MM-NNNN
 partitor rebuild <id> [part ...] [--jobs N|auto]
 partitor repage <id> [part ...]           page breaks again from the saved lines
+partitor plan <id> [part] [N]             options of a part; with N: set option N (not in --help yet)
 partitor analyse <id> [--yes] | analyse --all
 partitor bars | parts | groups | meta | proof <id>
 ```
@@ -1039,6 +1070,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 2 | `stagecache` | Stage cache of the page analysis (§12.4) |
 | 3 | `analysis` | Page loop, preview, cache read and write around `analyse_page` |
 | 3 | `render` | Packing, page plan, part drawing |
+| 4 | `partplan` | Part planning: the options table of `plan` (§5.8) |
 | 4 | `library` | Item folder, ids, load and save, parts folder swap, `step_size` |
 | 5 | `build` | `pieces`, `detect`, `build`, run and report helpers |
 | 5 | `proof` | Proof PDF |
@@ -1067,6 +1099,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | §12.4 stage cache | `stagecache`, `analysis` |
 | §5.1 to 5.4, 5.6 layout | `render` |
 | §5.7 page-turn planner | `turnplan` |
+| §5.8 part planning | `partplan` |
 | §5.5 typography | `typography`, `lines` |
 | §6 CLI | `cli_*` |
 | §8 security (sandbox check) | `cli_main` |

@@ -77,6 +77,7 @@ name. The 24 modules and their import levels:
 | 2 | `stagecache` | Stage cache of the page analysis |
 | 3 | `analysis` | Page loop, preview |
 | 3 | `render` | Packing, part drawing |
+| 4 | `partplan` | Part planning: options of a part (paper, staff size, page turns) |
 | 4 | `library` | Item folder, ids, load and save, `step_size` |
 | 5 | `build` | `pieces`, `detect`, `build` |
 | 5 | `proof` | Proof PDF |

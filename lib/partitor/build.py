@@ -36,6 +36,7 @@ from .library import (
     piece_tag, recover_parts, save_item, score_name, swap_parts,
 )
 from .lines import count_bad_turns, fill_rests, finish_lines, lines_path, save_lines
+from .partplan import read_source
 from .mapping import assign_maps
 from .model import PageResult, RestRun, Strip
 from .parallel import RENDER_WORKER_GB, job_count, page_worker_gb, worker_peak_mb
@@ -650,6 +651,12 @@ def cmd_build(a: argparse.Namespace) -> int:
                 opts[key] = float(opts[key])
             opts["gap_min"] = min(opts["gap_min"], opts["gap"])
             _note(f"{name}: own layout " + " ".join(f"{k}={v}" for k, v in own.items()))
+        plan_src = None
+        if lines_dir is not None:             # the lines as the plan command needs them (before re-flow)
+            try:
+                plan_src = read_source(strips, opts, dpi).to_dict()
+            except Exception as e:            # noqa: BLE001  (plan data never stops a build)
+                _warn(f"plan data:  {name}: {e}")
         h_max = 4.0 * strips[0].sp * 72.0 / dpi * fit_scale(strips, dpi, opts) * 25.4 / 72.0
         h_width = 4.0 * strips[0].sp * 72.0 / dpi * fit_scale(
             strips, dpi, {**opts, "scale": 1e9}) * 25.4 / 72.0   # page width only
@@ -700,7 +707,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                 if not t["resting"] and not t.get("movement"))
                   + "  (no rest to turn in; set breaks or accept)")
         if lines_dir is not None:
-            save_lines(lines_path(lines_dir, name), name, dpi, {**meta, **extra}, o, strips)
+            save_lines(lines_path(lines_dir, name), name, dpi, {**meta, **extra}, o, strips, plan_src)
         big = (large_copy(fn, opts["paper"])
                if opts.get("large") == "on" and opts["paper"] in LARGE else None)
         rec = {"part": name, "pages": n, "reflow": opts.get("reflow") == "on",

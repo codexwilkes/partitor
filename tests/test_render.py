@@ -13,6 +13,7 @@ import argparse
 import contextlib
 import dataclasses
 import io
+import json
 import os
 import re
 import shutil
@@ -872,6 +873,72 @@ class TestRepage(unittest.TestCase):
             for r in after["built"]["parts"]:
                 self.assertTrue((item / "parts" / r["file"]).is_file())
             self.assertIn("pages of music", out)
+
+    def test_build_saves_plan_data_and_plan_lists_and_sets_options(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            one = Path(tmp, "page.pdf")
+            make_score_pdf(str(one), systems=2, staves=2, labels=("Alto", "Bass"), title="")
+            doc = pymupdf.open()
+            for _ in range(6):
+                doc.insert_pdf(pymupdf.open(str(one)))
+            share = Path(tmp, "share")
+            (share / "inbox").mkdir(parents=True)
+            item = share / "library" / "2026-10-0001-c-t"
+            item.mkdir(parents=True)
+            doc.save(str(item / "2026-10-0001-source.pdf"))
+            pt.save_item(item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-27"})
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
+                d = pt.load_item(item)
+                pt.apply_set(d, ["pages=5", "max_staff_mm=8"])
+                pt.save_item(item, d)
+                self.assertEqual(build.run_build(item), 0)
+            self.assertEqual(sorted(p.name for p in (item / "lines").iterdir()), ["Alto.lines", "Bass.lines"])
+            for nm in ("Alto", "Bass"):
+                plan_data = pt.load_lines(pt.lines_path(item / "lines", nm))["plan"]
+                self.assertEqual(plan_data["format"], pt.SOURCE_FORMAT)
+                self.assertTrue(plan_data["lines"])
+            old_share = os.environ.get("PARTITOR_LIBRARY")
+            os.environ["PARTITOR_LIBRARY"] = str(share)
+
+            def plan(*words):
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                    rc = pt._engine_step(pt.cmd_plan, argparse.Namespace(id="2026-10-0001", words=list(words)))
+                return rc, buf.getvalue()
+            try:
+                rc, out = plan("Alto")
+                self.assertEqual(rc, 0, out)
+                self.assertIn("Plan: Alto", out)
+                self.assertIn("fold-out", out)
+                self.assertIn("letter", out)
+                self.assertIn("ledger", out)
+                self.assertIn("* = as built", out)
+                before = pt.load_item(item)
+                self.assertNotIn("Alto", (before["layout"].get(pt.PART_LAYOUT_KEY) or {}))   # read-only
+                rc, out = plan("Alto", "2")
+                self.assertEqual(rc, 0, out)
+                self.assertIn("option 2", out)
+                own = pt.load_item(item)["layout"][pt.PART_LAYOUT_KEY]["Alto"]
+                self.assertEqual(own["foldouts"], "on")
+                self.assertIn(own["paper"], ("letter", "ledger"))
+                self.assertIn("page_count", own)
+                rc, again = plan("Alto")                                        # the numbers do not move
+                rows = lambda s: {m[0]: m[1:] for m in
+                                  re.findall(r"^[* ]\s*(\d+)\s+(\w+)\s+([\d.]+) mm", s, re.M)}
+                self.assertTrue(rows(out))
+                self.assertEqual(rows(again), rows(out))
+                self.assertIn("Alto:paper", pt.load_item(item).get("pending") or [])
+                self.assertEqual(pt.load_item(item)["layout"].get("paper", "letter"),
+                                 before["layout"].get("paper", "letter"))           # other parts: untouched
+                rc, out = plan("Alto", "99")                                    # no such option
+                self.assertNotEqual(rc, 0)
+                self.assertIn("no such option", out)
+            finally:
+                if old_share is None:
+                    os.environ.pop("PARTITOR_LIBRARY", None)
+                else:
+                    os.environ["PARTITOR_LIBRARY"] = old_share
 
     def test_movement_start_is_second_choice(self):
         st = self.music(40, rests=())

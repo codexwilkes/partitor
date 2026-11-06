@@ -487,7 +487,7 @@ def plan_faces(strips: list[Strip], dpi: int, opts: dict, title_page: bool):
                                 if strips[t].rest_src is not None), default=0),
                  movement=bool(strips[j].movement)) for j in range(1, n)]
     plan = plan_turns(n, height, availn, bounds, avail_first=avail1, title_page=title_page,
-                      allow_fold=True, forced=tuple(opts.get("_breaks") or []))
+                      allow_fold=opts["paper"] in LARGE, forced=tuple(opts.get("_breaks") or []))
     flat = [pg for g in plan.groups for pg in g.pages]
     pages = []
     for c, (i, j) in enumerate(flat):

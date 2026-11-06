@@ -601,6 +601,119 @@ def cmd_contract(a: argparse.Namespace) -> int:
     return _cmd_step(a, False)
 
 
+PLAN_KEYS = ("margin_top", "margin_bottom", "margin_side", "gutter", "binding", "duplex",
+             "title_page", "gap", "gap_min", "clearance")     # layout keys `plan` reads
+
+
+def plan_names(data: dict, built: dict, words: list[str]) -> list[str]:
+    """plan_names -> the parts `plan` shows: the ones named, else the groups and
+    the parts with a bad turn."""
+    try:
+        only = parse_parts(data, words) if words else None
+    except ValueError as e:
+        _die(f"plan: {e}", f"Parts: {selection_help(data)}")
+    names = [nm for _, nm in build_names(data) if nm in built]
+    if only is not None:
+        return [nm for nm in names if nm in only]
+    return [nm for nm in names if built[nm].get("group") or built[nm].get("bad_turns")]
+
+
+def plan_rows(opts_list: list, old: dict, lay: dict) -> list[str]:
+    """plan_rows -> the table of options of one part, as text lines."""
+    out = [f"  {'#':>2}  {'paper':<6} {'staff':>7} {'pages':>5} {'rest':>5} {'1 bar':>5} {'attacca':>7} "
+           f"{'fold-out':>8} {'bad':>4}  note"]
+    for o in opts_list:
+        mark = "*" if (o.paper == lay.get("paper") and abs(o.staff_mm - old.get("staff_mm", 0)) <= 0.25) else " "
+        if not o.ok:
+            out.append(f"{mark} {o.n:>2}  {o.paper:<6} {o.staff_mm:>4.1f} mm {'-':>5}  {o.note}")
+            continue
+        c = o.counts
+        note = ", ".join(x for x in ("re-flow" if o.reflow else "", "no title page" if not o.title_page else "") if x)
+        out.append(f"{mark} {o.n:>2}  {o.paper:<6} {o.staff_mm:>4.1f} mm {o.pages:>5} {c.get('rest', 0):>5} "
+                   f"{c.get('rest1', 0):>5} {c.get('attacca', 0):>7} {o.folds:>8} "
+                   f"{c.get('bad', 0) + c.get('bridge', 0):>4}  {note}")
+    return out
+
+
+def cmd_plan(a: argparse.Namespace) -> int:
+    """plan <id> [part ...] [N]: the options of a part (paper, staff size) with
+    their page turns, estimated from the saved lines (read-only). `plan <id>
+    <part> N` sets option N for that part: paper, largest staff, re-flow,
+    fold-outs and a page budget; saved, not built (rebuild applies it)."""
+    from .lines import lines_path, load_lines
+    from .partplan import JUSTIFY_SHARE, Source, estimate, options, read_source, set_pairs
+    start = time.monotonic()
+    item = _item_or_die(a.id)
+    data = load_item(item)
+    built = {r["part"]: r for r in (data.get("built") or {}).get("parts") or []}
+    if not built:
+        _die("plan: nothing built yet", f"Build first: partitor rebuild {data['id']}")
+    words = list(getattr(a, "words", None) or [])
+    pick = int(words.pop()) if len(words) >= 2 and words[-1].isdigit() else None
+    names = plan_names(data, built, words)
+    if not names:
+        _die("plan: no part with bad turns and no group", "Name a part: partitor plan "
+             f"{data['id']} Trombones   (parts: {selection_help(data)})")
+    if pick is not None and len(names) != 1:
+        _die("plan: name one part to set an option", f"partitor plan {data['id']} Trombones {pick}")
+    print(f"{BOLD}partitor {VERSION} — plan{RST}\n{time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+    chosen = None
+    for nm in names:
+        lay = part_layout(data, nm)
+        try:
+            pl = load_lines(lines_path(item / "lines", nm))
+        except ValueError as e:
+            _warn(f"plan:  {nm}: {e}")
+            continue
+        raw = pl.get("plan")
+        try:
+            src = Source.from_dict(raw) if raw else None
+        except ValueError as e:
+            _warn(f"plan:  {nm}: {e}")
+            src = None
+        if src is None and not any(s.bars_x for s in pl["strips"]):
+            _warn(f"plan:  {nm}: no plan data and the saved lines are re-flowed: rebuild the part once "
+                  f"(partitor rebuild {data['id']} {nm})")
+            continue
+        if lay.get("duplex") == "off":
+            _warn(f"plan:  {nm}: duplex is off (single-sided): page turns follow every page; no plan")
+            continue
+        o = {**pl["opts"], **{k: lay[k] for k in PLAN_KEYS if lay.get(k) is not None}}
+        cur = lay.get("paper") or "letter"
+        papers = ("letter", "ledger") + (() if cur in ("letter", "ledger") else (cur,))   # fixed order: the numbers stay
+        if src is None:                         # a build before 0.8.6: the justified saved lines
+            src = read_source(pl["strips"], o, pl["dpi"], share=JUSTIFY_SHARE)
+        rows = options(src, o, papers, floor_mm=float(lay.get("min_staff_mm") or 5.0))
+        old = built[nm]
+        _head(f"Plan: {nm}")
+        c0 = old.get("content_pages", old["pages"])
+        est = estimate(src, o, o["paper"], float(old["staff_mm"]))
+        _note(f"built: {o['paper']}, staff {old['staff_mm']} mm, {c0} pages of music, "
+              f"{old.get('turns', 0)} turns, {old.get('bad_turns', 0)} while playing"
+              + (f"; the estimate for it: {est.pages} pages" if est.ok else ""))
+        for line in plan_rows(rows, old, lay):
+            print(line)
+        if pick is not None:
+            chosen = next((r for r in rows if r.n == pick), None)
+            if chosen is None or not chosen.ok:
+                _die(f"plan: option {pick}: " + ("no such option" if chosen is None else chosen.note))
+            pairs = set_pairs(nm, chosen)
+            try:
+                changes = apply_set(data, pairs)
+            except ValueError as e:
+                _die(f"plan: {e}")
+            mark_pending(data, *(c.split(": ")[0] for c in changes))
+            save_item(item, data)
+            _ok(f"plan:  {nm}: option {pick} ({chosen.paper}, staff {chosen.staff_mm:g} mm, about "
+                f"{chosen.pages} pages, {chosen.folds} fold-out(s)); " + "; ".join(changes))
+    if pick is None:
+        _note("estimates from the lines of the last build (no per-staff rests: bridgeable turns are not "
+              "counted); a build gives the real numbers. * = as built")
+        _note(f"Set an option: partitor plan {data['id']} PART N    then: partitor rebuild {data['id']}")
+        return _summary(start)
+    return saved(item, a, start)
+
+
 def cmd_repage(a: argparse.Namespace) -> int:
     """repage <id> [part ...]: new page breaks for built parts from the lines
     saved by the last build (no analysis, no build). Sets turns=rest for the

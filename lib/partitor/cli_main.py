@@ -17,7 +17,7 @@ from .cli_bars import cmd_bars
 from .cli_common import _lib_or_die, cmd_set
 from .cli_items import (
     cmd_analyse, cmd_contract, cmd_expand, cmd_list, cmd_meta, cmd_new, cmd_proof, cmd_reid,
-    cmd_rename, cmd_repage, cmd_show, item_matches, list_page_size,
+    cmd_plan, cmd_rename, cmd_repage, cmd_show, item_matches, list_page_size,
 )
 from .cli_parts import ambitus_menu, ask_part, cmd_groups, cmd_parts
 from .config import LAYOUT_DEFAULTS, PAGE_HEADER_SP, PAPER
@@ -64,7 +64,7 @@ def item_menu(item: Path) -> None:
                 elif k == "c":
                     cmd_contract(argparse.Namespace(id=data["id"], build=False, part=part))
                 else:
-                    v = ask("pages (auto or 1-20)", "auto")
+                    v = ask("pages (auto or 1-99)", "auto")
                     pre = f"{part}:" if part else ""
                     cmd_set(argparse.Namespace(id=data["id"], pairs=[f"{pre}pages={v}"],
                                                build=False))
@@ -235,6 +235,21 @@ def sandbox_check(library: bool = False) -> int:
     return 0 if all(g for _, _, g in res) else 1
 
 
+def plan_args(argv: list[str]) -> argparse.Namespace:
+    """plan_args -> the arguments of `partitor plan`. The command has its own parser and is
+    not in the main --help yet: that text is part of the G0 golden (DESIGN.md §5.8)."""
+    pn = argparse.ArgumentParser(
+        prog="partitor plan",
+        description="Options of a part: paper, staff size, page turns and fold-outs, estimated "
+                    "from the saved lines (read-only). With a part and a number: set that option "
+                    "(saved, not built; then partitor rebuild).")
+    pn.add_argument("id", help="12 or 2026-10-0012")
+    pn.add_argument("words", nargs="*", metavar="PART [N]",
+                    help="a part or group, then the option number to set; default: groups "
+                         "and parts with a bad turn")
+    return pn.parse_args(argv)
+
+
 def main() -> int:
     if "--sandbox-check" in sys.argv[1:2]:
         return sandbox_check(library="--library" in sys.argv[2:3])
@@ -243,6 +258,8 @@ def main() -> int:
         _die("the engine does not run as root (it parses PDFs from the internet)",
              "Use /usr/local/sbin/partitor: it runs the engine as user partitor "
              "in a sandbox.")
+    if sys.argv[1:2] == ["plan"]:
+        return cmd_plan(plan_args(sys.argv[2:]))
     p = argparse.ArgumentParser(prog="partitor", description="Split a score PDF into parts.")
     p.add_argument("--version", action="version", version=f"partitor {VERSION}")
     sub = p.add_subparsers(dest="cmd")

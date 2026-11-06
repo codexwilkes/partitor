@@ -403,15 +403,16 @@ def strip_fields() -> list[str]:
 
 
 def save_lines(path: Path, name: str, dpi: int, meta: dict, opts: dict,
-               strips: list[Strip]) -> None:
+               strips: list[Strip], plan: dict | None = None) -> None:
     """save_lines: write the finished lines of one part (atomic). The source
-    image of a rest line is dropped (the line is not drawn again)."""
+    image of a rest line is dropped (the line is not drawn again). plan: the
+    lines before re-flow as `partitor plan` needs them (partplan.Source.to_dict)."""
     slim = [dc_replace(s, rest_src=(None, 0, s.rest_src[2])) if s.rest_src is not None else s
             for s in strips]
     payload = {"format": LINES_FORMAT, "fields": strip_fields(), "version": VERSION,
                "name": name, "dpi": dpi, "meta": dict(meta),
                "opts": {k: v for k, v in opts.items() if not k.startswith("_")},
-               "strips": slim}
+               "strips": slim, **({"plan": plan} if plan else {})}
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
     with gzip.open(tmp, "wb", compresslevel=3) as f:

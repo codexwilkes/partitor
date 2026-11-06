@@ -8,6 +8,23 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.6 — 2026-11-05
+
+Add: `partitor plan ID [PART ...] [N]`, the options of a part (DESIGN.md §5.8).
+
+- A table of paper (Letter, ledger) and staff height (8 to 5 mm) with the pages, the turns by class and the
+  fold-outs, from the lines of the last build (read-only, a fraction of a second). Without a part:
+  the groups and the parts with a bad turn.
+- `plan ID PART N` sets option N for that part (`paper`, `max_staff_mm`, `reflow`, `foldouts`,
+  `pages`); `rebuild` makes it. The numbers of the rows stay the same after a choice.
+- The build saves the lines before re-flow, with their real bar widths, in `lines/<part>.lines` (key `plan`).
+  Parts built earlier are read from their saved lines (an estimate) or need a rebuild.
+- `pages` accepts 1 to 99 (was 20): a Letter part of a group score can need 30 pages.
+- Fold-outs are planned for Letter and A4 only: a sheet of two pages side by side.
+- The command is not in `partitor --help` yet: that text is part of the G0 golden.
+- Output of builds is the same as 0.8.5.
+
+
 ## 0.8.5 — 2026-11-05
 
 Add: fold-outs. `foldouts: on` (per part: `set ID "Trombones:foldouts=on"`) plans the pages of a

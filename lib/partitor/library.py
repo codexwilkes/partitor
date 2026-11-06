@@ -602,8 +602,8 @@ def apply_set(data: dict, pairs: list[str]) -> list[str]:
             continue
         if kind == "pages":
             val = None if v.lower() == "auto" else int(v)
-            if val is not None and not 1 <= val <= 20:
-                raise ValueError("pages: auto or 1-20")
+            if val is not None and not 1 <= val <= 99:
+                raise ValueError("pages: auto or 1-99")
         elif kind == "breaks":
             if part is None:
                 raise ValueError("breaks: per part only (\"Trombones:breaks=45,60\")")
