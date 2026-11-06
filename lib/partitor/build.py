@@ -35,7 +35,7 @@ from .library import (
     keep_other_parts, library_logo, library_root, load_item, part_layout, partial_blocker,
     piece_tag, recover_parts, save_item, score_name, swap_parts,
 )
-from .lines import count_bad_turns, fill_rests, finish_lines, lines_path, save_lines
+from .lines import count_bad_turns, fill_rests, finish_lines, label_column, lines_path, save_lines
 from .partplan import read_source
 from .mapping import assign_maps
 from .model import PageResult, RestRun, Strip
@@ -654,7 +654,10 @@ def cmd_build(a: argparse.Namespace) -> int:
         plan_src = None
         if lines_dir is not None:             # the lines as the plan command needs them (before re-flow)
             try:
-                plan_src = read_source(strips, opts, dpi).to_dict()
+                plan_src = read_source(
+                    strips, opts, dpi,
+                    label_px=label_column(strips, strips[0].sp, extra.get("ambitus_map")) if extra.get("members") else 0.0
+                ).to_dict()
             except Exception as e:            # noqa: BLE001  (plan data never stops a build)
                 _warn(f"plan data:  {name}: {e}")
         h_max = 4.0 * strips[0].sp * 72.0 / dpi * fit_scale(strips, dpi, opts) * 25.4 / 72.0

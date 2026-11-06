@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.8.6. Section numbers are stable: the code cites
+Status: describes partitor 0.8.7. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -789,6 +789,11 @@ second: nothing is analysed or drawn. Without a part it lists the groups and the
   height of the row, and hands the lines to `turnplan` with and without a title page. A line that
   cannot be cut narrow enough makes the row unavailable and the note says which line and how wide.
   Fold-outs are planned for Letter and A4 only (§5.7).
+- A group has a label column (staff names, the ambitus on the first line) that `finish_lines` adds
+  after the lines are cut; the staff then shrinks to fit. The row staff is the size that is printed.
+  The lines are cut for a staff a little larger (`cap_mm`, what `plan N` sets as `max_staff_mm`) and
+  the page budget (`pages`) is the page count at that size, plus 2. The build saves the width of the
+  column (`label_px`) with the plan data.
 - The estimate of the built layout is printed above the table (`built: ... the estimate for it: N
   pages`): the difference shows how far to trust the rows. Not counted: bridgeable turns (they need
   per-staff rests, §5.7) and one-bar rests; both are 0 in the table.

@@ -8,6 +8,18 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.7 — 2026-11-05
+
+Fix: `plan` models the label column of a group score, so the staff of a row is the staff that is printed.
+
+- A group's lines get a label column (staff names, ambitus) after they are cut, and the staff shrinks
+  to fit; a row of 6.5 mm built as 6.0 mm. `plan` now cuts for the larger size, lays the pages out at the
+  printed size and sets `max_staff_mm` and `pages` so that the build reaches the row. The build saves the
+  column width with the plan data (`label_px`).
+- `lines.label_column`: the width of the column, taken out of `finish_lines` (output unchanged).
+- Output of builds is the same as 0.8.6.
+
+
 ## 0.8.6 — 2026-11-05
 
 Add: `partitor plan ID [PART ...] [N]`, the options of a part (DESIGN.md §5.8).

@@ -9,6 +9,8 @@ paper, and handed to turnplan. Nothing is analysed or drawn: a table of options
 in a fraction of a second. A build confirms the numbers."""
 from __future__ import annotations
 
+import dataclasses
+import math
 from dataclasses import dataclass, field
 
 from .config import PAPER
@@ -36,6 +38,8 @@ class Option:
     plan: Plan | None = None
     reflow: bool = False    # the lines are cut: re-flow is needed
     n: int = 0              # row number, from 1
+    cap_mm: float = 0.0     # `max_staff_mm` that gives this row (the staff shrinks to fit the label column)
+    budget: int = 0         # pages at that size, before the shrink: the page budget the build needs
 
     @property
     def folds(self) -> int:
@@ -57,26 +61,28 @@ class Source:
     sp: float
     lines: list = field(default_factory=list)       # one dict per line
     exact: bool = True      # False: read from saved (justified) lines: an estimate
+    label_px: float = 0.0   # the label column a group's lines get after the cut (px)
 
     def to_dict(self) -> dict:
-        return {"format": SOURCE_FORMAT, "dpi": self.dpi, "sp": self.sp, "lines": self.lines}
+        return {"format": SOURCE_FORMAT, "dpi": self.dpi, "sp": self.sp, "lines": self.lines,
+                "label_px": self.label_px}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Source":
         if not isinstance(d, dict) or d.get("format") != SOURCE_FORMAT:
             raise ValueError("plan data from another partitor: rebuild the part")
-        return cls(int(d["dpi"]), float(d["sp"]), list(d["lines"]))
+        return cls(int(d["dpi"]), float(d["sp"]), list(d["lines"]), label_px=float(d.get("label_px", 0.0)))
 
 
-def read_source(strips: list, opts: dict, dpi: int, share: float = 1.0) -> Source:
+def read_source(strips: list, opts: dict, dpi: int, share: float = 1.0, label_px: float = 0.0) -> Source:
     """read_source -> Source: per line its pitch, height, rest bars, movement
     start and, if it can be cut, the width of each bar and of the clef + key
     copy a continuation line carries (px). share: the part of a bar's width
     that is music: 1.0 for the lines of a build (before they are justified),
-    JUSTIFY_SHARE for saved lines."""
+    JUSTIFY_SHARE for saved lines. label_px: the label column of a group."""
     pre = find_prefixes(strips)
     pit = pitches(strips, opts) + [0.0]
-    src = Source(dpi, float(strips[0].sp), exact=share >= 1.0)
+    src = Source(dpi, float(strips[0].sp), exact=share >= 1.0, label_px=float(label_px))
     for i, s in enumerate(strips):
         rest = s.rest_src[2].bars if s.rest_src is not None else 0
         ends = s.ends_at_bar or 0.0 <= s.end_gap_sp <= BAR_END_SP
@@ -120,17 +126,30 @@ def _pieces(src: Source, width_px: float):
 
 
 def estimate(src: Source, opts: dict, paper: str, staff_mm: float) -> Option:
-    """estimate -> Option for one paper and staff height (mm)."""
-    scale = staff_mm * src.dpi / (4.0 * src.sp * 25.4)
-    ov = {**opts, "paper": paper, "scale": scale}
+    """estimate -> Option for one paper and the staff height (mm) the part ends
+    with. Re-flow cuts the lines for the text width at a first staff size; a
+    group then gets its label column, which widens every line, and the staff
+    shrinks to fit: the lines are cut for a staff a little larger than the one
+    that is printed (cap_mm), and the pages are laid out at the printed size."""
+    sp, dpi = src.sp, src.dpi
+    s1 = staff_mm * dpi / (4.0 * sp * 25.4)             # scale of the printed staff
+    ov = {**opts, "paper": paper, "scale": s1}
     pw, ph = PAPER[paper]
-    k = 72.0 / src.dpi * scale
-    width_px = LINE_FIT * usable_width(ov, pw) / k
-    pieces, wide = _pieces(src, width_px)
+    usable = usable_width(ov, pw)
+    c = src.label_px * 72.0 / dpi                        # label column, pt at scale 1
+    if c > 0.0:
+        room = usable - c * s1
+        if room <= 0.0:
+            return Option(paper, staff_mm, False, "the label column is wider than the text")
+        s0 = LINE_FIT * usable * s1 / room               # the scale the lines are cut for
+    else:
+        s0 = s1
+    k0, k1 = 72.0 / dpi * s0, 72.0 / dpi * s1
+    pieces, wide = _pieces(src, LINE_FIT * usable / k0)
     if wide is not None:
         i, w = wide
         return Option(paper, staff_mm, False,
-                      f"line {i + 1} cannot be cut: {w * k / 72.0 * 25.4:.0f} mm of music")
+                      f"line {i + 1} cannot be cut: {w * k0 / 72.0 * 25.4:.0f} mm of music")
     n = len(pieces)
     L = [src.lines[i] for i, _ in pieces]
     cum = [0.0]
@@ -138,27 +157,32 @@ def estimate(src: Source, opts: dict, paper: str, staff_mm: float) -> Option:
         cum.append(cum[-1] + ln["pit"])
     _, _, mt, mb = page_box(ov, 0, False)
 
-    def height(i: int, j: int) -> float:
-        last = L[j - 1]
-        return (L[i]["top"] + (cum[j - 1] - cum[i]) - last["top"] + last["h"]) * k
+    def height(k: float):
+        def h(i: int, j: int) -> float:
+            last = L[j - 1]
+            return (L[i]["top"] + (cum[j - 1] - cum[i]) - last["top"] + last["h"]) * k
+        return h
 
     bounds = [Boundary()] + [
         Boundary(rest_bars=max(L[j - 1]["rest"], L[j]["rest"]),
                  movement=bool(pieces[j][1] and L[j]["movement"])) for j in range(1, n)]
     forced = tuple(opts.get("_breaks") or [])
+    fold = paper in LARGE and opts.get("duplex", "auto") != "off"
 
-    def plan(title: bool) -> Plan:
+    def plan(title: bool, k: float) -> Plan:
         band = RUN_HEAD if title else TITLE_BAND
-        return plan_turns(n, height, ph - mt - mb - RUN_HEAD, bounds,
+        return plan_turns(n, height(k), ph - mt - mb - RUN_HEAD, bounds,
                           avail_first=ph - mt - mb - band, title_page=title,
-                          allow_fold=paper in LARGE and opts.get("duplex", "auto") != "off", forced=forced)
-    best, title = plan(False), False
+                          allow_fold=fold, forced=forced)
+    best, title = plan(False, k1), False
     if opts.get("title_page", "auto") == "auto" and best.pages >= 3:
-        tp = plan(True)
+        tp = plan(True, k1)
         if tp.pages >= 3 and tp.cost <= best.cost:
             best, title = tp, True
+    budget = plan(title, k0).pages                       # the build lays the cut lines out at k0 first
     cut = any(ln["bars"] is not None for ln in src.lines) and n > len(src.lines)
-    return Option(paper, staff_mm, True, "", best.pages, title, best, reflow=cut)
+    return Option(paper, staff_mm, True, "", best.pages, title, best, reflow=cut,
+                  cap_mm=s0 * 4.0 * sp * 25.4 / dpi, budget=budget)
 
 
 def options(src: Source, opts: dict, papers: tuple, sizes: tuple = SIZES,
@@ -172,8 +196,7 @@ def options(src: Source, opts: dict, papers: tuple, sizes: tuple = SIZES,
         for p in papers:
             n += 1
             o = estimate(src, opts, p, s)
-            out.append(Option(o.paper, o.staff_mm, o.ok, o.note, o.pages, o.title_page, o.plan,
-                              o.reflow, n))
+            out.append(dataclasses.replace(o, n=n))
     return out
 
 
@@ -181,7 +204,8 @@ def set_pairs(name: str, o: Option) -> list[str]:
     """set_pairs -> the `set` pairs that make a build follow option o: the
     paper, the largest staff, re-flow, the planner (fold-outs) and a page
     budget with some room."""
-    pairs = [f"{name}:paper={o.paper}", f"{name}:max_staff_mm={o.staff_mm:g}",
+    cap = math.ceil((o.cap_mm or o.staff_mm) * 100.0 - 1e-6) / 100.0     # the cap of the cut size
+    pairs = [f"{name}:paper={o.paper}", f"{name}:max_staff_mm={cap:g}",
              f"{name}:reflow={'on' if o.reflow else 'off'}", f"{name}:foldouts=on",
-             f"{name}:pages={min(99, max(1, o.pages + SLACK_PAGES))}"]
+             f"{name}:pages={min(99, max(1, (o.budget or o.pages) + SLACK_PAGES))}"]
     return pairs

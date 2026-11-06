@@ -168,6 +168,21 @@ def put_smallcaps(page: pymupdf.Page, x_right: float, base: float, text: str,
 AMB_W_SP = 8.0          # ambitus width in staff spaces (ambitus_width / sp)
 
 
+def label_column(strips: list[Strip], sp: float, amb_map: dict | None = None) -> int:
+    """label_column -> width (px) of the label column finish_lines puts left of
+    the lines of a group (short staff names; the ambitus of each staff on
+    the first line needs AMB_W_SP + 3 sp); 0 when no line has labels."""
+    if not any(s.staff_labels for s in strips):
+        return 0
+    size = LABEL_SP * sp
+    shorts = {n: short_name(n) for s in strips for n, *_ in s.staff_labels}
+    col = int(max(text_len(v, "regular", size) for v in shorts.values()) + 3.0 * sp)
+    if amb_map and any(amb_map.values()):
+        # the first line shows each staff's ambitus instead of its name
+        col = max(col, int((AMB_W_SP + 3.0) * sp))
+    return col
+
+
 def finish_lines(strips: list[Strip], name: str, group: bool,
                  amb: tuple | None = None, amb_map: dict | None = None) -> list[Strip]:
     """finish_lines -> the lines of one part or group at one width: the
@@ -219,10 +234,7 @@ def finish_lines(strips: list[Strip], name: str, group: bool,
         size = LABEL_SP * sp
         shorts = {n: short_name(n) for s in out for n, *_ in s.staff_labels}
         col_w = max(text_len(v, "regular", size) for v in shorts.values())
-        col = int(col_w + 3.0 * sp)
-        if amb_map and any(amb_map.values()):
-            # the first line shows each staff's ambitus instead of its name
-            col = max(col, int((AMB_W_SP + 3.0) * sp))
+        col = label_column(out, sp, amb_map)
         fin = []
         for j, s in enumerate(out):
             names, marks = [], []

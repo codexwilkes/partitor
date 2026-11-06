@@ -157,6 +157,56 @@ class TestEstimate(unittest.TestCase):
 
 
 @needs_deps
+class TestLabelColumn(unittest.TestCase):
+    """A group's label column is added after the cut and the staff shrinks to fit (0.8.7)."""
+
+    def src(self, label_px):
+        return pt.read_source(part(60), OPTS, 400, label_px=label_px)
+
+    def test_label_column_helper(self):
+        st = part(4)
+        self.assertEqual(pt.label_column(st, 10.0), 0)               # a part: no labels
+        g = [dataclasses.replace(s, staff_labels=[("Altposaune", 0, 40), ("Tenorposaune", 130, 170)])
+             for s in st]
+        col = pt.label_column(g, 10.0)
+        self.assertGreater(col, 30)                                  # short names + 3 sp
+        self.assertGreaterEqual(pt.label_column(g, 10.0, {"Altposaune": (1, 2)}),
+                                int((pt.AMB_W_SP + 3.0) * 10.0))
+
+    def test_the_label_column_is_kept_in_the_plan_data(self):
+        s = self.src(80.0)
+        self.assertEqual(pt.Source.from_dict(s.to_dict()).label_px, 80.0)
+        self.assertEqual(pt.Source.from_dict({k: v for k, v in s.to_dict().items() if k != "label_px"}).label_px, 0.0)
+
+    def test_lines_are_cut_for_a_larger_staff_than_the_one_printed(self):
+        o = pt.estimate(self.src(150.0), OPTS, "letter", 6.5)
+        self.assertTrue(o.ok)
+        self.assertGreater(o.cap_mm, 6.5)                            # the build is told this cap
+        self.assertGreaterEqual(o.budget, o.pages)                   # more pages at the cut size
+        none = pt.estimate(self.src(0.0), OPTS, "letter", 6.5)
+        self.assertAlmostEqual(none.cap_mm, 6.5, places=6)           # no label column: no shrink
+        self.assertLess(none.cap_mm, o.cap_mm)
+
+    def test_a_label_column_costs_pages(self):
+        a = pt.estimate(self.src(0.0), OPTS, "letter", 6.5).pages
+        b = pt.estimate(self.src(200.0), OPTS, "letter", 6.5).pages
+        self.assertGreaterEqual(b, a)
+
+    def test_a_label_column_wider_than_the_text_is_refused(self):
+        o = pt.estimate(self.src(1e6), OPTS, "letter", 6.5)
+        self.assertFalse(o.ok)
+        self.assertIn("label column", o.note)
+
+    def test_set_pairs_use_the_cap_and_the_budget(self):
+        o = pt.estimate(self.src(150.0), OPTS, "letter", 6.5)
+        pairs = pt.set_pairs("G", o)
+        cap = float(next(p for p in pairs if "max_staff_mm" in p).split("=")[1])
+        self.assertGreaterEqual(cap, o.cap_mm)
+        self.assertLess(cap, o.cap_mm + 0.011)
+        self.assertIn(f"G:pages={o.budget + pt.SLACK_PAGES}", pairs)
+
+
+@needs_deps
 class TestOptions(unittest.TestCase):
     def test_rows_are_numbered_largest_staff_first_one_per_paper(self):
         s = pt.read_source(part(30), OPTS, 400)
