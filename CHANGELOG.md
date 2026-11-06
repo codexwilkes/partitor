@@ -8,6 +8,24 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.5 — 2026-11-05
+
+Add: fold-outs. `foldouts: on` (per part: `set ID "Trombones:foldouts=on"`) plans the pages of a
+bound part with `turnplan` and prints the fold-outs as ledger sheets (DESIGN.md §5.7). Default `off`: output is the same as 0.8.4.
+
+- Page breaks, spreads and fold-outs are chosen for the whole part at once. A fold-out (verso, recto,
+  flap) starts and ends at a rest turn; it costs less than a turn while playing.
+- The part PDF holds the Letter pages; `NN-part-foldout.pdf` holds one ledger sheet per fold-out
+  (front: the recto and the flap, with a dotted fold line and a dotted cut line 1/2 in off the flap;
+  back: the outside of the flap, blank, and the verso that follows). Page numbers count leaves:
+  `7a` the recto, `7b` the flap. The flap holds the same text width as the other pages.
+- The report lists the class of each turn; a turn while playing is still a warning.
+- `repage` applies `foldouts` without a rebuild. The part's record in `score.yaml` has `foldout` and
+  `foldouts`.
+- Internal: `render.draw_face` draws one page anywhere on a sheet; `render.page_lines` places the
+  lines of a page. Output with `foldouts: off` is the same as 0.8.4.
+
+
 ## 0.8.4 — 2026-11-05
 
 Add: a part can have its own paper, and a binding allowance at the spine.

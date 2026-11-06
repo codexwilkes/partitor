@@ -599,6 +599,103 @@ class TestLedger(unittest.TestCase):
 
 
 @needs_deps
+class TestFoldoutRender(unittest.TestCase):
+    """foldouts=on (0.8.5): turnplan chooses spreads and fold-outs; the part PDF holds
+    the Letter pages, <part>-foldout.pdf one ledger sheet per fold-out (DESIGN.md §5.7)."""
+
+    OPTS = {**pt.LAYOUT_DEFAULTS, "paper": "letter", "scale": 1.0, "foldouts": "on",
+            "margin_side": 8.0, "binding": 12.7, "turns": "rest"}
+
+    def line(self, **kw):
+        return TestRepage.line(**kw)
+
+    def music(self, n, rests=()):
+        return TestRepage().music(n, rests)
+
+    def render(self, d, strips, **extra):
+        out = Path(d, "p.pdf")
+        n = pt.render_part("P", strips, {"title": "T", "composer": "C D"}, 400,
+                           {**self.OPTS, **extra}, out)
+        return out, n, dict(pt.LAST_RENDER)
+
+    def test_a_stretch_of_three_pages_without_a_rest_gets_a_fold_out(self):
+        with tempfile.TemporaryDirectory() as d:
+            out, n, info = self.render(d, self.music(56))
+            sheet = Path(d, "p-foldout.pdf")
+            self.assertTrue(sheet.is_file())
+            self.assertEqual(info["foldouts"], 1)
+            self.assertEqual(info["foldout"], "p-foldout.pdf")
+            sh = pymupdf.open(sheet)
+            self.assertEqual(len(sh), 2)                              # front and back
+            self.assertEqual([(round(p.rect.width), round(p.rect.height)) for p in sh],
+                             [(1224, 792)] * 2)
+            txt = sh[0].get_text()
+            self.assertIn("2a/2", txt)                                # the bound face
+            self.assertIn("2b/2", txt)                                # the flap
+            self.assertEqual(len(pymupdf.open(out)) % 2, 0)           # leaves print in pairs
+
+    def test_folio_numbers_count_leaves_and_the_flap_is_b(self):
+        with tempfile.TemporaryDirectory() as d:
+            _, _, info = self.render(d, self.music(56))
+            sh = pymupdf.open(Path(d, "p-foldout.pdf"))
+            import re
+            labels = [w[4] for w in sh[0].get_text("words") if re.fullmatch(r"\d+[ab]/\d+", w[4])]
+            total = int(labels[0].split("/")[1])
+            self.assertEqual(sorted(labels), sorted([f"2a/{total}", f"2b/{total}"]))
+
+    def test_the_flap_holds_the_same_text_width_inside_the_trimmed_edge(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.render(d, self.music(56))
+            front = pymupdf.open(Path(d, "p-foldout.pdf"))[0]
+            boxes = [pymupdf.Rect(b["bbox"]) for b in front.get_image_info()]
+            left = [b for b in boxes if b.x1 <= 612.5]
+            right = [b for b in boxes if b.x0 >= 611.5]
+            self.assertTrue(left and right)
+            cut = 1224.0 - pt.TRIM_PT
+            self.assertLessEqual(max(b.x1 for b in right), cut - pt.mm2pt(5.0) + 0.5)   # outside margin >= 5 mm
+            self.assertAlmostEqual(left[0].width, right[0].width, places=1)           # same text width
+
+    def test_a_part_with_rests_needs_no_fold_out(self):
+        with tempfile.TemporaryDirectory() as d:
+            st = self.music(40, rests={9, 17, 25, 33})
+            _, _, info = self.render(d, st)
+            self.assertEqual(info["foldouts"], 0)
+            self.assertFalse(Path(d, "p-foldout.pdf").exists())
+            self.assertTrue(info["turns"] and all(t["cls"] == "rest" for t in info["turns"]))
+
+    def test_turn_classes_are_listed_and_bad_turns_counted(self):
+        with tempfile.TemporaryDirectory() as d:
+            _, _, info = self.render(d, self.music(70))
+            tl = info["turns"]
+            self.assertTrue(tl and all("cls" in t for t in tl))
+            self.assertEqual(pt.count_bad_turns(tl, {**self.OPTS}),
+                             sum(1 for t in tl if t["cls"] in ("bad", "bridge")))
+
+    def test_foldouts_off_does_not_use_the_planner(self):
+        with tempfile.TemporaryDirectory() as d:
+            _, _, info = self.render(d, self.music(56), foldouts="off")
+            self.assertEqual(info["foldouts"], 0)
+            self.assertFalse(Path(d, "p-foldout.pdf").exists())
+
+    def test_single_sided_print_never_uses_the_planner(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertFalse(pt.folds_wanted({**self.OPTS, "duplex": "off"}))
+            _, _, info = self.render(d, self.music(56), duplex="off")
+            self.assertEqual(info["foldouts"], 0)
+
+    def test_flap_margins_keep_the_text_width(self):
+        o = {**self.OPTS}
+        fm, em = pt.flap_margins(o, 612.0, 612.0 - pt.TRIM_PT)
+        self.assertAlmostEqual(fm + em + pt.usable_width(o, 612.0), 612.0 - pt.TRIM_PT, places=3)
+        self.assertAlmostEqual(fm, pt.mm2pt(8.0), places=3)
+        self.assertAlmostEqual(em, pt.mm2pt(8.0), places=3)         # binding 12.7 mm = the trim
+        wide = {**o, "binding": 20.0}
+        fm, em = pt.flap_margins(wide, 612.0, 612.0 - pt.TRIM_PT)
+        self.assertGreater(em, pt.mm2pt(8.0))                       # more binding: narrower text, more room outside
+        self.assertAlmostEqual(fm + em + pt.usable_width(wide, 612.0), 612.0 - pt.TRIM_PT, places=3)
+
+
+@needs_deps
 class TestRepage(unittest.TestCase):
     """turns=rest, manual breaks, saved lines and `repage` (0.3.0-dev.37)."""
 

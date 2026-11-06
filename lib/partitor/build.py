@@ -694,7 +694,7 @@ def cmd_build(a: argparse.Namespace) -> int:
         n = render_part(name, strips, {**meta, **extra}, dpi, o, fn)
         tl = LAST_RENDER.get("turns") or []
         nbad = count_bad_turns(tl, o)
-        if o.get("turns", "any") == "rest" and nbad:
+        if (o.get("turns", "any") == "rest" or o.get("foldouts") == "on") and nbad:
             _warn(f"turn-while-playing:  {name}  " + "; ".join(
                 f"PDF page {t['pdf_page']} (after bar {t['bar']})" for t in tl
                 if not t["resting"] and not t.get("movement"))
@@ -711,6 +711,8 @@ def cmd_build(a: argparse.Namespace) -> int:
                "staff_max_mm": round(h_max, 2), "gap": round(g, 2),
                "turns": len(tl), "bad_turns": nbad,
                "file": fn.name, **({"large": big.name} if big else {}),
+               **({"foldout": LAST_RENDER["foldout"], "foldouts": LAST_RENDER["foldouts"]}
+                  if LAST_RENDER.get("foldout") else {}),
                **({"group": True} if extra.get("members") else {})}
         flow = f" (re-flowed from {nsrc})" if opts.get("reflow") == "on" else ""
         _ok(f"{name}:  {len(strips)} lines{flow}  {n} page(s)  staff {h_mm:.1f} mm  "

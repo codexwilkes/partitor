@@ -340,7 +340,7 @@ class TestRealRepo(unittest.TestCase):
         import ast
         level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
-                 "lines": 2, "ownership": 2, "stagecache": 2, "render": 3}
+                 "lines": 2, "ownership": 2, "stagecache": 2, "render": 3, "turnplan": 1}
         for m in ("lines", "render"):
             with open(os.path.join(ROOT, "lib", "partitor", m + ".py"), encoding="utf-8") as fh:
                 tree = ast.parse(fh.read())

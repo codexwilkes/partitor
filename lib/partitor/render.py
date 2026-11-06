@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,7 @@ from .console import _warn
 from .lines import line_labels, put_smallcaps
 from .model import Strip
 from .reflow import find_prefixes, reflow, reflow_caps
+from .turnplan import Boundary, plan_turns
 from .strips import (
     REH_PAD, ambitus_width, anchor, bar_mark, bar_x, pitches, reh_boxes, rest_box,
 )
@@ -321,6 +323,30 @@ def good_turn(strips: list[Strip], j: int) -> bool:
     return any(mx <= s.staff_x0 + 3 * s.sp for mx, _ in s.marks)
 
 
+def page_lines(strips: list[Strip], pit: list[float], k: float, i: int, j: int,
+               free: float | None = None) -> list[tuple[Strip, float]]:
+    """page_lines -> (strip, y) pairs of lines i..j-1 on one page, y relative to
+    the first line. free: the spare height of a last page (pt); a group score
+    spreads it between its systems, up to SYSTEM_GAP_LAST."""
+    extra = 0.0
+    if free is not None and j - i > 1 and len(strips[i].staff_labels) > 1:
+        s0 = strips[i]
+        n_st = len(s0.staff_labels)
+        inner = ((s0.staff_bottom - s0.staff_top) - n_st * 4 * s0.sp) / (n_st - 1)
+        extra = max(0.0, min(free / (j - i - 1),
+                             (SYSTEM_GAP_LAST - SYSTEM_GAP_FACTOR) * inner * k))
+    page, y_top = [], 0.0
+    for t in range(i, j):
+        s = strips[t]
+        if t == i:
+            y_top = s.staff_top * k
+            page.append((s, 0.0))
+        else:
+            y_top += pit[t - 1] * k + extra
+            page.append((s, y_top - s.staff_top * k))
+    return page
+
+
 def plan_pages(strips: list[Strip], dpi: int, opts: dict, title_page: bool
                ) -> tuple[list[list[tuple[Strip, float]]], int]:
     """plan_pages -> (pages of (strip, y), bad turns): page breaks chosen over the
@@ -412,25 +438,10 @@ def plan_pages(strips: list[Strip], dpi: int, opts: dict, title_page: bool
         # last page of a group score with room to spare: systems further
         # apart, up to SYSTEM_GAP_LAST (operator request 2026-10-24: "the whole page
         # is available")
-        extra = 0.0
-        if c == len(cuts) - 1 and j - i > 1 and len(strips[i].staff_labels) > 1:
-            avail = avail1 if c == 0 else availn
-            free = avail - height(i, j)
-            s0 = strips[i]
-            n_st = len(s0.staff_labels)
-            inner = ((s0.staff_bottom - s0.staff_top) - n_st * 4 * s0.sp) / (n_st - 1)
-            extra = max(0.0, min(free / (j - i - 1),
-                                 (SYSTEM_GAP_LAST - SYSTEM_GAP_FACTOR) * inner * k))
-        page, y_top = [], 0.0
-        for t in range(i, j):
-            s = strips[t]
-            if t == i:
-                y_top = s.staff_top * k
-                page.append((s, 0.0))
-            else:
-                y_top += pit[t - 1] * k + extra
-                page.append((s, y_top - s.staff_top * k))
-        pages.append(page)
+        free = None
+        if c == len(cuts) - 1:
+            free = (avail1 if c == 0 else availn) - height(i, j)
+        pages.append(page_lines(strips, pit, k, i, j, free))
     bad, j = 0, 0
     for c, pg in enumerate(pages[:-1]):
         j += len(pg)
@@ -440,12 +451,72 @@ def plan_pages(strips: list[Strip], dpi: int, opts: dict, title_page: bool
     return pages, bad
 
 
+TRIM_PT = 36.0         # 1/2 in cut off the free edge of a fold-out flap
+
+
+def folds_wanted(opts: dict) -> bool:
+    """The planner of turnplan (spreads, fold-outs) runs for double-sided parts
+    with `foldouts: on`; single-sided print has a turn after every page."""
+    return opts.get("foldouts", "off") == "on" and opts.get("duplex", "auto") != "off"
+
+
+def plan_faces(strips: list[Strip], dpi: int, opts: dict, title_page: bool):
+    """plan_faces -> (pages, Plan): the faces of a part (content pages; a flap
+    is a face) with page breaks and fold-outs chosen by turnplan for the whole
+    part at once (DESIGN.md §5.7). pages: (strip, y) pairs per face, in
+    reading order."""
+    n = len(strips)
+    _, ph = PAPER[opts["paper"]]
+    k = 72.0 / dpi * (opts.get("scale") or 1.0)
+    pit = pitches(strips, opts)
+    _, _, mt, mb = page_box(opts, 0, False)
+    band = RUN_HEAD if (title_page or opts.get("_no_band")) else TITLE_BAND
+    avail1 = ph - mt - mb - band
+    availn = ph - mt - mb - RUN_HEAD
+    cum = [0.0]
+    for v in pit:
+        cum.append(cum[-1] + v)
+
+    def height(i: int, j: int) -> float:        # lines i..j-1 on one page (pt)
+        last = strips[j - 1]
+        return (strips[i].staff_top + (cum[j - 1] - cum[i]) - last.staff_top
+                + last.img.shape[0]) * k
+
+    bounds = [Boundary()] + [
+        Boundary(rest_bars=max((strips[t].rest_src[2].bars for t in (j - 1, j)
+                                if strips[t].rest_src is not None), default=0),
+                 movement=bool(strips[j].movement)) for j in range(1, n)]
+    plan = plan_turns(n, height, availn, bounds, avail_first=avail1, title_page=title_page,
+                      allow_fold=True, forced=tuple(opts.get("_breaks") or []))
+    flat = [pg for g in plan.groups for pg in g.pages]
+    pages = []
+    for c, (i, j) in enumerate(flat):
+        free = (avail1 if c == 0 else availn) - height(i, j) if c == len(flat) - 1 else None
+        pages.append(page_lines(strips, pit, k, i, j, free))
+    return pages, plan
+
+
+def layout_plan(strips: list[Strip], dpi: int, opts: dict):
+    """layout_plan -> (pages, title page?, Plan): plan_faces with and without a
+    title page (title_page auto, 3+ pages); the cheaper plan wins, a tie keeps
+    the title page (the music then starts on a spread)."""
+    pages, plan = plan_faces(strips, dpi, opts, False)
+    if opts.get("title_page", "auto") == "auto" and len(pages) >= 3:
+        tp, tplan = plan_faces(strips, dpi, opts, True)
+        if len(tp) >= 3 and tplan.cost <= plan.cost:
+            return tp, True, tplan
+    return pages, False, plan
+
+
 def layout_pages(strips: list[Strip], dpi: int, opts: dict
                  ) -> tuple[list[list[tuple[Strip, float]]], bool]:
     """layout_pages -> (content pages, title page?). DESIGN.md §5.4: page
     breaks by plan_pages, with and without a title page (title_page auto,
     double-sided, 3+ content pages); fewer bad turns, then fewer pages
     win; a tie keeps the title page (the music starts on a spread)."""
+    if folds_wanted(opts):
+        pages, title_page, _ = layout_plan(strips, dpi, opts)
+        return pages, title_page
     pages, bad = plan_pages(strips, dpi, opts, False)
     if opts.get("title_page", "auto") == "auto" and opts.get("duplex", "auto") != "off" \
        and len(pages) >= 3:
@@ -650,6 +721,261 @@ def turn_list(strips: list[Strip], pages: list, title_page: bool, opts: dict,
     return out
 
 
+@dataclass(frozen=True)
+class Face:
+    """Where and how one content page is drawn. x0, width: the face on its
+    sheet (pt; a ledger fold-out sheet holds two faces); ml, mr: margins
+    inside the face; title_band: page 1 of a part with no title page;
+    head_right: running head at the right (a recto); folio: the page label;
+    last: the back page (the logo goes here)."""
+    x0: float
+    width: float
+    height: float
+    ml: float
+    mr: float
+    mt: float
+    mb: float
+    title_band: bool
+    head_right: bool
+    folio: str
+    last: bool
+
+
+def draw_face(page: pymupdf.Page, pg: list, strips: list[Strip], name: str, meta: dict,
+              opts: dict, k: float, left_ink: float, f: Face) -> None:
+    """draw_face: one content page: title band or running head, folio, the
+    lines of pg ((strip, y) pairs) and, on the back page, the logo."""
+    ph, mt, mb = f.height, f.mt, f.mb
+    L, R = f.x0 + f.ml, f.x0 + f.width - f.mr         # text area (x)
+    if f.title_band:
+        # Title band. insert_text draws at a baseline and never drops
+        # text (insert_textbox drops text that does not fit its box).
+        cx = (L + R) / 2
+
+        def centre(text: str, size: float, base: float, kind: str) -> None:
+            put_text(page, (cx - text_len(text, kind, size) / 2, base), text, kind, size)
+        if meta.get("title"):
+            centre(meta["title"], 21, mt + 18, "regular")
+        if meta.get("subtitle"):
+            centre(meta["subtitle"], 13, mt + 38, "italic")
+        put_text(page, (L, mt + 66), name, "bold", 16)
+        if meta.get("ambitus") and not any(s_.ambitus_marks for s_ in strips):
+            # no room in the first-line indent: beside the part name
+            draw_ambitus(page, L + text_len(name, "bold", 16) + 14,
+                         mt + 66 - 5.5 + 2 * AMB_SP, *meta["ambitus"])
+        if meta.get("composer"):
+            w = text_len(meta["composer"], "regular", 12)
+            put_text(page, (R - w, mt + 66), meta["composer"], "regular", 12)
+        if meta.get("members"):
+            put_text(page, (L, mt + 80), meta["members"], "italic", 10)
+        top = mt + TITLE_BAND
+    else:
+        # interior pages: short composer — title — part
+        short = meta.get("composer_short") or composer_surname(meta.get("composer", ""))
+        head = " — ".join(x for x in (short, meta.get("title", ""), name) if x)
+        if f.head_right:                      # recto: head at the outer (right)
+            w = text_len(head, "italic", 9.5)
+            put_text(page, (R - w, mt + 4), head, "italic", 9.5)
+        else:                                 # verso or single-sided: left
+            put_text(page, (L, mt + 4), head, "italic", 9.5)
+        top = mt + RUN_HEAD
+    w = text_len(f.folio, "regular", FOLIO_SIZE)
+    put_text(page, ((L + R - w) / 2, folio_base(ph, mb)), f.folio, "regular", FOLIO_SIZE)
+    for s, y in pg:
+        hpx, wpx = s.img.shape
+        x = L + (left_ink - anchor(s)) * k
+        rect = pymupdf.Rect(x, top + y, x + wpx * k, top + y + hpx * k)
+        if s.bar_no is not None:
+            # bar number above the staff start, clear of the clef
+            base, _, _ = bar_mark(s)
+            put_text(page, (x + bar_x(s) * k, top + y + base * k), str(s.bar_no),
+                     "italic", s.bar_size * s.sp * k)
+        for bx0, btop, bx1, bbot, letter, fs, bl in reh_boxes(s):
+            r = pymupdf.Rect(x + bx0 * k, top + y + btop * k,
+                             x + bx1 * k, top + y + bbot * k)
+            page.draw_rect(r, color=(0, 0, 0), width=max(0.6, 0.12 * s.sp * k))
+            put_text(page, (x + (bx0 + REH_PAD * s.sp) * k, top + y + bl * k),
+                     letter, "bold", fs * k)
+        rb = rest_box(s)
+        if rb:
+            put_text(page, (x + rb[0] * k, top + y + rb[3] * k), rb[5], rb[6], rb[4] * k)
+        for xl_, bot_, clef_, lo_, hi_, *alt_ in s.ambitus_marks:
+            draw_ambitus(page, x + xl_ * k, top + y + bot_ * k, clef_, lo_, hi_,
+                         *alt_, sp=s.sp * k)
+        for t_, x1_, base_, fs_, caps_ in line_labels(s):
+            if caps_:
+                put_smallcaps(page, x + x1_ * k, top + y + base_ * k, t_, fs_ * k)
+            else:
+                put_text(page, (x + x1_ * k - text_len(t_, "regular", fs_ * k),
+                                top + y + base_ * k), t_, "regular", fs_ * k)
+        if s.bracket:
+            # group score: a bracket joins the staves (engraver practice)
+            bx = x + (s.staff_x0 - 1.0 * s.sp) * k
+            y0 = top + y + s.staff_top * k
+            y1 = top + y + s.staff_bottom * k
+            lw = 0.45 * s.sp * k
+            page.draw_line((bx, y0 - 0.3 * s.sp * k), (bx, y1 + 0.3 * s.sp * k),
+                           color=(0, 0, 0), width=lw)
+            for yy, d in ((y0 - 0.3 * s.sp * k, -1), (y1 + 0.3 * s.sp * k, 1)):
+                page.draw_line((bx - lw / 2, yy), (bx + 0.9 * s.sp * k, yy + d * 0.5 * s.sp * k),
+                               color=(0, 0, 0), width=0.18 * s.sp * k)
+        # grey + alpha: paper is transparent, so a nested strip never
+        # hides ink of the strip above it
+        ga = np.empty((hpx, wpx, 2), np.uint8)
+        ga[..., 0] = 0
+        ga[..., 1] = np.where(s.img, 255, 0)
+        pix = pymupdf.Pixmap(pymupdf.csGRAY, wpx, hpx, ga.tobytes(), True)
+        page.insert_image(rect, pixmap=pix)
+    if f.last and logo_wanted(opts):
+        # back page: logo centred above the folio, in the room left under
+        # the last line (plan_pages leaves room where it can)
+        s_, y_ = pg[-1]
+        free = folio_top(ph, mb) - LOGO_FOLIO_GAP - (top + y_ + s_.img.shape[0] * k)
+        lh = min(LOGO_LAST_H, free - LOGO_GAP)
+        if lh >= LOGO_LAST_MIN_H:
+            put_logo(page, (L + R) / 2, folio_top(ph, mb) - LOGO_FOLIO_GAP - lh, lh,
+                     "centre", opts)
+        elif logo_path(opts) is not None:
+            _warn(f"{name}: no room for the logo on the back page (page {f.folio.split('/')[0]}); left out")
+
+
+def plan_turn_list(strips: list[Strip], plan, faces: list[dict], breaks: list[int]) -> list[dict]:
+    """plan_turn_list -> one dict per turn of a turnplan Plan, in the form of
+    turn_list (pdf_page = the page before the turn, 1-based in the book; a
+    fold-out counts as its bound face). cls: the turn class."""
+    out, j = [], 0
+    for gi, g in enumerate(plan.groups[:-1]):
+        j = g.turn.before
+        last = [f for f in faces if f["group"] == gi and f["role"] != "flap"][-1]
+        a, b = line_bars(strips[j - 1]), line_bars(strips[j])
+        c = g.turn.cls
+        out.append({"pdf_page": last["book"], "bar": a[1] if a and a[1] is not None else None,
+                    "next_bar": b[0] if b else None, "rest": g.turn.bars,
+                    "ok": c in ("rest", "rest1", "attacca"), "resting": c in ("rest", "rest1"),
+                    "movement": c == "attacca", "manual": j in (breaks or []),
+                    "cls": c, "fold": g.fold})
+    return out
+
+
+def flap_margins(opts: dict, width: float, flap_width: float) -> tuple[float, float]:
+    """flap_margins -> (fold-side margin, free-edge margin) in pt of a flap face
+    that must hold the same text width as the other faces. The free edge is
+    trimmed, so the text area is what is left of the trimmed panel."""
+    side = mm2pt(opts.get("margin_side", 15.0))
+    floor = mm2pt(config.MIN_MARGIN_MM)
+    text = usable_width(opts, width)
+    ml = side
+    mr = flap_width - text - ml
+    if mr < floor:
+        mr = floor
+        ml = flap_width - text - mr
+        if ml < floor:
+            _warn("fold-out flap: the text is too wide for the trimmed flap; lower binding "
+                  "or margin_side")
+            ml = floor
+    return ml, mr
+
+
+def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict,
+                out: Path, pages: list, title_page: bool, plan, breaks: list[int]) -> int:
+    """render_plan -> physical page count of the part PDF. The part of a plan
+    with fold-outs (DESIGN.md §5.7): out holds the Letter pages; the sheets of
+    the fold-outs are in <out>-foldout.pdf, one ledger sheet (two pages: front
+    and back) per fold-out. A right fold-out group is verso, recto, flap: the
+    recto and the flap are the front of a sheet, its back is the verso of the
+    next group (the leaf of the recto). Page numbers count leaves: the recto
+    is 7a and the flap 7b. The flap is trimmed 1/2 in at its free edge."""
+    pw, ph = PAPER[opts["paper"]]
+    k = 72.0 / dpi * (opts.get("scale") or 1.0)
+    left_ink = max(anchor(s) for s in strips)
+    faces, leaf, idx = [], 0, 0
+    for gi, g in enumerate(plan.groups):
+        for fi in range(g.faces):
+            role = "normal" if not g.fold or fi == 0 else ("bound" if fi == 1 else "flap")
+            if role != "flap":
+                leaf += 1
+            faces.append({"group": gi, "role": role, "leaf": leaf, "page": pages[idx], "idx": idx,
+                          "book": leaf + (1 if title_page else 0), "sheet": None})
+            idx += 1
+    total = leaf
+    for gi, g in enumerate(plan.groups):
+        if not g.fold:
+            continue
+        nxt = next((f for f in faces if f["group"] == gi + 1 and f["role"] == "normal"), None)
+        for f in faces:
+            if f["group"] == gi and f["role"] in ("bound", "flap"):
+                f["sheet"] = gi
+        if nxt is not None and nxt["sheet"] is None:
+            nxt["sheet"] = gi
+    for f in faces:
+        f["label"] = {"normal": f"{f['leaf']}/{total}", "bound": f"{f['leaf']}a/{total}",
+                      "flap": f"{f['leaf']}b/{total}"}[f["role"]]
+    LAST_RENDER["turns"] = plan_turn_list(strips, plan, faces, breaks)
+    nfaces = len(faces)
+
+    def face_for(f: dict, x0: float, width: float, ml: float, mr: float, mt: float, mb: float,
+                 head_right: bool) -> Face:
+        return Face(x0=x0, width=width, height=ph, ml=ml, mr=mr, mt=mt, mb=mb,
+                    title_band=(f["idx"] == 0 and not title_page), head_right=head_right,
+                    folio=f["label"], last=(f["idx"] == nfaces - 1 and f["sheet"] is None))
+
+    doc = pymupdf.open()
+    if title_page:
+        page = doc.new_page(width=pw, height=ph)
+        _title_page(page, name, meta, page_box(opts, 0, True), logo_wanted(opts), opts)
+    for f in faces:
+        if f["sheet"] is not None:
+            continue
+        page = doc.new_page(width=pw, height=ph)
+        ml, mr, mt, mb = page_box(opts, f["book"] - 1, True)
+        draw_face(page, f["page"], strips, name, meta, opts, k, left_ink,
+                  face_for(f, 0.0, pw, ml, mr, mt, mb, f["book"] % 2 == 1))
+    if plan.folds and len(doc) % 2:
+        doc.new_page(width=pw, height=ph)          # a blank back: the leaves print in pairs
+    doc.save(out, garbage=3, deflate=True)
+    foldout = None
+    if plan.folds:
+        foldout = out.with_name(out.stem + "-foldout.pdf")
+        sheets = pymupdf.open()
+        flap_w = pw - TRIM_PT
+        for gi, g in enumerate(plan.groups):
+            if not g.fold:
+                continue
+            fb = next(f for f in faces if f["group"] == gi and f["role"] == "bound")
+            ff = next(f for f in faces if f["group"] == gi and f["role"] == "flap")
+            nx = next((f for f in faces if f["sheet"] == gi and f["role"] == "normal"), None)
+            front = sheets.new_page(width=2 * pw, height=ph)
+            ml, mr, mt, mb = page_box(opts, fb["book"] - 1, True)
+            draw_face(front, fb["page"], strips, name, meta, opts, k, left_ink,
+                      face_for(fb, 0.0, pw, ml, mr, mt, mb, True))
+            fm, em = flap_margins(opts, pw, flap_w)
+            draw_face(front, ff["page"], strips, name, meta, opts, k, left_ink,
+                      face_for(ff, pw, flap_w, fm, em, mt, mb, True))
+            _sheet_guides(front, pw, ph, 2 * pw - TRIM_PT, mt,
+                          f"{name}: fold-out {fb['leaf']}a / {fb['leaf']}b. Cut at the right dotted "
+                          f"line, fold at the middle, flap forward over {fb['leaf']}a.")
+            back = sheets.new_page(width=2 * pw, height=ph)
+            if nx is not None:
+                ml, mr, mt, mb = page_box(opts, nx["book"] - 1, True)
+                draw_face(back, nx["page"], strips, name, meta, opts, k, left_ink,
+                          face_for(nx, pw, pw, ml, mr, mt, mb, False))
+            _sheet_guides(back, pw, ph, TRIM_PT, mt, "Back of the sheet (outside of the flap: blank).")
+        sheets.save(foldout, garbage=3, deflate=True)
+    LAST_RENDER.update(content=nfaces, title_page=title_page, foldouts=plan.folds,
+                       foldout=foldout.name if foldout else None)
+    return len(doc)
+
+
+def _sheet_guides(page: pymupdf.Page, fold_x: float, ph: float, cut_x: float, mt: float,
+                  note: str) -> None:
+    """Dotted fold line and dotted cut line on a fold-out sheet, with a note."""
+    for x in (fold_x, cut_x):
+        page.draw_line((x, 0), (x, ph), color=(0.5, 0.5, 0.5), width=0.6, dashes="[4 3] 0")
+    put_text(page, (fold_x + 3, ph - 6), "fold", "regular", 6.5)
+    put_text(page, (cut_x + (3 if cut_x < fold_x else -34), 10), "cut 1/2 in", "regular", 6.5)
+    put_text(page, (fold_x - text_len(note, "italic", 7) / 2, max(mt - 10, 10)), note, "italic", 7)
+
+
 def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
                 opts: dict, out: Path) -> int:
     """render_part -> physical page count. Writes out (PDF). meta: title,
@@ -660,6 +986,9 @@ def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
     for w_ in bwarn:
         _warn(f"{name}: {w_}")
     opts = {**opts, "_breaks": breaks}
+    if folds_wanted(opts):
+        pages, title_page, plan = layout_plan(strips, dpi, opts)
+        return render_plan(name, strips, meta, dpi, opts, out, pages, title_page, plan, breaks)
     pages, title_page = layout_pages(strips, dpi, opts)
     LAST_RENDER["turns"] = turn_list(strips, pages, title_page, opts, breaks)
     doc = pymupdf.open()
@@ -673,98 +1002,11 @@ def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
         phys = ci + (1 if title_page else 0)
         page = doc.new_page(width=pw, height=ph)
         ml, mr, mt, mb = page_box(opts, phys, duplex)
-        if ci == 0 and not title_page:
-            # Title band. insert_text draws at a baseline and never drops
-            # text (insert_textbox drops text that does not fit its box).
-            cx = (ml + pw - mr) / 2
-
-            def centre(text: str, size: float, base: float, kind: str) -> None:
-                put_text(page, (cx - text_len(text, kind, size) / 2, base), text, kind, size)
-            if meta.get("title"):
-                centre(meta["title"], 21, mt + 18, "regular")
-            if meta.get("subtitle"):
-                centre(meta["subtitle"], 13, mt + 38, "italic")
-            put_text(page, (ml, mt + 66), name, "bold", 16)
-            if meta.get("ambitus") and not any(s_.ambitus_marks for s_ in strips):
-                # no room in the first-line indent: beside the part name
-                draw_ambitus(page, ml + text_len(name, "bold", 16) + 14,
-                             mt + 66 - 5.5 + 2 * AMB_SP, *meta["ambitus"])
-            if meta.get("composer"):
-                w = text_len(meta["composer"], "regular", 12)
-                put_text(page, (pw - mr - w, mt + 66), meta["composer"], "regular", 12)
-            if meta.get("members"):
-                put_text(page, (ml, mt + 80), meta["members"], "italic", 10)
-            top = mt + TITLE_BAND
-        else:
-            # interior pages: short composer — title — part
-            short = meta.get("composer_short") or composer_surname(meta.get("composer", ""))
-            head = " — ".join(x for x in (short, meta.get("title", ""), name) if x)
-            if duplex and phys % 2 == 0:          # recto: head at the outer (right)
-                w = text_len(head, "italic", 9.5)
-                put_text(page, (pw - mr - w, mt + 4), head, "italic", 9.5)
-            else:                                 # verso or single-sided: left
-                put_text(page, (ml, mt + 4), head, "italic", 9.5)
-            top = mt + RUN_HEAD
-        folio = f"{ci + 1}/{n}"
-        w = text_len(folio, "regular", FOLIO_SIZE)
-        put_text(page, ((ml + pw - mr - w) / 2, folio_base(ph, mb)), folio,
-                 "regular", FOLIO_SIZE)
-        for s, y in pg:
-            hpx, wpx = s.img.shape
-            x = ml + (left_ink - anchor(s)) * k
-            rect = pymupdf.Rect(x, top + y, x + wpx * k, top + y + hpx * k)
-            if s.bar_no is not None:
-                # bar number above the staff start, clear of the clef
-                base, _, _ = bar_mark(s)
-                put_text(page, (x + bar_x(s) * k, top + y + base * k), str(s.bar_no),
-                         "italic", s.bar_size * s.sp * k)
-            for bx0, btop, bx1, bbot, letter, fs, bl in reh_boxes(s):
-                r = pymupdf.Rect(x + bx0 * k, top + y + btop * k,
-                                 x + bx1 * k, top + y + bbot * k)
-                page.draw_rect(r, color=(0, 0, 0), width=max(0.6, 0.12 * s.sp * k))
-                put_text(page, (x + (bx0 + REH_PAD * s.sp) * k, top + y + bl * k),
-                         letter, "bold", fs * k)
-            rb = rest_box(s)
-            if rb:
-                put_text(page, (x + rb[0] * k, top + y + rb[3] * k), rb[5], rb[6], rb[4] * k)
-            for xl_, bot_, clef_, lo_, hi_, *alt_ in s.ambitus_marks:
-                draw_ambitus(page, x + xl_ * k, top + y + bot_ * k, clef_, lo_, hi_,
-                             *alt_, sp=s.sp * k)
-            for t_, x1_, base_, fs_, caps_ in line_labels(s):
-                if caps_:
-                    put_smallcaps(page, x + x1_ * k, top + y + base_ * k, t_, fs_ * k)
-                else:
-                    put_text(page, (x + x1_ * k - text_len(t_, "regular", fs_ * k),
-                                    top + y + base_ * k), t_, "regular", fs_ * k)
-            if s.bracket:
-                # group score: a bracket joins the staves (engraver practice)
-                bx = x + (s.staff_x0 - 1.0 * s.sp) * k
-                y0 = top + y + s.staff_top * k
-                y1 = top + y + s.staff_bottom * k
-                lw = 0.45 * s.sp * k
-                page.draw_line((bx, y0 - 0.3 * s.sp * k), (bx, y1 + 0.3 * s.sp * k),
-                               color=(0, 0, 0), width=lw)
-                for yy, d in ((y0 - 0.3 * s.sp * k, -1), (y1 + 0.3 * s.sp * k, 1)):
-                    page.draw_line((bx - lw / 2, yy), (bx + 0.9 * s.sp * k, yy + d * 0.5 * s.sp * k),
-                                   color=(0, 0, 0), width=0.18 * s.sp * k)
-            # grey + alpha: paper is transparent, so a nested strip never
-            # hides ink of the strip above it
-            ga = np.empty((hpx, wpx, 2), np.uint8)
-            ga[..., 0] = 0
-            ga[..., 1] = np.where(s.img, 255, 0)
-            pix = pymupdf.Pixmap(pymupdf.csGRAY, wpx, hpx, ga.tobytes(), True)
-            page.insert_image(rect, pixmap=pix)
-        if ci == n - 1 and logo_wanted(opts):
-            # back page: logo centred above the folio, in the room left under
-            # the last line (plan_pages leaves room where it can)
-            s_, y_ = pg[-1]
-            free = folio_top(ph, mb) - LOGO_FOLIO_GAP - (top + y_ + s_.img.shape[0] * k)
-            lh = min(LOGO_LAST_H, free - LOGO_GAP)
-            if lh >= LOGO_LAST_MIN_H:
-                put_logo(page, (ml + pw - mr) / 2, folio_top(ph, mb) - LOGO_FOLIO_GAP - lh, lh,
-                         "centre", opts)
-            elif logo_path(opts) is not None:
-                _warn(f"{name}: no room for the logo on the back page (page {ci + 1}); left out")
+        draw_face(page, pg, strips, name, meta, opts, k, left_ink,
+                  Face(x0=0.0, width=pw, height=ph, ml=ml, mr=mr, mt=mt, mb=mb,
+                       title_band=(ci == 0 and not title_page),
+                       head_right=bool(duplex and phys % 2 == 0),
+                       folio=f"{ci + 1}/{n}", last=(ci == n - 1)))
     doc.save(out, garbage=3, deflate=True)
-    LAST_RENDER.update(content=n, title_page=title_page)
+    LAST_RENDER.update(content=n, title_page=title_page, foldouts=0, foldout=None)
     return n + (1 if title_page else 0)

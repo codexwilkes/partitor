@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # partitor — design
 
-Status: describes partitor 0.8.4. Section numbers are stable: the code cites
+Status: describes partitor 0.8.5. Section numbers are stable: the code cites
 them (`DESIGN.md §5.4`). Do not renumber. Add new text as a new subsection.
 Version numbers in this file are not history. The history is in
 `CHANGELOG.md`.
@@ -716,32 +716,58 @@ PDF (`large: on`, default):
 
 ---
 
-### 5.7 Page-turn planner for bound parts (`turnplan`)
+### 5.7 Page-turn planner and fold-outs for bound parts (`turnplan`)
 
-Status: the planner exists and is tested; the build does not use it yet (it still uses
-`plan_pages`, §5.4). Pure functions, no strips and no drawing: `plan_turns` takes the height of a
-run of lines, the page height and, for each page break, a `Boundary` (bars of rest next to it, a
-movement start, bars one staff rests), and returns a `Plan`: groups of pages, the class of every
-turn, the cost.
+`foldouts: on` (layout key, per part too; `set ID "Trombones:foldouts=on"`; default `off`, which keeps
+the page plan of §5.4) lets `turnplan` choose the page breaks, the spreads and the fold-outs of a
+bound part. It applies to double-sided print only (`duplex` not `off`). `plan_turns` takes the height
+of a run of lines, the page height and, for each page break, a `Boundary` (bars of rest next to it, a
+movement start, bars one staff rests), and returns a `Plan`: groups of pages, the class of every turn,
+the cost. The pure planner is in `turnplan`; `render` feeds it (`plan_faces`, `layout_plan`).
 
 - A bound part (3 or more pages, printed double-sided) is read as spreads: a verso and a recto, a
-  turn after each recto. A part without a title page starts with a recto on its own.
+  turn after each recto. A part without a title page starts with a recto on its own. With
+  `title_page: auto` the plan is made with and without a title page; the cheaper one wins.
 - Turn classes, cheapest that applies: `rest` (2 bars or more of rest, all staves; 0), `rest1` (one
   bar; 100), `attacca` (a movement starts, no rest; 150), `bridge` (the player is playing, but one
   staff rests next to the turn: tape a few notes over it; 800), `bad` (5000). A turn while playing
   is high but finite: a rehearsal part with a bad turn beats no part. The costs are constants in
-  `typography` (`PLAN_*`, `TURN_MOVE`) and a `Costs` value.
+  `typography` (`PLAN_*`, `TURN_MOVE`) and a `Costs` value. Today the build gives `rest`, `attacca`
+  and `bad` only: `rest1` and `bridge` need rest data the analysis does not keep per staff or per bar.
 - A fold-out group has three faces with no turn between them: verso, recto and a flap that folds
-  out to the right of the recto (or flap, verso, recto). The stand holds three faces at most. The
-  flap is unfolded at the start of the spread and folded in over its page before the turn (an open
-  flap is never turned: it would hang off the stand and dip). So the turn before a fold-out group
-  and the turn after it must both be rest turns (`rest` or `rest1`); the group costs 300 more
-  (`PLAN_FOLD`). A fold-out is chosen only when it lowers the total cost. The first page of a part
-  without a title page never starts one.
+  out to the right of the recto. The stand holds three faces at most. The flap is unfolded at the
+  start of the spread and folded in over its page before the turn (an open flap is never turned: it
+  would hang off the stand and dip). So the turn before a fold-out group and the turn after it must
+  both be rest turns (`rest` or `rest1`); the group costs 300 more (`PLAN_FOLD`). A fold-out is
+  chosen only when it lowers the total cost.
 - Pages and fold-outs are chosen for the whole part at once (dynamic programming), with the page
   costs of §5.4 (`PAGE_COST`, `REPAGE_FILL`, `SHORT_LAST`). Manual breaks (`breaks`) end a page.
-- Not done yet: the one-bar and per-staff rest data (`bridge_bars`) from the analysis, the
-  `plan` command, per-part paper, and the print of the fold-out sheets.
+
+Print of a part with fold-outs (`render_plan`). Two files per part:
+
+- `NN-part.pdf`: the pages on the part's paper (Letter). Print double-sided and bind. It has no
+  recto and no flap of a fold-out and no verso that follows a fold-out; a blank page is added when
+  the count would be odd, so the leaves print in pairs.
+- `NN-part-foldout.pdf`: one ledger sheet (17 x 11 in) per fold-out, two PDF pages: print double-sided
+  (flip on the short edge), cut, fold, and bind it in place of the leaf it replaces.
+  - Front: the bound face (the recto, spine at the left) and the flap. A dotted line marks the fold
+    (the middle) and a dotted line the cut: 1/2 in off the flap's free edge, so the folded flap does
+    not stand out. The staves stop inside the margins, so no dotted line crosses ink.
+  - Back: the outside of the flap is blank; behind the bound face is the verso that follows (spine at
+    the right edge), the first face of the next group. The flap folds forward over the bound face.
+  - Text width: the flap holds the same text width as every other face. The trimmed panel is 8 in
+    wide, so `binding` of about 12.7 mm (the trim) leaves the margin `margin_side` on both sides of the
+    flap; a smaller binding leaves less, a larger one more. The build warns when the text is too wide
+    for the trimmed flap (lower `binding` or `margin_side`).
+  - Page numbers count leaves, not faces: the recto is `7a` and the flap `7b` (`7a/18`, `7b/18`), and
+    the next verso is 8. The recto, its flap and the verso behind it are one sheet.
+- The record of the part in `score.yaml` (`built`) has `foldout` (the file) and `foldouts` (the count).
+  `repage` applies `foldouts` without a rebuild.
+- Only right fold-outs are made (flap to the right of the recto). A left fold-out (flap, verso,
+  recto) would put the previous recto on the back of the sheet; the planner does not tell the two apart,
+  so the build always makes the right one.
+- Not done yet: the `plan` command, the one-bar and per-staff rest data (`bridge_bars`) from the
+  analysis, and the 3-hole marks on the sheet.
 
 ## 6. CLI
 
@@ -813,11 +839,11 @@ Details:
 - `set` keys: title, subtitle, composer, composer_short, pages (auto or N), paper (letter, a4 or
   ledger), gap, min_gap, ink, scale, min_staff_mm, margin_top, margin_bottom,
   margin_side, gutter, binding, duplex, bar_numbers, bar_raise, bar_size, large, logo,
-  reflow, reflow_offer, max_staff_mm, title_page, group_gap, rests, turns, and per part
+  reflow, reflow_offer, max_staff_mm, title_page, group_gap, rests, turns, foldouts, and per part
   breaks
   (per part, as `Name:key=value`: pages, gap, min_gap, scale, min_staff_mm, max_staff_mm,
   group_gap, reflow, title_page, bar_raise, bar_size, ink, turns, breaks, and since 0.8.4
-  paper, margin_top, margin_bottom, margin_side, gutter, binding, duplex).
+  paper, margin_top, margin_bottom, margin_side, gutter, binding, duplex, foldouts).
   Bad keys or values change nothing.
 - `bars ID`: one line per system with its first bar and letters; `p N` pickup
   on/off (movement starts), `s N` split on/off (bars after a repeat), `f N=B`

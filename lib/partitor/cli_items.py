@@ -660,10 +660,12 @@ def cmd_repage(a: argparse.Namespace) -> int:
         nbad = count_bad_turns(tl, o)
         big = (large_copy(fn, o["paper"])
                if o.get("large") == "on" and o["paper"] in LARGE else None)
-        rec = {k: v for k, v in old.items() if k != "large"}
+        rec = {k: v for k, v in old.items() if k not in ("large", "foldout", "foldouts")}
         rec.update(pages=n, content_pages=LAST_RENDER.get("content", n),
                    title_page=bool(LAST_RENDER.get("title_page")), turns=len(tl),
-                   bad_turns=nbad, **({"large": big.name} if big else {}))
+                   bad_turns=nbad, **({"large": big.name} if big else {}),
+                   **({"foldout": LAST_RENDER["foldout"], "foldouts": LAST_RENDER["foldouts"]}
+                      if LAST_RENDER.get("foldout") else {}))
         recs[nm] = rec
         c0 = old.get("content_pages", old["pages"])
         _ok(f"{nm}:  pages of music {c0} -> {rec['content_pages']}  "
