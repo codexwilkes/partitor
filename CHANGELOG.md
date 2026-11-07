@@ -8,6 +8,27 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.19 — 2026-11-06
+
+### Added
+
+- `partitor pages ID PART`: one line for each page of a built part: its bars,
+  its systems, the room left at the foot (in systems) and the turn after it
+  (`PLAYING` for a turn while the player plays). `--move PAGE=N` moves the last
+  N systems of a page to the next page (a negative N brings systems up); the
+  part is paged again and the table shown again. `--clear` drops the manual
+  breaks. Menu key `l`. The guide has a section "Fix a bad turn by hand".
+
+### Fixed
+
+- `partitor plan` (0.8.6 and later) could not reach the library through the
+  root front end `bin/partitor`: it was missing from the list of library
+  commands, so it ran without the library folder. `plan` and `pages` are now on
+  the list.
+- A page break set after a bar (`Part:breaks=45`) did nothing on a part with
+  re-flow: a cut line has no list of bar numbers. The last bar of such a line is
+  now the bar before the first bar of the next line.
+
 ## 0.8.18 — 2026-11-06
 
 ### Fixed

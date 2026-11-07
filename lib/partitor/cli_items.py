@@ -754,6 +754,116 @@ def plan_trial(item: Path, data: dict, specs: list[str]) -> tuple[Path, dict, li
         raise
 
 
+def _turn_word(t: dict | None) -> str:
+    """_turn_word -> the turn after a page as a word for the pages table."""
+    if t is None:
+        return "-"
+    if t.get("cls") == "attacca" or t.get("movement"):
+        return "movement"
+    if t["resting"]:
+        return f"rest {t['rest']}" if t.get("rest") else "rest"
+    return "PLAYING" if not t["ok"] else "section"
+
+
+def pages_table(nm: str, rows: list[dict]) -> int:
+    """pages_table -> the number of turns while playing; prints one line per page."""
+    print(f"     {'page':>7}  {'bars':<9} {'systems':>7}  {'room':>5}  turn after it")
+    bad = 0
+    for r in rows:
+        t = r["turn"]
+        word = _turn_word(t)
+        bad += word == "PLAYING"
+        bars = f"{r['first']}-{r['last']}" if r["first"] is not None and r["last"] is not None else (
+            f"{r['first']}-" if r["first"] is not None else "?")
+        flag = "  <- move a system?" if word == "PLAYING" and r["systems"] > 1 else ""
+        mark = " [manual]" if r["manual"] else ""
+        role = " (flap)" if r["role"] == "flap" else ""
+        print(f"     {r['page']:>7}  {bars:<9} {r['systems']:>7}  {r['free']:>5.1f}  {word}{mark}{role}{flag}")
+    return bad
+
+
+def cmd_pages(a: argparse.Namespace) -> int:
+    """pages <id> <part> [--move PAGE=N ...] [--clear]: the pages of a built part, one line each: bars,
+    systems, room left at the foot (in systems) and the turn after it. --move 26=1 moves the last
+    system of page 26 to the next page (26=-1: the first system of the next page up to 26) by a page
+    break after the bar before it; the part is paged again (repage) and the table shown again.
+    --clear drops the manual breaks."""
+    from .lines import lines_path, load_lines
+    from .render import page_report
+    start = time.monotonic()
+    item = _item_or_die(a.id)
+    recover_parts(item)
+    data = load_item(item)
+    built = {r["part"]: r for r in (data.get("built") or {}).get("parts") or []}
+    if not built:
+        _die("pages: nothing built yet", f"Build first: partitor rebuild {data['id']}")
+    try:
+        only = parse_parts(data, [a.part])
+    except ValueError as e:
+        _die(f"pages: {e}", f"Parts: {selection_help(data)}")
+    names = [nm for _, nm in build_names(data) if nm in built and nm in only]
+    if len(names) != 1:
+        _die("pages: name one built part or group", f"Parts: {selection_help(data)}")
+    nm = names[0]
+
+    def report() -> list[dict]:
+        pl = load_lines(lines_path(item / "lines", nm))
+        lay = part_layout(load_item(item), nm)
+        o = {**pl["opts"], **{k: lay.get(k) for k in REPAGE_KEYS}}
+        return page_report(pl["strips"], pl["dpi"], o)
+    try:
+        rows = report()
+    except ValueError as e:
+        _die(f"pages: {nm}: {e}", "Rebuild the part once to save its lines")
+    moves = list(getattr(a, "move", None) or [])
+    pairs = []
+    if getattr(a, "clear", False):
+        pairs.append(f"{nm}:breaks=none")
+    for mv in moves:
+        page, _, n_ = mv.partition("=")
+        try:
+            n = int(n_)
+        except ValueError:
+            _die(f"pages: --move {mv!r}", "Use PAGE=N, e.g. --move 26=1 (the last system of page 26 goes to the next page)")
+        row = next((r for r in rows if r["page"] == page or r["page"].split("/")[0] == page), None)
+        if row is None or n == 0:
+            _die(f"pages: no page {page!r} (or N is 0)", "Pages: " + ", ".join(r["page"] for r in rows))
+        j = row["j"] - n                                   # the page ends before line j
+        if not row["i"] < j < rows[-1]["j"]:
+            _die(f"pages: page {page}: cannot move {n} system(s)", "A page keeps at least one system")
+        before = next((r for r in rows if r["j"] == j), None)
+        bar = before["last"] if before else None
+        if bar is None:
+            pl = load_lines(lines_path(item / "lines", nm))
+            from .render import line_spans
+            sp = line_spans(pl["strips"])[j - 1]
+            bar = sp[1] if sp else None
+        if bar is None:
+            _die(f"pages: page {page}: the bar numbers there are unknown", "Set the page break by hand: set Part:breaks=BAR")
+        old = [r for r in rows if r["manual"] and r["j"] == row["j"] and r["last"] is not None]
+        if old:
+            pairs.append(f"{nm}:breaks=-{old[0]['last']}")
+        pairs.append(f"{nm}:breaks=+{bar}")
+    if pairs:
+        try:
+            apply_set(data, pairs)
+        except ValueError as e:
+            _die(f"pages: {e}")
+        save_item(item, data)
+        _note("breaks:  " + ", ".join(p.split("=", 1)[1] for p in pairs) + f"  ({nm})")
+        if cmd_repage(argparse.Namespace(id=data["id"], parts=[nm])):
+            return 1
+        rows = report()
+    print(f"{BOLD}partitor {VERSION} — pages: {nm}{RST}")
+    bad = pages_table(nm, rows)
+    spare = [r for r in rows[:-1] if r["free"] >= 1.0]
+    print(f"     {len(rows)} pages, {bad} turn(s) while playing" + (
+        f"; room for a system on page(s) {', '.join(r['page'] for r in spare)}" if spare else ""))
+    if bad:
+        _note(f"to move the last system of a page to the next: partitor pages {data['id']} {nm} --move PAGE=1")
+    return _summary(start)
+
+
 def cmd_plan(a: argparse.Namespace) -> int:
     """plan <id> [part ...] [N] [--group Name=Alto,Tenor ...]: the options of a part (paper,
     staff size) with their page turns, estimated from the saved lines (read-only). `plan <id>

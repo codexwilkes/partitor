@@ -293,12 +293,24 @@ def line_bars(s: Strip) -> tuple[int, int | None] | None:
     return None
 
 
+def line_spans(strips: list[Strip]) -> list[tuple[int, int | None] | None]:
+    """line_spans -> (first bar, last bar) of every line. A line cut by re-flow has no list of bar
+    numbers, so its last bar is the one before the first bar of the next line (not across a
+    movement start, where the numbers begin again)."""
+    spans = [line_bars(s) for s in strips]
+    for i, sp in enumerate(spans[:-1]):
+        nxt = spans[i + 1]
+        if sp and sp[1] is None and nxt and nxt[0] > sp[0] and not strips[i + 1].movement:
+            spans[i] = (sp[0], nxt[0] - 1)
+    return spans
+
+
 def break_lines(strips: list[Strip], bars: list[int]) -> tuple[list[int], list[str]]:
     """break_lines -> (j list, warnings): a page break before line j for each
     bar N in `bars` ("break after bar N"). Lines are fixed, so N must be the
     last bar of a line; else a warning names the line ends near N."""
     out, warn = [], []
-    spans = [line_bars(s) for s in strips]
+    spans = line_spans(strips)
     for n in sorted({int(b) for b in bars or []}):
         hit = next((i for i, sp in enumerate(spans) if sp and sp[1] == n), None)
         if hit is not None:
@@ -504,6 +516,48 @@ def plan_faces(strips: list[Strip], dpi: int, opts: dict, title_page: bool):
         free = (avail1 if c == 0 else availn) - height(i, j) if c == len(flat) - 1 else None
         pages.append(page_lines(strips, pit, k, i, j, free))
     return pages, plan
+
+
+def page_report(strips: list[Strip], dpi: int, opts: dict) -> list[dict]:
+    """page_report -> one row per face of the part as it would be laid out now (no drawing): page
+    (the printed label), i and j (its lines i..j-1), first and last bar, systems, free (the spare
+    height at the foot, in systems of the page: its tallest line pitch), turn (the turn after it: the dict of turn_list, or None),
+    role (normal, bound, flap), manual (a manual break ends the page)."""
+    breaks, _ = break_lines(strips, opts.get("breaks") or [])
+    o = {**opts, "_breaks": breaks}
+    if folds_wanted(o):
+        pages, title_page, plan = layout_plan(strips, dpi, o)
+        flat = [pg for g in plan.groups for pg in g.pages]
+        faces, _ = build_faces(plan, pages, title_page)
+        labels = [f["label"] for f in faces]
+        roles = [f["role"] for f in faces]
+        tmap = {t["page"]: t for t in plan_turn_list(strips, plan, faces, breaks)}
+    else:
+        pages, title_page = layout_pages(strips, dpi, o)
+        flat, j0 = [], 0
+        for pg in pages:
+            flat.append((j0, j0 + len(pg)))
+            j0 += len(pg)
+        labels = [f"{c + 1}/{len(pages)}" for c in range(len(pages))]
+        roles = ["normal"] * len(pages)
+        tmap = {t["page"]: t for t in turn_list(strips, pages, title_page, o, breaks)}
+    _, ph = PAPER[o["paper"]]
+    k = 72.0 / dpi * (o.get("scale") or 1.0)
+    pit = pitches(strips, o)
+    _, _, mt, mb = page_box(o, 0, False)
+    avail = [ph - mt - mb - (RUN_HEAD if title_page else TITLE_BAND)] + [ph - mt - mb - RUN_HEAD] * (len(flat) - 1)
+    spans = line_spans(strips)
+    out = []
+    for c, (i, j) in enumerate(flat):
+        used = (strips[i].staff_top + sum(pit[i:j - 1]) - strips[j - 1].staff_top + strips[j - 1].img.shape[0]) * k
+        out.append({"page": labels[c], "i": i, "j": j, "systems": j - i,
+                    "first": spans[i][0] if spans[i] else None,
+                    "last": (spans[j - 1][1] if spans[j - 1] and spans[j - 1][1] is not None
+                             else (spans[j][0] - 1 if j < len(spans) and spans[j] else None)),
+                    "free": max(0.0, (avail[c] - used) / (max(pit[i:max(j - 1, i + 1)] or [1.0]) * k)),
+                    "turn": tmap.get(labels[c]),
+                    "role": roles[c], "manual": j in breaks})
+    return out
 
 
 def layout_plan(strips: list[Strip], dpi: int, opts: dict):
@@ -887,25 +941,11 @@ def flap_margins(opts: dict, width: float, flap_width: float) -> tuple[float, fl
     return ml, mr
 
 
-def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict,
-                out: Path, pages: list, title_page: bool, plan, breaks: list[int]) -> int:
-    """render_plan -> physical page count of the part PDF. The part of a plan
-    with fold-outs (DESIGN.md §5.7): out holds every leaf as Letter pages
-    except the flaps. A fold-out has two ways to be made, and both files are
-    written: <out>-foldout-sheets.pdf holds one ledger sheet (two pages: front
-    and back) per fold-out, to replace the two part pages of its leaf; and
-    <out>-foldout-flaps.pdf holds each flap on a Letter page, to cut and tape to
-    its page. A sheet is one leaf with a flap on its outer edge.
-    Right fold-out (verso, recto, flap): the front of the sheet is the recto and
-    the flap, its back the verso of the next group. Left fold-out (flap, verso,
-    recto): one side is the flap and the verso, the other the last recto of the
-    previous group. Page numbers count leaves: the recto is 7a and the flap 7b
-    (right); the flap 6a and the verso 6b (left). The flap is trimmed 1/2 in at
-    its free edge and folds forward over its page. <out>-assemble.txt says how to
-    print the files and how each fold-out is made."""
-    pw, ph = PAPER[opts["paper"]]
-    k = 72.0 / dpi * (opts.get("scale") or 1.0)
-    left_ink = max(anchor(s) for s in strips)
+def build_faces(plan, pages: list, title_page: bool) -> tuple[list[dict], int]:
+    """build_faces -> (faces, leaves): the faces of a turnplan Plan in reading order (a flap is a
+    face), each with its group, role (normal, bound, flap), leaf, book page, sheet and printed
+    label ("7", "7a", "6b"). leaves: the number of leaves (the denominator of a label). pages:
+    what render_plan draws on each face, in the same order (anything for a report)."""
     faces, leaf, idx = [], 0, 0
     for gi, g in enumerate(plan.groups):
         order = ("flap", "bound", "normal") if g.fold and g.side == "left" else \
@@ -943,6 +983,29 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
             f["label"] = f"{f['leaf']}{'a' if f['role'] == 'flap' else 'b'}/{total}"
         else:
             f["label"] = f"{f['leaf']}{'a' if f['role'] == 'bound' else 'b'}/{total}"
+    return faces, total
+
+
+def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict,
+                out: Path, pages: list, title_page: bool, plan, breaks: list[int]) -> int:
+    """render_plan -> physical page count of the part PDF. The part of a plan
+    with fold-outs (DESIGN.md §5.7): out holds every leaf as Letter pages
+    except the flaps. A fold-out has two ways to be made, and both files are
+    written: <out>-foldout-sheets.pdf holds one ledger sheet (two pages: front
+    and back) per fold-out, to replace the two part pages of its leaf; and
+    <out>-foldout-flaps.pdf holds each flap on a Letter page, to cut and tape to
+    its page. A sheet is one leaf with a flap on its outer edge.
+    Right fold-out (verso, recto, flap): the front of the sheet is the recto and
+    the flap, its back the verso of the next group. Left fold-out (flap, verso,
+    recto): one side is the flap and the verso, the other the last recto of the
+    previous group. Page numbers count leaves: the recto is 7a and the flap 7b
+    (right); the flap 6a and the verso 6b (left). The flap is trimmed 1/2 in at
+    its free edge and folds forward over its page. <out>-assemble.txt says how to
+    print the files and how each fold-out is made."""
+    pw, ph = PAPER[opts["paper"]]
+    k = 72.0 / dpi * (opts.get("scale") or 1.0)
+    left_ink = max(anchor(s) for s in strips)
+    faces, total = build_faces(plan, pages, title_page)
     LAST_RENDER["turns"] = plan_turn_list(strips, plan, faces, breaks)
     nfaces = len(faces)
 

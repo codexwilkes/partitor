@@ -23,6 +23,7 @@ turns where the player rests.
 | You want to | Use | Menu key |
 |---|---|---|
 | choose paper and staff size before a build | `partitor plan ID PART` | `f` |
+| see the pages of a built part and move a system to another page | `partitor pages ID PART` | `l` |
 | apply a changed setting (turns, breaks, fold-outs) without a new build | `partitor repage ID PART` | `x` |
 | change any setting | `partitor set ID PART:key=value` | `s` |
 | build or rebuild | `partitor rebuild ID PART` | `r` |
@@ -149,6 +150,34 @@ carries the flap and the page it folds over; its back is the next page.
 
 On the stand, open fold-outs are about 25 in wide. Check your stand. Staves
 stop inside the cut line, so no dotted line touches music.
+
+## Fix a bad turn by hand
+
+`partitor pages ID PART` shows one line for each page of a built part: its
+bars, its systems, the room left at the foot (in systems) and the turn after
+it. A turn while the player plays is marked `PLAYING`.
+
+```
+        page  bars      systems   room  turn after it
+       25/30  11-27           4    1.0  -
+       26/30  28-44           4    0.3  PLAYING  <- move a system?
+       27/30  45-58           3    2.0  -
+```
+
+To move the last system of page 26 to page 27:
+
+```
+partitor pages 12 Trombones --move 26=1
+```
+
+`--move 26=-1` brings the first system of the next page up to page 26. The
+part is paged again from that page on, and the table is shown again. The break
+is saved as a manual page break (`[manual]` in the table) and stays through
+later builds. `--clear` drops the manual breaks of the part.
+
+Use it when the planner could not find a good turn, or when you see a better one
+on the page. A move changes only that break: the pages before it stay as they
+are. If the next page has no room, the later pages move on by themselves.
 
 ## Settings
 

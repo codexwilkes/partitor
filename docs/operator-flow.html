@@ -115,7 +115,7 @@ html { scroll-behavior: smooth; }
 
 <div class="wrap">
 <header>
-  <span class="eyebrow">partitor 0.8.18</span>
+  <span class="eyebrow">partitor 0.8.19</span>
   <h1>From score to parts</h1>
   <p class="lede">How to turn a score PDF into large-print parts for your ensemble. You work on your phone or PC over SSH; partitor runs on your partitor host and keeps everything in the library folder (local, or on a NAS). Only the build takes a long time, so you make every change first, review it, and build once.</p>
 </header>
@@ -233,6 +233,7 @@ html { scroll-behavior: smooth; }
       <tr><td><kbd>v</kbd></td><td>review (stage 4)</td></tr>
       <tr><td><kbd>y</kbd></td><td>analyse again (new proof; names, groups and settings kept; choices and bar numbers asked again, the previous answers offered)</td></tr>
       <tr><td><kbd>f</kbd></td><td>fit: which paper and staff size give the best page turns for a part (<code>f Trombones</code>; <code>f Trombones 4</code> picks option 4, then <kbd>r</kbd>). Read-only until you pick. Guide: <code>PLAN-AND-FOLDOUTS.md</code></td></tr>
+      <tr><td><kbd>l</kbd></td><td>pages: one line for each page of a built part with the turn after it (<code>l Trombones</code>). Move a system to the next page: <code>partitor pages ID Trombones --move 26=1</code>. Guide: <code>PLAN-AND-FOLDOUTS.md</code></td></tr>
       <tr><td><kbd>x</kbd></td><td>repage: new page breaks from the lines of the last build, no new analysis (<code>x Trombones</code>). A page turn falls only beside a multi-bar rest; a turn while playing is a warning with page and bar. Break a page by hand: <kbd>s</kbd>, <code>Trombones:breaks=45,60</code>, then <kbd>x Trombones</kbd>. Needs one build with this version or later</td></tr>
       <tr><td><kbd>r</kbd></td><td>build (stage 5). <code>r Trombones</code> or <code>r 2-4</code> builds only those parts or groups (numbers as in the file names); the other part files stay</td></tr>
       <tr><td><kbd>b</kbd></td><td>back to the list</td></tr>
@@ -308,7 +309,7 @@ html { scroll-behavior: smooth; }
 
 <footer>
   <div class="staff" role="presentation"></div>
-  <p>partitor 0.8.18. Install: <code>INSTALL.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Design: <code>DESIGN.md</code>.</p>
+  <p>partitor 0.8.19. Install: <code>INSTALL.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Design: <code>DESIGN.md</code>.</p>
 </footer>
 </div>
 </body>

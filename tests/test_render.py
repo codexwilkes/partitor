@@ -30,6 +30,7 @@ from support import (  # noqa: E402,F401
     LIB,
     SRC,
     build,
+    cli_items,
     library,
     lines,
     make_logo_png,
@@ -1225,7 +1226,7 @@ class TestRepage(unittest.TestCase):
         run = (Path(SRC).parent.parent / "bin" / "partitor").read_text()
         line = next(ln for ln in run.splitlines() if "needs_lib=1 ;;" in ln and "|" in ln)
         listed = set(line.split(")")[0].strip().split("|"))
-        for c in cmds - {"pieces", "detect", "build"}:
+        for c in (cmds | {"plan"}) - {"pieces", "detect", "build"}:     # plan has its own parser, not a cmds entry
             self.assertIn(c, listed, f"bin/partitor does not list {c}")
 
     def test_partitor_color_gives_colour_without_a_terminal(self):
@@ -1692,3 +1693,117 @@ class TestTurnWhere(unittest.TestCase):
             self.assertIn(tl[0]["page"], pdf[tl[0]["pdf_page"] - 1].get_text())     # the page it names is that page
             self.assertGreaterEqual(first, 1)
 
+
+@needs_deps
+class TestPagesReport(unittest.TestCase):
+    """The pages table and `pages --move` (0.8.19)."""
+
+    def music(self, n=40, rests=()):
+        return TestRepage().music(n, rests)
+
+    OPTS = {**pt.LAYOUT_DEFAULTS, "paper": "letter", "scale": 1.0, "turns": "rest", "title_page": "off"}
+
+    def test_the_last_bar_of_a_line_without_bar_numbers_is_the_one_before_the_next_line(self):
+        a = dataclasses.replace(TestRepage.line(bars=(5, 8)), bar_nums=[], bar_no=5)
+        b = dataclasses.replace(TestRepage.line(bars=(9, 12)), bar_nums=[], bar_no=9)
+        c = dataclasses.replace(TestRepage.line(bars=(1, 4)), bar_nums=[], bar_no=1, movement=True)
+        spans = pt.line_spans([a, b, c])
+        self.assertEqual(spans[0], (5, 8))                       # next line starts at 9
+        self.assertEqual(spans[1], (9, None))                    # a movement starts again at 1: unknown
+        self.assertEqual(spans[2], (1, None))
+
+    def test_a_break_after_a_bar_works_on_lines_cut_by_re_flow(self):
+        st = [dataclasses.replace(TestRepage.line(bars=(1 + 4 * k, 4 + 4 * k)), bar_nums=[], bar_no=1 + 4 * k)
+              for k in range(6)]
+        out, warn = pt.break_lines(st, [12])
+        self.assertEqual((out, warn), ([3], []))                 # the line of bars 9-12 is line 2; break before line 3
+
+    def test_the_report_has_a_row_per_page_and_covers_every_line(self):
+        st = self.music(40, rests={9, 17, 25, 33})
+        rows = pt.page_report(st, 400, self.OPTS)
+        self.assertEqual(rows[0]["i"], 0)
+        self.assertEqual(rows[-1]["j"], len(st))
+        self.assertEqual(sum(r["systems"] for r in rows), len(st))
+        for a, b in zip(rows, rows[1:]):
+            self.assertEqual(a["j"], b["i"])
+        self.assertTrue(all(r["free"] >= 0.0 for r in rows))
+        self.assertTrue(all(r["page"] for r in rows))
+        self.assertEqual(sum(1 for r in rows if r["turn"] is not None) >= 1, True)
+
+    def test_a_manual_break_is_marked_and_ends_its_page(self):
+        st = self.music(40)
+        rows = pt.page_report(st, 400, self.OPTS)
+        first = rows[0]
+        bar = first["last"] - 4 if first["systems"] > 1 else None
+        if bar is None:
+            self.skipTest("first page has one line")
+        rows2 = pt.page_report(st, 400, {**self.OPTS, "breaks": [bar]})
+        marked = [r for r in rows2 if r["manual"]]
+        self.assertEqual(len(marked), 1)
+        self.assertEqual(marked[0]["last"], bar)
+
+    def test_the_turn_words(self):
+        w = cli_items._turn_word
+        self.assertEqual(w(None), "-")
+        self.assertEqual(w({"resting": True, "rest": 7, "ok": True}), "rest 7")
+        self.assertEqual(w({"resting": False, "ok": True}), "section")
+        self.assertEqual(w({"resting": False, "ok": False}), "PLAYING")
+        self.assertEqual(w({"resting": False, "ok": True, "movement": True}), "movement")
+
+    def test_a_part_with_no_rest_has_a_turn_while_playing_in_the_report(self):
+        rows = pt.page_report(self.music(30), 400, self.OPTS)          # no rests anywhere
+        words = [cli_items._turn_word(r["turn"]) for r in rows if r["turn"] is not None]
+        self.assertIn("PLAYING", words)
+
+    def test_the_pages_command_shows_the_table_and_moves_a_system(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            one = Path(tmp, "page.pdf")
+            make_score_pdf(str(one), systems=2, staves=2, labels=("Alto", "Bass"), title="")
+            doc = pymupdf.open()
+            for _ in range(6):
+                doc.insert_pdf(pymupdf.open(str(one)))
+            share = Path(tmp, "share")
+            (share / "inbox").mkdir(parents=True)
+            item = share / "library" / "2026-10-0001-c-t"
+            item.mkdir(parents=True)
+            doc.save(str(item / "2026-10-0001-source.pdf"))
+            pt.save_item(item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-27"})
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
+                d = pt.load_item(item)
+                pt.apply_set(d, ["pages=5", "max_staff_mm=8"])
+                pt.save_item(item, d)
+                self.assertEqual(build.run_build(item), 0)
+            old_share = os.environ.get("PARTITOR_LIBRARY")
+            os.environ["PARTITOR_LIBRARY"] = str(share)
+
+            def run(**kw):
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    rc = pt._engine_step(pt.cmd_pages, argparse.Namespace(
+                        id="2026-10-0001", part="Alto", move=kw.get("move"), clear=kw.get("clear", False)))
+                return rc, buf.getvalue()
+            try:
+                rc, out = run()
+                self.assertEqual(rc, 0, out)
+                self.assertIn("turn after it", out)
+                rows = [ln.split() for ln in out.splitlines() if "/" in ln[:15] and ln.strip()[:1].isdigit()]
+                self.assertTrue(rows, out)
+                self.assertEqual(pt.load_item(item).get("layout", {}).get("parts", {}).get("Alto", {}).get("breaks"), None)  # read-only
+                page = next((r[0].split("/")[0] for r in rows if int(r[2]) > 1), None)
+                self.assertIsNotNone(page, out)
+                rc, out = run(move=[f"{page}=1"])
+                self.assertEqual(rc, 0, out)
+                self.assertTrue(pt.load_item(item)["layout"]["parts"]["Alto"]["breaks"])           # a break was saved
+                self.assertIn("[manual]", out)
+                rc, out = run(clear=True)
+                self.assertEqual(rc, 0, out)
+                self.assertNotIn("breaks", pt.load_item(item)["layout"]["parts"]["Alto"])
+                self.assertNotIn("[manual]", out)
+                rc, out = run(move=["99=1"])                                                    # no such page
+                self.assertNotEqual(rc, 0)
+            finally:
+                if old_share is None:
+                    os.environ.pop("PARTITOR_LIBRARY", None)
+                else:
+                    os.environ["PARTITOR_LIBRARY"] = old_share

@@ -17,7 +17,7 @@ from .cli_bars import cmd_bars
 from .cli_common import _lib_or_die, cmd_set
 from .cli_items import (
     cmd_analyse, cmd_contract, cmd_expand, cmd_list, cmd_meta, cmd_new, cmd_proof, cmd_reid,
-    cmd_plan, cmd_rename, cmd_repage, cmd_show, item_matches, list_page_size,
+    cmd_pages, cmd_plan, cmd_rename, cmd_repage, cmd_show, item_matches, list_page_size,
 )
 from .cli_parts import ambitus_menu, ask_part, cmd_groups, cmd_parts
 from .config import LAYOUT_DEFAULTS, PAGE_HEADER_SP, PAPER
@@ -47,7 +47,8 @@ def item_menu(item: Path) -> None:
               "  s set")
         print("  v review   y analyse again   r build (r Trombones, r 2-4: only those)")
         print("  f fit (paper, staff size, page turns: f Trombones)   "
-              "x repage (page turns while resting; x Trombones)   b back")
+              "l pages (see and move page turns: l Trombones)")
+        print("  x repage (page turns while resting; x Trombones)   b back")
         try:
             raw = ask(">", "b").strip()
         except Abort:
@@ -96,6 +97,10 @@ def item_menu(item: Path) -> None:
                 cmd_repage(argparse.Namespace(id=data["id"], parts=rest.split()))
             elif k == "f":
                 cmd_plan(plan_args([str(data["id"]), *rest.split()]))
+            elif k == "l":
+                part = rest.strip() or ask_part(data)
+                if part:
+                    cmd_pages(argparse.Namespace(id=data["id"], part=part, move=[], clear=False))
             elif k == "v":
                 cmd_show(ns)
         except SystemExit:            # _die inside a command: stay in the menu
@@ -289,6 +294,14 @@ def main() -> int:
                          "default: every part")
     rb.add_argument("--jobs", help="worker processes: a number or auto "
                     "(default: PARTITOR_JOBS, else auto)")
+    pg = sub.add_parser("pages", help="the pages of a built part and the turn after each; "
+                        "--move PAGE=N moves a system to the next page")
+    pg.add_argument("id", help="12 or 2026-10-0012")
+    pg.add_argument("part", help="one part or group, name or number")
+    pg.add_argument("--move", action="append", metavar="PAGE=N",
+                    help="move the last N systems of PAGE to the next page (N negative: bring the "
+                         "first systems of the next page up); the part is paged again")
+    pg.add_argument("--clear", action="store_true", help="drop the manual page breaks of the part")
     rp = sub.add_parser("repage", help="new page breaks from the saved lines: turns while "
                         "resting, manual breaks (no analysis, no build)")
     rp.add_argument("id", help="12 or 2026-10-0012")
@@ -364,7 +377,7 @@ def main() -> int:
                 "build": build.cmd_build}[a.cmd](a)
     cmds = {"menu": cmd_menu, "new": cmd_new, "list": cmd_list, "show": cmd_show,
             "set": cmd_set, "expand": cmd_expand, "contract": cmd_contract,
-            "rebuild": cli_items.cmd_rebuild, "repage": cmd_repage, "bars": cmd_bars, "parts": cmd_parts,
+            "rebuild": cli_items.cmd_rebuild, "pages": cmd_pages, "repage": cmd_repage, "bars": cmd_bars, "parts": cmd_parts,
             "proof": cmd_proof,
             "groups": cmd_groups, "meta": cmd_meta, "analyse": cmd_analyse,
             "reid": cmd_reid, "rename": cmd_rename}

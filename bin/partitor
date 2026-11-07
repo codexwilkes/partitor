@@ -50,7 +50,7 @@
 #
 # Usage:
 #   partitor                               menu (recent items, new from inbox)
-#   partitor <new|list|show|set|expand|contract|rebuild|repage|bars|proof|parts|groups|meta|analyse> ... library
+#   partitor <new|list|show|set|expand|contract|rebuild|repage|plan|pages|bars|proof|parts|groups|meta|analyse> ... library
 #   partitor rebuild <id> [part ...]       build all parts, or only the parts / groups named
 #                                          (numbers, 2-4, names: partitor rebuild 12 Trombones)
 #   partitor <pieces|detect|build> ...     engine commands in the work folder
@@ -179,7 +179,7 @@ needs_files=0
 needs_lib=0
 case "${1:-}" in
   pieces|detect|build) needs_files=1 ;;
-  ""|menu|new|list|show|set|expand|contract|rebuild|bars|proof|parts|groups|meta|analyse|reid|rename|repage) needs_lib=1 ;;
+  ""|menu|new|list|show|set|expand|contract|rebuild|bars|proof|parts|groups|meta|analyse|reid|rename|repage|plan|pages) needs_lib=1 ;;
   --sandbox-check) [[ "${2:-}" == "--library" ]] && needs_lib=1 ;;
 esac
 (( $# )) || set -- menu
