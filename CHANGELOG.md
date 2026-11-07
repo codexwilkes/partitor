@@ -8,6 +8,20 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.17 — 2026-11-06
+
+### Changed
+
+- A page turn is reported as the player reads it: the printed page and the next
+  bar ("page 26/30, before bar 45"). Before, the report said "PDF page 27 (after
+  bar None)": the PDF page is one more than the printed page when the part has a
+  title page, and the bar was often unknown. `repage` and the build warning use
+  the new text; turns saved by an older build say "(PDF page N)".
+- `plan` is listed in `partitor --help` and in the item menu (key `f`), and in
+  the command table of `OPERATING.md` and in the operator flow.
+- Docs: the plan guide has a "Which command?" table and no longer uses the word
+  "leaf".
+
 ## 0.8.16 — 2026-11-06
 
 ### Fixed

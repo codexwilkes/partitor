@@ -707,7 +707,8 @@ def _title_page(page: pymupdf.Page, name: str, meta: dict, box: tuple,
 def turn_list(strips: list[Strip], pages: list, title_page: bool, opts: dict,
               breaks: list[int] | None = None) -> list[dict]:
     """turn_list -> one dict per page turn (after each recto; every page when
-    single-sided): pdf_page (the page before the turn, 1-based in the PDF),
+    single-sided): pdf_page (the page before the turn, 1-based in the PDF), page
+    (its printed number, "26/30": the one the player reads),
     bar (last bar before the turn, None if unknown), next_bar, rest (bars of
     the multi-bar rest beside the turn; 0 if none), ok (the player rests or
     a movement or rehearsal letter starts: good_turn), resting (rest_turn),
@@ -722,7 +723,8 @@ def turn_list(strips: list[Strip], pages: list, title_page: bool, opts: dict,
             continue
         a, b = line_bars(strips[j - 1]), line_bars(strips[j])
         rest = edge_rest(strips, j)
-        out.append({"pdf_page": phys, "bar": a[1] if a and a[1] is not None else None,
+        out.append({"pdf_page": phys, "page": f"{c + 1}/{len(pages)}",
+                    "bar": a[1] if a and a[1] is not None else None,
                     "next_bar": b[0] if b else None, "rest": rest,
                     "ok": good_turn(strips, j), "resting": rest_turn(strips, j),
                     "movement": bool(strips[j].movement) and not rest_turn(strips, j),
@@ -857,7 +859,8 @@ def plan_turn_list(strips: list[Strip], plan, faces: list[dict], breaks: list[in
         last = [f for f in faces if f["group"] == gi and f["role"] != "flap"][-1]
         a, b = line_bars(strips[j - 1]), line_bars(strips[j])
         c = g.turn.cls
-        out.append({"pdf_page": last["book"], "bar": a[1] if a and a[1] is not None else None,
+        out.append({"pdf_page": last["book"], "page": last["label"],
+                    "bar": a[1] if a and a[1] is not None else None,
                     "next_bar": b[0] if b else None, "rest": g.turn.bars,
                     "ok": c in ("rest", "rest1", "attacca"), "resting": c in ("rest", "rest1"),
                     "movement": c == "attacca", "manual": j in (breaks or []),

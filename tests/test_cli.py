@@ -38,6 +38,14 @@ class TestCommands(unittest.TestCase):
         return subprocess.run([sys.executable, SRC, *args], capture_output=True, text=True,
                               env=env)
 
+    def test_plan_is_listed_in_the_help_and_still_runs_its_own_parser(self):
+        r = self.run_cli("--help")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(r.stdout, r"\n\s+plan\s+choose paper")
+        r = self.run_cli("plan", "--help")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("usage: partitor plan", r.stdout)             # the plan parser, not the stub
+
     def test_detect_and_build_end_to_end(self):
         with tempfile.TemporaryDirectory() as d:
             pdf = os.path.join(d, "s.pdf")

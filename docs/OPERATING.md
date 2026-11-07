@@ -20,6 +20,7 @@ sandbox (`SANDBOX.md`).
 | `partitor expand ID [part]`, `contract ID [part]` | One step larger or smaller. |
 | `partitor analyse ID [--yes]`, `analyse --all` | Read the score again. |
 | `partitor bars`, `parts`, `groups`, `meta`, `proof ID` | Edit bar numbers, part names, groups, title; redraw the proof. |
+| `partitor plan ID [part [N]]` | Which paper and staff size give the best page turns? Read-only until you pick an option `N`; then `rebuild`. Guide: `PLAN-AND-FOLDOUTS.md`. |
 | `partitor rebuild ID [part ...]` | Build. With names or numbers: only those parts or groups. |
 | `partitor repage ID [part ...]` | New page breaks from the saved lines. |
 | `partitor rename ID`, `reid ID` | Folder name follows title and composer; old id to new format. |

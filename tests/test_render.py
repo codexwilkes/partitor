@@ -1655,3 +1655,40 @@ class TestLogoInLibrary(unittest.TestCase):
                                      argparse.Namespace(id="2026-10-0001", parts=["Alto"]))
         self.assertEqual(rc, 0)
         self.assertEqual(set(seen.read_text().split()), {wanted})
+
+
+@needs_deps
+class TestTurnWhere(unittest.TestCase):
+    """A page turn is reported as the player reads it: the printed page and the next bar (0.8.17)."""
+
+    def test_the_printed_page_and_the_next_bar(self):
+        t = {"pdf_page": 27, "page": "26/30", "bar": None, "next_bar": 45}
+        self.assertEqual(pt.turn_where(t), "page 26/30, before bar 45")
+        self.assertEqual(pt.turn_where({**t, "next_bar": None, "bar": 44}), "page 26/30, after bar 44")
+        self.assertEqual(pt.turn_where({**t, "next_bar": None}), "page 26/30")
+        self.assertNotIn("None", pt.turn_where({**t, "next_bar": None}))
+
+    def test_an_older_turn_without_a_printed_page_names_the_pdf_page(self):
+        self.assertEqual(pt.turn_where({"pdf_page": 27, "bar": 9, "next_bar": None}),
+                         "page (PDF page 27), after bar 9")
+
+    def test_the_turn_text_of_repage_uses_it(self):
+        t = {"pdf_page": 27, "page": "26/30", "bar": 44, "next_bar": 45, "rest": 0, "resting": False,
+             "ok": False, "manual": False}
+        self.assertEqual(pt.turn_text(t), "page 26/30, before bar 45  PLAYING")
+
+    def test_a_render_gives_every_turn_its_printed_page(self):
+        import re
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d, "p.pdf")
+            pt.render_part("P", TestFoldoutRender().music(70), {"title": "T"}, 400,
+                           {**TestFoldoutRender.OPTS, "foldouts": "off"}, out)
+            tl = pt.LAST_RENDER["turns"]
+            self.assertTrue(tl)
+            for t in tl:
+                self.assertRegex(t["page"], r"^\d+/\d+$")
+            pdf = pymupdf.open(out)
+            first = int(tl[0]["page"].split("/")[0])
+            self.assertIn(tl[0]["page"], pdf[tl[0]["pdf_page"] - 1].get_text())     # the page it names is that page
+            self.assertGreaterEqual(first, 1)
+

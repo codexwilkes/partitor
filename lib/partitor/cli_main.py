@@ -46,7 +46,8 @@ def item_menu(item: Path) -> None:
         print("                            e expand  c contract  p pages  a paper  k ambitus"
               "  s set")
         print("  v review   y analyse again   r build (r Trombones, r 2-4: only those)")
-        print("  x repage (page turns while resting; x Trombones)   b back")
+        print("  f fit (paper, staff size, page turns: f Trombones)   "
+              "x repage (page turns while resting; x Trombones)   b back")
         try:
             raw = ask(">", "b").strip()
         except Abort:
@@ -93,6 +94,8 @@ def item_menu(item: Path) -> None:
                                                jobs=None))
             elif k == "x":
                 cmd_repage(argparse.Namespace(id=data["id"], parts=rest.split()))
+            elif k == "f":
+                cmd_plan(plan_args([str(data["id"]), *rest.split()]))
             elif k == "v":
                 cmd_show(ns)
         except SystemExit:            # _die inside a command: stay in the menu
@@ -237,7 +240,7 @@ def sandbox_check(library: bool = False) -> int:
 
 def plan_args(argv: list[str]) -> argparse.Namespace:
     """plan_args -> the arguments of `partitor plan`. The command has its own parser and is
-    not in the main --help yet: that text is part of the G0 golden (DESIGN.md §5.8)."""
+    listed in the main --help by a stub parser that is never run."""
     pn = argparse.ArgumentParser(
         prog="partitor plan",
         description="Options of a part: paper, staff size, page turns and fold-outs, estimated "
@@ -276,6 +279,8 @@ def main() -> int:
     ls_ = sub.add_parser("list", help="all library items, or those matching words")
     ls_.add_argument("words", nargs="*", help="e.g. Schein (composer, title, part, id)")
     sub.add_parser("show").add_argument("id", help="12 or 2026-10-0012")
+    sub.add_parser("plan", help="choose paper, staff size and fold-outs of a part by its page turns "
+                   "(read-only until you pick an option; partitor plan --help)")
     rb = sub.add_parser("rebuild", help="build; with parts or groups: only those "
                         "(the other part files stay)")
     rb.add_argument("id", help="12 or 2026-10-0012")

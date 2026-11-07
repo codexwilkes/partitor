@@ -713,12 +713,21 @@ def count_bad_turns(turns_: list[dict], opts: dict) -> int:
     return sum(1 for t in turns_ if not t["ok"])
 
 
+def turn_where(t: dict) -> str:
+    """turn_where -> where a page turn is, as the player reads it: "page 26/30, before bar 45".
+    The page is the printed number; the PDF page when a saved turn has none."""
+    page = t.get("page") or f"(PDF page {t['pdf_page']})"
+    if t.get("next_bar") is not None:
+        return f"page {page}, before bar {t['next_bar']}"
+    if t.get("bar") is not None:
+        return f"page {page}, after bar {t['bar']}"
+    return f"page {page}"
+
+
 def turn_text(t: dict) -> str:
     """One page turn as a line for the report."""
-    bar = f"bar {t['bar']}" if t["bar"] is not None else "bar ?"
-    nxt = f" -> {t['next_bar']}" if t["next_bar"] is not None else ""
     why = (f"rest {t['rest']} bars" if t["resting"] else
            "movement start, no rest: check that it is not attacca" if t.get("movement") else
            "section start (player may be playing)" if t["ok"] else "PLAYING")
-    return f"PDF page {t['pdf_page']}: after {bar}{nxt}  {why}" + \
+    return f"{turn_where(t)}  {why}" + \
         ("  [manual break]" if t["manual"] else "")

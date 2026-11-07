@@ -18,6 +18,18 @@ A part of three pages or more is bound (3-hole punch or comb). It is printed
 double-sided. The planner adds extra margin at the spine and puts the page
 turns where the player rests.
 
+## Which command?
+
+| You want to | Use | Menu key |
+|---|---|---|
+| choose paper and staff size before a build | `partitor plan ID PART` | `f` |
+| apply a changed setting (turns, breaks, fold-outs) without a new build | `partitor repage ID PART` | `x` |
+| change any setting | `partitor set ID PART:key=value` | `s` |
+| build or rebuild | `partitor rebuild ID PART` | `r` |
+
+A turn is reported by its printed page number, for example "page 26/30, before
+bar 45": the number you read on the sheet.
+
 ## Quick start
 
 1. Build the item once: `partitor rebuild 12`.
@@ -130,10 +142,10 @@ Then punch or bind the stack.
 Each sheet page and each flap page has a line at the foot with its number, the
 print setting and the place. If a page comes out wrong, you can read it there.
 
-A sheet is one leaf. Its flap is on the outer edge. Its other face (the back
-of the bound half) is a normal page of the part. A fold-out has three faces
-that you see without a turn: unfold the flap at the start, fold it in before
-the turn. The player must rest at both ends.
+A fold-out gives three pages that you see without a turn: the flap, and the
+two pages behind it. Unfold the flap at the start, fold it in before the turn.
+The player must rest at both ends. A ledger sheet is one piece of paper that
+carries the flap and the page it folds over; its back is the next page.
 
 On the stand, open fold-outs are about 25 in wide. Check your stand. Staves
 stop inside the cut line, so no dotted line touches music.

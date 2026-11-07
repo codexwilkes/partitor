@@ -36,7 +36,7 @@ from .library import (
     piece_tag, recover_parts, save_item, score_name, swap_parts,
 )
 from .lines import (
-    count_bad_turns, fill_rests, finish_lines, label_column, lines_path, merge_rest_bars, save_lines,
+    count_bad_turns, fill_rests, finish_lines, label_column, lines_path, merge_rest_bars, save_lines, turn_where,
 )
 from .partplan import read_source
 from .mapping import assign_maps
@@ -709,7 +709,7 @@ def cmd_build(a: argparse.Namespace) -> int:
         nbad = count_bad_turns(tl, o)
         if (o.get("turns", "any") == "rest" or o.get("foldouts") == "on") and nbad:
             _warn(f"turn-while-playing:  {name}  " + "; ".join(
-                f"PDF page {t['pdf_page']} (after bar {t['bar']})" for t in tl
+                turn_where(t) for t in tl
                 if not t["resting"] and not t.get("movement"))
                   + "  (no rest to turn in; set breaks or accept)")
         if lines_dir is not None:
