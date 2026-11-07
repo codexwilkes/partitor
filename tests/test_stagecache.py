@@ -431,7 +431,7 @@ class TestCacheOutputIsIdentical(unittest.TestCase):
         self.assertFalse((off_item / "cache").exists())
         off = self.result(off_item)
         def norm(r):
-            ident = lambda t: re.sub(r"2026-10-000\d", "ID", t)
+            ident = lambda t: re.sub(r"\d{4}-\d\d-\d\d \d\d:\d\d", "DATE", re.sub(r"2026-10-000\d", "ID", t))   # the build minute may roll over
             return (ident(r[0]), {ident(k): v for k, v in r[1].items()},
                     {ident(k): v for k, v in r[2].items()})
         self.assertEqual(norm(cold), norm(warm))

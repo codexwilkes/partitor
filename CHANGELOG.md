@@ -21,6 +21,8 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
   are put back now.
 - `plan` took `foldside` from the last build, not from the settings.
 - The mark `<- move a system?` showed when the next page had no room.
+- A test of the analysis cache failed when the clock changed to the next minute
+  between two builds (the saved build time was compared). It now ignores the time.
 
 ### Changed
 
