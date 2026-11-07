@@ -173,11 +173,21 @@ partitor pages 12 Trombones --move 26=1
 `--move 26=-1` brings the first system of the next page up to page 26. The
 part is paged again from that page on, and the table is shown again. The break
 is saved as a manual page break (`[manual]` in the table) and stays through
-later builds. `--clear` drops the manual breaks of the part.
+later builds. `--clear` drops the manual breaks of the part. `--dry-run` shows
+the pages after a move and saves nothing. Use one `--move` for each call.
 
 Use it when the planner could not find a good turn, or when you see a better one
-on the page. A move changes only that break: the pages before it stay as they
-are. If the next page has no room, the later pages move on by themselves.
+on the page. The pages before the moved page keep their ends: if the planner
+would change one, `pages` saves a manual break there too (`[manual]`; the
+`breaks:` line lists them). If the next page has no room, the later pages move
+on by themselves. The `<- move a system?` mark shows only when the next page has
+room for a system. A move pages the part again with `turns=rest` and keeps that
+setting; if the repage fails, the settings are put back. In the item menu (key
+`l`) `pages` asks for a move after the table.
+
+`plan` does not use manual breaks in its estimates (it says so). After
+`plan ID PART N`, check the breaks with `pages`; if a break no longer ends a
+line, drop them with `--clear`.
 
 ## Settings
 

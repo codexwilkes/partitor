@@ -8,6 +8,32 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.20 — 2026-11-07
+
+### Fixed
+
+- `partitor pages --move` kept the pages before the moved page only by chance:
+  the planner could page the whole part again. The ends of the earlier pages that
+  a move would change are now saved as manual breaks too. The guide said this
+  already.
+- `pages` with `all` stopped with a Python error. It now asks for one part.
+- A failed repage after `pages --move` left the new breaks in the settings. They
+  are put back now.
+- `plan` took `foldside` from the last build, not from the settings.
+- The mark `<- move a system?` showed when the next page had no room.
+
+### Changed
+
+- `pages --move`: one move for each call. A second `--move` was computed from the
+  old pages.
+- `pages` says when settings are not built yet. `plan` says that it does not use
+  manual page breaks, and `plan ID PART N` warns when the part has them.
+
+### Added
+
+- `pages --dry-run`: show the pages after `--move`, save nothing.
+- Menu key `l` asks for a move after the table.
+
 ## 0.8.19 — 2026-11-06
 
 ### Added

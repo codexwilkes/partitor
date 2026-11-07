@@ -100,7 +100,11 @@ def item_menu(item: Path) -> None:
             elif k == "l":
                 part = rest.strip() or ask_part(data)
                 if part:
-                    cmd_pages(argparse.Namespace(id=data["id"], part=part, move=[], clear=False))
+                    cmd_pages(argparse.Namespace(id=data["id"], part=part, move=[], clear=False, dry_run=False))
+                    mv = ask("move (PAGE=N, e.g. 26=1; Enter = no)", "").strip()
+                    if mv:
+                        cmd_pages(argparse.Namespace(id=data["id"], part=part, move=[mv], clear=False,
+                                                     dry_run=False))
             elif k == "v":
                 cmd_show(ns)
         except SystemExit:            # _die inside a command: stay in the menu
@@ -302,6 +306,7 @@ def main() -> int:
                     help="move the last N systems of PAGE to the next page (N negative: bring the "
                          "first systems of the next page up); the part is paged again")
     pg.add_argument("--clear", action="store_true", help="drop the manual page breaks of the part")
+    pg.add_argument("--dry-run", action="store_true", help="show the pages after --move, save nothing")
     rp = sub.add_parser("repage", help="new page breaks from the saved lines: turns while "
                         "resting, manual breaks (no analysis, no build)")
     rp.add_argument("id", help="12 or 2026-10-0012")

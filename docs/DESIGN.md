@@ -865,8 +865,12 @@ the one before the next line's first, except across a movement), systems, the ro
 of that page (its tallest line pitch), the turn after it (`turn_list` or `plan_turn_list`) and whether a
 manual break ends it. `partitor pages ID PART` prints it; `--move PAGE=N` turns the move into a
 `breaks=+BAR` (and drops the manual break it replaces), calls `repage` for the part and prints the table
-again; `--clear` is `breaks=none`. A manual break is a forced page end in the planner, so the pages before it
-keep their lines and the later ones are planned again. Sections 5.1 to 5.8 keep their numbers.
+again; `--clear` is `breaks=none`. A manual break is only a limit in the planner (no page runs past it), and
+the planner optimises the whole part, so one break can change the pages before it. `--move` therefore pins
+the ends of the earlier pages that a trial paging would change (extra `breaks=+BAR`). One `--move` for each
+call (each move changes the rows after it). `--dry-run` shows the result and saves nothing. If the repage
+fails, the settings are put back. `plan` does not put manual breaks into its estimate (it says so). Sections
+5.1 to 5.8 keep their numbers.
 
 ## 6. CLI
 

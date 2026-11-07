@@ -1807,3 +1807,121 @@ class TestPagesReport(unittest.TestCase):
                     os.environ.pop("PARTITOR_LIBRARY", None)
                 else:
                     os.environ["PARTITOR_LIBRARY"] = old_share
+
+
+@needs_deps
+class TestPagesSafety(unittest.TestCase):
+    """0.8.20: `pages` pins earlier pages, takes one move, rolls back, has a dry run."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        tmp = self.tmp.name
+        one = Path(tmp, "page.pdf")
+        make_score_pdf(str(one), systems=2, staves=2, labels=("Alto", "Bass"), title="")
+        doc = pymupdf.open()
+        for _ in range(6):
+            doc.insert_pdf(pymupdf.open(str(one)))
+        self.share = Path(tmp, "share")
+        (self.share / "inbox").mkdir(parents=True)
+        self.item = self.share / "library" / "2026-10-0001-c-t"
+        self.item.mkdir(parents=True)
+        doc.save(str(self.item / "2026-10-0001-source.pdf"))
+        pt.save_item(self.item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-27"})
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(pt.run_detect(self.item, None, "T", "C D"), 0)
+            d = pt.load_item(self.item)
+            pt.apply_set(d, ["pages=5", "max_staff_mm=8"])
+            pt.save_item(self.item, d)
+            self.assertEqual(build.run_build(self.item), 0)
+        old = os.environ.get("PARTITOR_LIBRARY")
+        os.environ["PARTITOR_LIBRARY"] = str(self.share)
+        self.addCleanup(lambda: os.environ.pop("PARTITOR_LIBRARY", None) if old is None
+                        else os.environ.__setitem__("PARTITOR_LIBRARY", old))
+
+    def run_pages(self, part="Alto", **kw):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            rc = pt._engine_step(pt.cmd_pages, argparse.Namespace(
+                id="2026-10-0001", part=part, move=kw.get("move"), clear=kw.get("clear", False),
+                dry_run=kw.get("dry_run", False)))
+        return rc, buf.getvalue()
+
+    def breaks(self):
+        return pt.load_item(self.item).get("layout", {}).get("parts", {}).get("Alto", {}).get("breaks")
+
+    def multi_page(self):
+        rc, out = self.run_pages()
+        rows = [ln.split() for ln in out.splitlines() if "/" in ln[:15] and ln.strip()[:1].isdigit()]
+        page = next((r[0].split("/")[0] for r in rows if int(r[2]) > 1), None)
+        self.assertIsNotNone(page, out)
+        return page
+
+    def test_all_is_not_one_part(self):
+        rc, out = self.run_pages(part="all")
+        self.assertNotEqual(rc, 0)
+        self.assertNotIn("Traceback", out)
+        self.assertIn("one built part", out)
+
+    def test_two_moves_in_one_call_are_refused_and_nothing_is_saved(self):
+        page = self.multi_page()
+        rc, out = self.run_pages(move=[f"{page}=1", f"{page}=1"])
+        self.assertNotEqual(rc, 0)
+        self.assertIn("one --move", out)
+        self.assertIsNone(self.breaks())
+
+    def test_a_dry_run_saves_nothing(self):
+        page = self.multi_page()
+        before = (self.item / "score.yaml").read_bytes() if (self.item / "score.yaml").exists() else None
+        rc, out = self.run_pages(move=[f"{page}=1"], dry_run=True)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("dry run", out)
+        self.assertIn("[manual]", out)
+        self.assertIsNone(self.breaks())
+        if before is not None:
+            self.assertEqual((self.item / "score.yaml").read_bytes(), before)
+
+    def test_a_failed_repage_puts_the_settings_back(self):
+        page = self.multi_page()
+        orig = cli_items.cmd_repage
+        cli_items.cmd_repage = lambda a: 1
+        try:
+            rc, out = self.run_pages(move=[f"{page}=1"])
+        finally:
+            cli_items.cmd_repage = orig
+        self.assertNotEqual(rc, 0)
+        self.assertIsNone(self.breaks())
+
+    def test_pending_settings_are_named(self):
+        d = pt.load_item(self.item)
+        pt.mark_pending(d, "Alto:paper")
+        pt.save_item(self.item, d)
+        rc, out = self.run_pages()
+        self.assertIn("not built yet", out)
+
+    def test_the_move_mark_needs_room_on_the_next_page(self):
+        def row(page, free, systems=3, turn_ok=False):
+            return {"page": page, "first": 1, "last": 9, "systems": systems, "free": free,
+                    "manual": False, "role": "normal", "turn": {"resting": False, "ok": turn_ok}}
+        for free, shown in ((0.2, False), (1.5, True)):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                cli_items.pages_table("A", [row("1/2", 0.0), row("2/2", free)])
+            self.assertEqual("move a system?" in buf.getvalue(), shown, buf.getvalue())
+
+
+class TestPagesPins(unittest.TestCase):
+    """A move must not change earlier pages (0.8.20)."""
+
+    @needs_deps
+    def test_a_trial_break_on_the_last_page_changes_earlier_pages_unless_pinned(self):
+        T = TestPagesReport("test_the_turn_words")
+        st = T.music(60, rests={9, 17, 25, 33, 41, 49})
+        base = pt.page_report(st, 400, T.OPTS)
+        last = base[-2]
+        bar = pt.line_spans(st)[last["j"] - 2][1]
+        free = pt.page_report(st, 400, {**T.OPTS, "breaks": [bar]})
+        pins = [r["last"] for r in base if r["j"] < last["j"]]
+        pinned = pt.page_report(st, 400, {**T.OPTS, "breaks": sorted(set(pins) | {bar})})
+        self.assertNotEqual([r["j"] for r in free[:3]], [r["j"] for r in base[:3]])   # the defect
+        self.assertEqual([r["j"] for r in pinned[:len(base) - 2]], [r["j"] for r in base[:-2]])

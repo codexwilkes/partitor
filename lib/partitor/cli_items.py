@@ -602,7 +602,7 @@ def cmd_contract(a: argparse.Namespace) -> int:
 
 
 PLAN_KEYS = ("margin_top", "margin_bottom", "margin_side", "gutter", "binding", "duplex",
-             "title_page", "gap", "gap_min", "clearance")     # layout keys `plan` reads
+             "title_page", "gap", "gap_min", "clearance", "foldside")     # layout keys `plan` reads
 
 
 def plan_names(data: dict, built: dict, words: list[str]) -> list[str]:
@@ -715,6 +715,9 @@ def plan_table(item: Path, data: dict, built: dict, nm: str, trial: bool = False
         src = read_source(pl["strips"], o, pl["dpi"], share=JUSTIFY_SHARE)
     rows = options(src, o, papers, floor_mm=float(lay.get("min_staff_mm") or 5.0))
     old = built[nm]
+    if lay.get("breaks"):
+        _note(f"plan:  {nm}: manual page breaks (after bars {', '.join(str(b) for b in lay['breaks'])}) are not "
+              f"in this estimate; see them with: partitor pages {data['id']} {nm}")
     _head(f"Plan: {nm}")
     c0 = old.get("content_pages", old["pages"])
     est = estimate(src, o, o["paper"], float(old["staff_mm"]))
@@ -769,13 +772,14 @@ def pages_table(nm: str, rows: list[dict]) -> int:
     """pages_table -> the number of turns while playing; prints one line per page."""
     print(f"     {'page':>7}  {'bars':<9} {'systems':>7}  {'room':>5}  turn after it")
     bad = 0
-    for r in rows:
+    for k, r in enumerate(rows):
         t = r["turn"]
         word = _turn_word(t)
         bad += word == "PLAYING"
         bars = f"{r['first']}-{r['last']}" if r["first"] is not None and r["last"] is not None else (
             f"{r['first']}-" if r["first"] is not None else "?")
-        flag = "  <- move a system?" if word == "PLAYING" and r["systems"] > 1 else ""
+        room = k + 1 < len(rows) and rows[k + 1]["free"] >= 1.0       # the next page can take a system
+        flag = "  <- move a system?" if word == "PLAYING" and r["systems"] > 1 and room else ""
         mark = " [manual]" if r["manual"] else ""
         role = " (flap)" if r["role"] == "flap" else ""
         print(f"     {r['page']:>7}  {bars:<9} {r['systems']:>7}  {r['free']:>5.1f}  {word}{mark}{role}{flag}")
@@ -787,7 +791,10 @@ def cmd_pages(a: argparse.Namespace) -> int:
     systems, room left at the foot (in systems) and the turn after it. --move 26=1 moves the last
     system of page 26 to the next page (26=-1: the first system of the next page up to 26) by a page
     break after the bar before it; the part is paged again (repage) and the table shown again.
-    --clear drops the manual breaks."""
+    --clear drops the manual breaks. One --move for each call. Pages before the moved page keep
+    their ends (a break is pinned for each one a move would change). --dry-run shows the result and
+    saves nothing."""
+    import copy
     from .lines import lines_path, load_lines
     from .render import page_report
     start = time.monotonic()
@@ -801,21 +808,29 @@ def cmd_pages(a: argparse.Namespace) -> int:
         only = parse_parts(data, [a.part])
     except ValueError as e:
         _die(f"pages: {e}", f"Parts: {selection_help(data)}")
-    names = [nm for _, nm in build_names(data) if nm in built and nm in only]
-    if len(names) != 1:
+    names = [nm for _, nm in build_names(data) if nm in built and (only is None or nm in only)]
+    if only is None or len(names) != 1:
         _die("pages: name one built part or group", f"Parts: {selection_help(data)}")
     nm = names[0]
+    dry = bool(getattr(a, "dry_run", False))
 
-    def report() -> list[dict]:
+    def report(breaks: list[int] | None = None) -> list[dict]:
         pl = load_lines(lines_path(item / "lines", nm))
         lay = part_layout(load_item(item), nm)
         o = {**pl["opts"], **{k: lay.get(k) for k in REPAGE_KEYS}}
+        if breaks is not None:
+            o["breaks"] = breaks
         return page_report(pl["strips"], pl["dpi"], o)
     try:
         rows = report()
     except ValueError as e:
         _die(f"pages: {nm}: {e}", "Rebuild the part once to save its lines")
     moves = list(getattr(a, "move", None) or [])
+    if len(moves) > 1:
+        _die("pages: one --move for each call", "Each move changes the pages after it: look at the table, then move again")
+    if data.get("pending"):
+        _note(f"pages:  not built yet: {', '.join(data['pending'])}. The table follows these settings; "
+              "the PDF is the same after a rebuild or repage")
     pairs = []
     if getattr(a, "clear", False):
         pairs.append(f"{nm}:breaks=none")
@@ -844,16 +859,35 @@ def cmd_pages(a: argparse.Namespace) -> int:
         if old:
             pairs.append(f"{nm}:breaks=-{old[0]['last']}")
         pairs.append(f"{nm}:breaks=+{bar}")
+        # the pages before the moved page keep their ends: a break alone lets the planner
+        # change them. Pin the ends a trial paging would move.
+        cur = [int(x) for x in (part_layout(data, nm).get("breaks") or [])]
+        gone = {int(p.rsplit("=", 1)[1][1:]) for p in pairs if "=-" in p}
+        after = {r["j"] for r in report(sorted((set(cur) - gone) | {bar}))}
+        pairs += [f"{nm}:breaks=+{r['last']}" for r in rows
+                  if r["j"] < row["j"] and r["j"] not in after and r["last"] is not None and r["last"] not in cur]
     if pairs:
+        kept = copy.deepcopy(data)
         try:
             apply_set(data, pairs)
         except ValueError as e:
             _die(f"pages: {e}")
-        save_item(item, data)
-        _note("breaks:  " + ", ".join(p.split("=", 1)[1] for p in pairs) + f"  ({nm})")
-        if cmd_repage(argparse.Namespace(id=data["id"], parts=[nm])):
-            return 1
-        rows = report()
+        note = "breaks:  " + ", ".join(p.split("=", 1)[1] for p in pairs) + f"  ({nm})"
+        if dry:
+            _note(note + "  (dry run: nothing saved)")
+            rows = report(sorted(int(x) for x in (part_layout(data, nm).get("breaks") or [])))
+        else:
+            save_item(item, data)
+            _note(note)
+            try:
+                failed = cmd_repage(argparse.Namespace(id=data["id"], parts=[nm]))
+            except BaseException:
+                save_item(item, kept)               # parts/ is unchanged: so are the settings
+                raise
+            if failed:
+                save_item(item, kept)
+                return 1
+            rows = report()
     print(f"{BOLD}partitor {VERSION} — pages: {nm}{RST}")
     bad = pages_table(nm, rows)
     spare = [r for r in rows[:-1] if r["free"] >= 1.0]
@@ -925,6 +959,10 @@ def cmd_plan(a: argparse.Namespace) -> int:
                 changes = apply_set(data, set_pairs(nm, chosen))
             except ValueError as e:
                 _die(f"plan: {e}")
+            if part_layout(data, nm).get("breaks"):
+                _warn(f"plan:  {nm}: manual page breaks are kept, but bar numbers may no longer end a line "
+                      f"at this size. Check: partitor pages {data['id']} {nm}   Drop them: partitor pages "
+                      f"{data['id']} {nm} --clear")
             mark_pending(data, *(c.split(": ")[0] for c in changes))
             save_item(item, data)
             _ok(f"plan:  {nm}: option {pick} ({chosen.paper}, staff {chosen.staff_mm:g} mm, about "
