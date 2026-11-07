@@ -263,16 +263,19 @@ def large_copy(src: Path, paper: str) -> Path:
 LAST_RENDER: dict = {}      # content pages and title page of the last render_part
 
 
+def edge_rest(strips: list[Strip], j: int) -> int:
+    """edge_rest -> the longest multi-bar rest (bars) next to a page turn before line j: a
+    rest line on either side, a merged rest that ends line j-1 or one that starts line j."""
+    return max([strips[t].rest_src[2].bars for t in (j - 1, j) if strips[t].rest_src is not None]
+               + [strips[j - 1].rest_out, strips[j].rest_in])
+
+
 def rest_turn(strips: list[Strip], j: int) -> bool:
     """A page may turn before line j and the player rests: a multi-bar rest
-    line (REST_TURN_MIN bars or more) is the last line of the page or the
-    first line of the next. A movement start or a rehearsal letter does not
-    count: the player may be playing there."""
-    for t in (j - 1, j):
-        rs = strips[t].rest_src
-        if rs is not None and rs[2].bars >= REST_TURN_MIN:
-            return True
-    return False
+    (REST_TURN_MIN bars or more) is a whole line, or the end of the last line of
+    the page, or the start of the first line of the next. A movement start or a
+    rehearsal letter does not count: the player may be playing there."""
+    return edge_rest(strips, j) >= REST_TURN_MIN
 
 
 def line_bars(s: Strip) -> tuple[int, int | None] | None:
@@ -318,7 +321,8 @@ def good_turn(strips: list[Strip], j: int) -> bool:
     opens with a rehearsal letter (a new section, after a repeat), or a
     multi-bar rest stands on either side (the player turns while resting)."""
     s = strips[j]
-    if s.movement or s.rest_src is not None or strips[j - 1].rest_src is not None:
+    if s.movement or s.rest_src is not None or strips[j - 1].rest_src is not None \
+       or strips[j - 1].rest_out or s.rest_in:
         return True
     return any(mx <= s.staff_x0 + 3 * s.sp for mx, _ in s.marks)
 
@@ -489,9 +493,8 @@ def plan_faces(strips: list[Strip], dpi: int, opts: dict, title_page: bool):
                 + last.img.shape[0]) * k
 
     bounds = [Boundary()] + [
-        Boundary(rest_bars=max((strips[t].rest_src[2].bars for t in (j - 1, j)
-                                if strips[t].rest_src is not None), default=0),
-                 movement=bool(strips[j].movement)) for j in range(1, n)]
+        Boundary(rest_bars=edge_rest(strips, j), movement=bool(strips[j].movement))
+        for j in range(1, n)]
     plan = plan_turns(n, height, availn, bounds, avail_first=avail1, title_page=title_page,
                       allow_fold=opts["paper"] in LARGE, forced=tuple(opts.get("_breaks") or []),
                       fold_sides=fold_sides(opts))
@@ -718,8 +721,7 @@ def turn_list(strips: list[Strip], pages: list, title_page: bool, opts: dict,
         if not (phys % 2 == 1 or not duplex):
             continue
         a, b = line_bars(strips[j - 1]), line_bars(strips[j])
-        rest = max((strips[t].rest_src[2].bars for t in (j - 1, j)
-                    if strips[t].rest_src is not None), default=0)
+        rest = edge_rest(strips, j)
         out.append({"pdf_page": phys, "bar": a[1] if a and a[1] is not None else None,
                     "next_bar": b[0] if b else None, "rest": rest,
                     "ok": good_turn(strips, j), "resting": rest_turn(strips, j),

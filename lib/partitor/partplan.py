@@ -86,7 +86,8 @@ def read_source(strips: list, opts: dict, dpi: int, share: float = 1.0, label_px
     for i, s in enumerate(strips):
         rest = s.rest_src[2].bars if s.rest_src is not None else 0
         ends = s.ends_at_bar or 0.0 <= s.end_gap_sp <= BAR_END_SP
-        ln = {"rest": rest, "movement": bool(s.movement), "pit": float(pit[i]),
+        ln = {"rest": rest, "rin": int(s.rest_in), "rout": int(s.rest_out),
+              "movement": bool(s.movement), "pit": float(pit[i]),
               "top": float(s.staff_top), "h": float(s.img.shape[0]),
               "whole": s.img.shape[1] * share, "bars": None, "copy": 0.0}
         p_ = pre[i]
@@ -101,19 +102,24 @@ def read_source(strips: list, opts: dict, dpi: int, share: float = 1.0, label_px
             edges = [p_[0]] + list(s.bars_x)
             ln["bars"] = [(edges[b + 1] - edges[b]) * share for b in range(len(s.bars_x))]
             ln["copy"] = float(pre[p_[1]][0])
+            # the merged rests among the bars: where a cut leaves a rest at a line edge
+            rc = [next((int(t) for cx, t, *_ in s.rest_labels if edges[b] <= cx < edges[b + 1]), 0)
+                  for b in range(len(s.bars_x))]
+            if any(rc):
+                ln["rcount"] = rc
         src.lines.append(ln)
     return src
 
 
 def _pieces(src: Source, width_px: float):
     """_pieces -> (pieces, too wide): the lines cut for a text width. A piece:
-    (source line, first piece of its line, movement start)."""
+    (source line, first piece of its line, bars of a merged rest at its start, at its end)."""
     out, wide = [], None
     for i, ln in enumerate(src.lines):
         if ln["bars"] is None:
             if not ln["rest"] and ln["whole"] > width_px:
                 wide = wide or (i, ln["whole"])
-            out.append((i, True))
+            out.append((i, True, ln.get("rin", 0), ln.get("rout", 0)))
             continue
         starts = _break_lines(ln["bars"], ln["copy"], width_px)
         for k, a in enumerate(starts):
@@ -121,7 +127,8 @@ def _pieces(src: Source, width_px: float):
             piece = (ln["copy"] if k else 0.0) + sum(ln["bars"][a:z])
             if z - a == 1 and piece > width_px:          # one bar wider than a line
                 wide = wide or (i, piece)
-            out.append((i, k == 0))
+            rc = ln.get("rcount")
+            out.append((i, k == 0, rc[a] if rc else 0, rc[z - 1] if rc else 0))
     return out, wide
 
 
@@ -151,7 +158,7 @@ def estimate(src: Source, opts: dict, paper: str, staff_mm: float) -> Option:
         return Option(paper, staff_mm, False,
                       f"line {i + 1} cannot be cut: {w * k0 / 72.0 * 25.4:.0f} mm of music")
     n = len(pieces)
-    L = [src.lines[i] for i, _ in pieces]
+    L = [src.lines[p[0]] for p in pieces]
     cum = [0.0]
     for ln in L:
         cum.append(cum[-1] + ln["pit"])
@@ -164,7 +171,7 @@ def estimate(src: Source, opts: dict, paper: str, staff_mm: float) -> Option:
         return h
 
     bounds = [Boundary()] + [
-        Boundary(rest_bars=max(L[j - 1]["rest"], L[j]["rest"]),
+        Boundary(rest_bars=max(L[j - 1]["rest"], L[j]["rest"], pieces[j - 1][3], pieces[j][2]),
                  movement=bool(pieces[j][1] and L[j]["movement"])) for j in range(1, n)]
     forced = tuple(opts.get("_breaks") or [])
     fold = paper in LARGE and opts.get("duplex", "auto") != "off"

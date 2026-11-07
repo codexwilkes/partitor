@@ -8,6 +8,19 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.16 — 2026-11-06
+
+### Fixed
+
+- A merged multi-bar rest (0.8.11) at the start or the end of a line was not
+  seen as a rest at a page turn. The page planner, `plan` and the turn report
+  looked only at lines that are all rest. A page could end in a bad turn when
+  moving one line would have ended it on a rest. A rest of 2 bars or more at a
+  line edge now counts, and re-flow gives each cut line the rest of its first and
+  last bar.
+- Saved lines from before this release load without a rebuild (the two new
+  values default to 0, so they keep their old turns until the part is rebuilt).
+
 ## 0.8.15 — 2026-11-06
 
 ### Fixed

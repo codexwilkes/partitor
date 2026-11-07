@@ -1342,6 +1342,7 @@ class TestLinesFileCompatibility(unittest.TestCase):
         d = pt.load_lines(self.FIXTURE)
         for st in d["strips"]:
             self.assertEqual(st.rest_labels, [])
+            self.assertEqual((st.rest_in, st.rest_out), (0, 0))
 
     def test_a_file_with_an_unknown_field_is_refused(self):
         import gzip

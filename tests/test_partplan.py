@@ -316,3 +316,61 @@ class TestTrialGroups(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@needs_deps
+class TestMergedRestsAtTheEdge(unittest.TestCase):
+    """A merged rest that ends or starts a line is a rest at a page turn (0.8.16)."""
+
+    def line(self, rin=0, rout=0):
+        return dataclasses.replace(music([250 * (k + 1) for k in range(8)]), rest_in=rin, rest_out=rout)
+
+    def test_the_source_keeps_the_edges_of_each_line(self):
+        st = [self.line(), self.line(rout=3), self.line(rin=2)]
+        src = pt.read_source(st, OPTS, 400)
+        self.assertEqual([(ln["rin"], ln["rout"]) for ln in src.lines], [(0, 0), (0, 3), (2, 0)])
+
+    def test_edge_rest_counts_a_merged_rest_on_either_side_of_the_turn(self):
+        st = [self.line(), self.line(rout=3), self.line(rin=2), self.line()]
+        self.assertEqual(pt.edge_rest(st, 1), 0)
+        self.assertEqual(pt.edge_rest(st, 2), 3)          # line 1 ends in a 3-bar rest
+        self.assertEqual(pt.edge_rest(st, 3), 0)
+        st2 = [self.line(), self.line(), self.line(rin=2)]
+        self.assertEqual(pt.edge_rest(st2, 2), 2)         # line 2 starts with a 2-bar rest
+
+    def test_a_merged_rest_of_two_bars_makes_a_rest_turn_and_one_bar_does_not(self):
+        st = [self.line(), self.line(rout=2), self.line()]
+        self.assertTrue(pt.rest_turn(st, 2))
+        self.assertTrue(pt.good_turn(st, 2))
+        st = [self.line(), self.line(rout=1), self.line()]
+        self.assertFalse(pt.rest_turn(st, 2))             # one bar: not a rest turn (REST_TURN_MIN)
+        self.assertFalse(pt.rest_turn([self.line(), self.line(), self.line()], 2))
+
+    def test_a_cut_piece_gets_the_rest_of_its_edge_bar(self):
+        """read_source finds the merged rests among the bars; _pieces gives each piece its edges."""
+        s = self.line()
+        edges = [0] + list(s.bars_x)
+        s2 = dataclasses.replace(s, rest_labels=[((edges[3] + edges[4]) / 2, "4", 0)])
+        st = [music([250 * (k + 1) for k in range(8)], first=True), s2,
+              music([250 * (k + 1) for k in range(8)])]
+        src = pt.read_source(st, OPTS, 400)
+        self.assertEqual(src.lines[1]["rcount"], [0, 0, 0, 4, 0, 0, 0, 0])
+        pieces, wide = pt._pieces(src, src.lines[1]["copy"] + 700)    # about 2.8 bars of 250 px
+        self.assertIsNone(wide)
+        mine = [p for p in pieces if p[0] == 1]
+        self.assertGreater(len(mine), 1)
+        self.assertEqual(sum(1 for p in mine if 4 in (p[2], p[3])), 1)  # one piece has the merged rest at an edge
+        self.assertTrue(all(p[2] in (0, 4) and p[3] in (0, 4) for p in mine))
+
+    def test_the_planner_takes_the_rest_turn_it_could_not_see_before(self):
+        """Two lines per page: with a 3-bar rest ending the first line of a spread, the plan has a rest turn there."""
+        n = 12
+        plain = [self.line() for _ in range(n)]
+        marked = [self.line(rout=3) if i % 2 == 1 else self.line() for i in range(n)]
+        o = {**OPTS, "paper": "letter", "foldouts": "off", "title_page": "off"}
+        a = pt.estimate(pt.read_source(plain, o, 400), o, "letter", 8.0)
+        b = pt.estimate(pt.read_source(marked, o, 400), o, "letter", 8.0)
+        self.assertLessEqual(b.counts.get("bad", 0) + b.counts.get("bridge", 0),
+                             a.counts.get("bad", 0) + a.counts.get("bridge", 0))
+        self.assertGreaterEqual(b.counts.get("rest", 0), a.counts.get("rest", 0))
+

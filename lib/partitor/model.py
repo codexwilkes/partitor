@@ -85,6 +85,8 @@ class Strip:
     num_mask: np.ndarray | None = None  # ink of printed mid-line bar numbers (same shape)
     rest_label: tuple | None = None     # (x centre in img, text): multi-bar rest count
     rest_labels: list = field(default_factory=list)  # [(x centre in img, text, rows below the top line of its staff)]: counts of merged rest bars inside the line, one per staff
+    rest_in: int = 0            # bars of a merged rest at the start of the line (the player rests after a turn here)
+    rest_out: int = 0           # bars of a merged rest at the end of the line (the player rests at a turn after it)
     rest_src: tuple | None = None       # (src, cw, RestRun): to rebuild at another width
     indent: int = 0             # px left of the staff start kept free (first line, labels)
     name_label: str | None = None       # full part name in the indent (small caps)

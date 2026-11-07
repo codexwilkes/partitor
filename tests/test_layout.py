@@ -1151,3 +1151,18 @@ class TestMergeRestBars(unittest.TestCase):
         wide = pt.justify(s, s.img.shape[1] + 120)
         self.assertEqual(len(pt.staff_lines(wide)), 3)
 
+    def test_a_merged_rest_at_a_line_edge_is_recorded(self):
+        out = self.merged(staves=3)                                   # bars 0-2 merged, bar 3 music
+        self.assertEqual((out.rest_in, out.rest_out), (3, 0))
+        mid = pt.merge_rest_bars([self.line(rests=(0, 1, 2, 3), note=(0, 0))], {}, pre=[(self.PRE, 0)])[0]
+        self.assertEqual((mid.rest_in, mid.rest_out), (0, 3))         # bars 1-3: a rest at the end
+        both = pt.merge_rest_bars([self.line(rests=(1, 2), note=(0, 0))], {}, pre=[(self.PRE, 0)])[0]
+        self.assertEqual((both.rest_in, both.rest_out), (0, 0))       # a run in the middle: no edge
+        self.assertEqual(self.line().rest_in, 0)
+
+    def test_re_flow_gives_each_piece_the_rest_of_its_edge_bar(self):
+        out = self.merged()
+        cut = pt.reflow([out], 150.0, pre=[(self.PRE, 0)])
+        self.assertEqual(cut[0].rest_in, 3)                           # the piece that is the merged rest
+        self.assertEqual(cut[-1].rest_in, 0)                          # the piece with the music bar
+        self.assertEqual(cut[-1].rest_out, 0)

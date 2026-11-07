@@ -570,9 +570,17 @@ def merge_rest_bars(strips: list[Strip], opts: dict, pre: list | None = None) ->
     out = []
     for i, s in enumerate(strips):
         runs = rest_bar_runs(s, pre[i][0] if pre[i] is not None else None)
+        last = len(s.bars_x) - 1
+        edge = {}
         for b0, b1 in reversed(runs):
-            s = _merge_run(s, b0, b1, pre[i][0] if pre[i] is not None else 0)
-        out.append(s)
+            s2 = _merge_run(s, b0, b1, pre[i][0] if pre[i] is not None else 0)
+            if s2 is not s:                  # made: the run is a rest at the line edge when it starts or ends it
+                if b0 == 0:
+                    edge["rest_in"] = b1 - b0 + 1
+                if b1 == last:
+                    edge["rest_out"] = b1 - b0 + 1
+            s = s2
+        out.append(dc_replace(s, **edge) if edge else s)
     return out
 
 
@@ -632,7 +640,7 @@ LINES_FORMAT = 1
 # Fields added to Strip after the format shipped, with their defaults: a file
 # written before the field loads (the lines have none of it); any other
 # difference in the fields still means "rebuild the part".
-_FIELD_DEFAULTS = {"rest_labels": list}
+_FIELD_DEFAULTS = {"rest_labels": list, "rest_in": int, "rest_out": int}
 _NP_OK = {"_reconstruct", "ndarray", "dtype", "scalar", "_frombuffer"}
 
 

@@ -255,7 +255,10 @@ notehead, slur or word goes whole to one owner.
    the number of its first bar, and the line gets shorter, so re-flow and the
    planner see fewer lines. The test is made for certain: a note, a stem, a
    hollow whole note, a rest of another length, a dot, text, a rehearsal mark
-   or a printed number keeps the bar as engraved. Justify gives an H-bar three shares of the
+   or a printed number keeps the bar as engraved. A merged rest that starts or ends a line is
+   recorded (`Strip.rest_in`, `rest_out`; re-flow gives each piece those of its first and last
+   bar) and counts as a rest at a page turn: the planner, `plan` and the turn report take the
+   longest of a rest line on either side and these edges, with the same minimum of 2 bars. Justify gives an H-bar three shares of the
    extra space to a blank gap's one and keeps the count on the middle of its bar; it reads the
    staff-line rows from the staff, since a wide H-bar could be taken for a line. A run whose merge saves
    less than 3 sp is not made. The bar after a clef and key needs the music
