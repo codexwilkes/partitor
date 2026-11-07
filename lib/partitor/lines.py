@@ -493,13 +493,14 @@ def _only_measure_rests(s: Strip, lines: list[list[float]], xa: int, xb: int) ->
         if m is not None and m[:, xa:xb].any():
             return False
     reg = s.img[:, xa:xb].copy()
+    y0, y1 = tops[0], min(reg.shape[0], tops[-1] + int(round(4 * sp)) + 1)
+    bar_cols = reg[y0:y1].mean(axis=0) >= 0.85       # a barline (thick, double) crosses all staves
     inked = reg.mean(axis=1)
     reg[inked >= 0.95] = False                 # staff lines run across the bar
     for ln in lines:                           # (a line may break around a rest: clear its rows)
         for c in ln:
             reg[max(0, int(round(c)) - 1):int(round(c)) + 2] = False
-    y0, y1 = tops[0], min(reg.shape[0], tops[-1] + int(round(4 * sp)) + 1)
-    reg[:, reg[y0:y1].mean(axis=0) >= 0.85] = False    # a barline (thick, double) crosses all staves
+    reg[:, bar_cols] = False
     th = max(1, int(round(0.3 * sp)))
     near = np.zeros(reg.shape[0], bool)
     for t in tops:                             # rows of each staff, with the edge of a line
@@ -522,11 +523,11 @@ def _only_measure_rests(s: Strip, lines: list[list[float]], xa: int, xb: int) ->
     return True
 
 
-def rest_bar_runs(s: Strip, pre_x: int | None) -> list[tuple[int, int]]:
-    """rest_bar_runs -> [(first bar, last bar)] runs of MERGE_MIN_BARS or more
-    bars of a line that hold only measure rests on every staff. pre_x: where
-    the music of bar 0 starts (None: bar 0 is never merged)."""
-    if s.rest_src is not None or not s.ends_at_bar or len(s.bars_x) < MERGE_MIN_BARS:
+def rest_only_bars(s: Strip, pre_x: int | None) -> list[bool]:
+    """rest_only_bars -> per bar of a line: True when it holds only measure rests on every
+    staff (see _only_measure_rests). pre_x: where the music of bar 0 starts (None: bar 0 is
+    never judged). [] for a line that is not read: a rest line, no final barline, no staff."""
+    if s.rest_src is not None or not s.ends_at_bar or not s.bars_x:
         return []
     lines = staff_lines(s)
     if not lines or abs(lines[0][0] - s.staff_top) > max(2, int(0.2 * s.sp)):   # (the line centre is off by a pixel)
@@ -544,6 +545,26 @@ def rest_bar_runs(s: Strip, pre_x: int | None) -> list[tuple[int, int]]:
             ok.append(False)
             continue
         ok.append(_only_measure_rests(s, lines, xa, bx - e))
+    return ok
+
+
+ONE_BAR_START_SP = 16.0     # a line with no barline is read from here (clef and key are before it)
+
+
+def _one_bar_rest(s: Strip) -> bool:
+    """_one_bar_rest -> True when a line with no barline of its own holds, after its clef and
+    key, one filled rest block on each staff and nothing else: one bar of rests."""
+    lines = staff_lines(s)
+    if not lines or abs(lines[0][0] - s.staff_top) > max(2, int(0.2 * s.sp)):
+        return False
+    xa = _x0(s) + int(ONE_BAR_START_SP * s.sp)
+    xb = staff_end(s) - int(MERGE_EDGE_SP * s.sp)
+    return xb - xa > 6 * s.sp and not any(mx >= xa for mx, _ in s.marks) \
+        and _only_measure_rests(s, lines, xa, xb)
+
+
+def _runs_of(ok: list[bool]) -> list[tuple[int, int]]:
+    """_runs_of -> [(first, last)] of the runs of MERGE_MIN_BARS or more True values."""
     runs, b = [], 0
     while b < len(ok):
         if not ok[b]:
@@ -558,6 +579,13 @@ def rest_bar_runs(s: Strip, pre_x: int | None) -> list[tuple[int, int]]:
     return runs
 
 
+def rest_bar_runs(s: Strip, pre_x: int | None) -> list[tuple[int, int]]:
+    """rest_bar_runs -> [(first bar, last bar)] runs of MERGE_MIN_BARS or more
+    bars of a line that hold only measure rests on every staff. pre_x: where
+    the music of bar 0 starts (None: bar 0 is never merged)."""
+    return _runs_of(rest_only_bars(s, pre_x))
+
+
 def merge_rest_bars(strips: list[Strip], opts: dict, pre: list | None = None) -> list[Strip]:
     """merge_rest_bars -> the lines with each run of bars that hold only
     measure rests on every staff made one multi-bar rest (an H-bar on each
@@ -569,17 +597,37 @@ def merge_rest_bars(strips: list[Strip], opts: dict, pre: list | None = None) ->
     pre = find_prefixes(strips) if pre is None else pre
     out = []
     for i, s in enumerate(strips):
-        runs = rest_bar_runs(s, pre[i][0] if pre[i] is not None else None)
+        pre_x = pre[i][0] if pre[i] is not None else None
+        if not s.bars_x and s.rest_src is None and _one_bar_rest(s):
+            out.append(dc_replace(s, rest_in=1, rest_out=1))        # a line with no barline: one bar of rests
+            continue
+        ok = rest_only_bars(s, pre_x)
+        runs = _runs_of(ok)
         last = len(s.bars_x) - 1
         edge = {}
+        lead = next((n for n, v in enumerate(ok) if not v), len(ok))        # rest-only bars at the start
+        trail = next((n for n, v in enumerate(reversed(ok)) if not v), len(ok))     # and at the end
+        if lead:                             # merged or not (a single bar, or too narrow to save): a rest
+            edge["rest_in"] = lead           # at the edge of the line, for the page turn
+        if trail:
+            edge["rest_out"] = trail
+        made = []
         for b0, b1 in reversed(runs):
-            s2 = _merge_run(s, b0, b1, pre[i][0] if pre[i] is not None else 0)
+            s2 = _merge_run(s, b0, b1, pre_x or 0)
             if s2 is not s:                  # made: the run is a rest at the line edge when it starts or ends it
+                made.append((b0, b1))
                 if b0 == 0:
                     edge["rest_in"] = b1 - b0 + 1
                 if b1 == last:
                     edge["rest_out"] = b1 - b0 + 1
             s = s2
+        if ok:                               # the bars that are left, each with its bars of rest
+            counts, b = [], 0
+            while b <= last:
+                run = next(((x, z) for x, z in made if x == b), None)
+                counts.append(run[1] - run[0] + 1 if run else (1 if ok[b] else 0))
+                b = run[1] + 1 if run else b + 1
+            edge["rest_counts"] = counts
         out.append(dc_replace(s, **edge) if edge else s)
     return out
 
@@ -640,7 +688,7 @@ LINES_FORMAT = 1
 # Fields added to Strip after the format shipped, with their defaults: a file
 # written before the field loads (the lines have none of it); any other
 # difference in the fields still means "rebuild the part".
-_FIELD_DEFAULTS = {"rest_labels": list, "rest_in": int, "rest_out": int}
+_FIELD_DEFAULTS = {"rest_labels": list, "rest_in": int, "rest_out": int, "rest_counts": list}
 _NP_OK = {"_reconstruct", "ndarray", "dtype", "scalar", "_frombuffer"}
 
 

@@ -1093,9 +1093,20 @@ class TestMergeRestBars(unittest.TestCase):
         s = self.line()
         self.assertIs(pt.merge_rest_bars([s], {"rests": "keep"}, pre=[(self.PRE, 0)])[0], s)
 
-    def test_a_line_without_a_run_is_unchanged(self):
+    def test_a_line_without_a_run_keeps_its_image(self):
         s = self.line(note=(1, 0))
-        self.assertIs(pt.merge_rest_bars([s], {}, pre=[(self.PRE, 0)])[0], s)
+        out = pt.merge_rest_bars([s], {}, pre=[(self.PRE, 0)])[0]
+        self.assertIs(out.img, s.img)                                 # nothing merged
+        self.assertEqual(out.bars_x, s.bars_x)
+        self.assertEqual((out.rest_in, out.rest_out), (1, 0))         # but bar 0 is a one-bar rest at the edge
+
+    def test_a_single_rest_bar_at_either_edge_is_a_one_bar_rest(self):
+        a = pt.merge_rest_bars([self.line(rests=(0,), note=(0, 0))], {}, pre=[(self.PRE, 0)])[0]
+        self.assertEqual((a.rest_in, a.rest_out), (0, 0))             # a note in bar 0: no rest
+        b = pt.merge_rest_bars([self.line(rests=(0, 1, 2, 3), note=(1, 0))], {}, pre=[(self.PRE, 0)])[0]
+        self.assertEqual((b.rest_in, b.rest_out), (1, 2))             # bar 0 alone; bars 2-3 at the end
+        c = pt.merge_rest_bars([self.line(rests=(0,))], {"rests": "keep"}, pre=[(self.PRE, 0)])[0]
+        self.assertEqual((c.rest_in, c.rest_out), (0, 0))             # rests: keep records nothing
 
     def test_a_merge_that_saves_nothing_is_not_made(self):
         import dataclasses
@@ -1166,3 +1177,32 @@ class TestMergeRestBars(unittest.TestCase):
         self.assertEqual(cut[0].rest_in, 3)                           # the piece that is the merged rest
         self.assertEqual(cut[-1].rest_in, 0)                          # the piece with the music bar
         self.assertEqual(cut[-1].rest_out, 0)
+
+    def test_a_line_with_no_barline_and_one_rest_per_staff_is_a_one_bar_rest(self):
+        s = self.line(staves=3, rests=(1,))                           # a rest in the middle of the line
+        import dataclasses
+        one = dataclasses.replace(s, bars_x=[], bar_nums=[], ends_at_bar=False)
+        out = pt.merge_rest_bars([one], {}, pre=[None])[0]
+        self.assertEqual((out.rest_in, out.rest_out), (1, 1))
+        self.assertIs(out.img, one.img)                               # nothing is drawn again
+        note = dataclasses.replace(self.line(staves=3, rests=(1,), note=(1, 1)), bars_x=[], bar_nums=[], ends_at_bar=False)
+        self.assertEqual(pt.merge_rest_bars([note], {}, pre=[None])[0].rest_in, 0)     # a note: not a rest
+        two = dataclasses.replace(self.line(staves=3, rests=(1, 2)), bars_x=[], bar_nums=[], ends_at_bar=False)
+        self.assertEqual(pt.merge_rest_bars([two], {}, pre=[None])[0].rest_in, 0)      # two blocks: not read
+
+    def test_the_rest_count_of_each_bar_is_kept_for_re_flow(self):
+        out = self.merged(staves=3)                                   # bars 0-2 merged, bar 3 music
+        self.assertEqual(out.rest_counts, [3, 0])
+        one = pt.merge_rest_bars([self.line(rests=(0, 1, 2, 3), note=(1, 0))], {}, pre=[(self.PRE, 0)])[0]
+        self.assertEqual(len(one.rest_counts), len(one.bars_x))       # one count per bar left
+        self.assertEqual(one.rest_counts[:2], [1, 0])                 # bar 0 a one-bar rest, bar 1 notes
+        self.assertEqual(sum(one.rest_counts), 3)                     # bars 2-3 add two more bars of rest
+
+    def test_a_one_bar_rest_cut_by_re_flow_is_a_rest_at_the_edge_of_its_line(self):
+        s = self.line(rests=(0, 1, 2, 3), note=(1, 0))                # bar 0 rest, bar 1 note, bars 2-3 rests
+        out = pt.merge_rest_bars([s], {}, pre=[(self.PRE, 0)])[0]
+        cut = pt.reflow([out], 120.0, pre=[(self.PRE, 0)])
+        self.assertTrue(len(cut) >= 2)
+        self.assertEqual((cut[0].rest_in, cut[0].rest_out), (1, 1))   # the line of bar 0 alone
+        self.assertEqual((cut[1].rest_in, cut[1].rest_out), (0, 0))   # the bar with the note
+

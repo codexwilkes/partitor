@@ -258,7 +258,10 @@ notehead, slur or word goes whole to one owner.
    or a printed number keeps the bar as engraved. A merged rest that starts or ends a line is
    recorded (`Strip.rest_in`, `rest_out`; re-flow gives each piece those of its first and last
    bar) and counts as a rest at a page turn: the planner, `plan` and the turn report take the
-   longest of a rest line on either side and these edges, with the same minimum of 2 bars. Justify gives an H-bar three shares of the
+   longest of a rest line on either side and these edges, with the same minimum of 2 bars. A single rest-only bar at a line edge, or a line with no
+   barline that holds one rest block on every staff, is a one-bar rest there (`rest_in` or `rest_out`
+   of 1): the planner calls it a short rest turn, not a bad one. `Strip.rest_counts` keeps the bars of
+   rest of each bar so that re-flow can give a cut piece the rest at its edge. Justify gives an H-bar three shares of the
    extra space to a blank gap's one and keeps the count on the middle of its bar; it reads the
    staff-line rows from the staff, since a wide H-bar could be taken for a line. A run whose merge saves
    less than 3 sp is not made. The bar after a clef and key needs the music

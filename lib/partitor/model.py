@@ -85,6 +85,7 @@ class Strip:
     num_mask: np.ndarray | None = None  # ink of printed mid-line bar numbers (same shape)
     rest_label: tuple | None = None     # (x centre in img, text): multi-bar rest count
     rest_labels: list = field(default_factory=list)  # [(x centre in img, text, rows below the top line of its staff)]: counts of merged rest bars inside the line, one per staff
+    rest_counts: list = field(default_factory=list)  # per bar (parallel to bars_x): bars of rest-only music it holds (0: it has notes)
     rest_in: int = 0            # bars of a merged rest at the start of the line (the player rests after a turn here)
     rest_out: int = 0           # bars of a merged rest at the end of the line (the player rests at a turn after it)
     rest_src: tuple | None = None       # (src, cw, RestRun): to rebuild at another width

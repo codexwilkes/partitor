@@ -8,6 +8,21 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.18 — 2026-11-06
+
+### Fixed
+
+- A bar of rests on every staff that stands alone at the start or the end of a
+  line, or a line with no barline of its own that holds one rest on each staff,
+  was not seen as a rest at a page turn, so the planner called the turn a bad
+  one. It is now a one-bar rest ("short rest" in the plan table). Each bar keeps
+  its count of rest bars (`rest_counts`), so a line cut by re-flow gets the rest
+  of its first and last bar. On the Trombones test part both fold sides now have
+  no turn while playing.
+- A barline that crosses every staff of a group is found before the staff
+  lines are cleared (it was missed when the staves were many).
+- Saved lines from before this release load without a rebuild.
+
 ## 0.8.17 — 2026-11-06
 
 ### Changed

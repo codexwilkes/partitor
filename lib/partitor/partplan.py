@@ -103,10 +103,8 @@ def read_source(strips: list, opts: dict, dpi: int, share: float = 1.0, label_px
             ln["bars"] = [(edges[b + 1] - edges[b]) * share for b in range(len(s.bars_x))]
             ln["copy"] = float(pre[p_[1]][0])
             # the merged rests among the bars: where a cut leaves a rest at a line edge
-            rc = [next((int(t) for cx, t, *_ in s.rest_labels if edges[b] <= cx < edges[b + 1]), 0)
-                  for b in range(len(s.bars_x))]
-            if any(rc):
-                ln["rcount"] = rc
+            if any(s.rest_counts) and len(s.rest_counts) == len(s.bars_x):
+                ln["rcount"] = [int(v) for v in s.rest_counts]
         src.lines.append(ln)
     return src
 

@@ -3,6 +3,7 @@
 """Re-flow of strips: move ink from one system into the previous one."""
 from __future__ import annotations
 
+import itertools
 from dataclasses import replace as dc_replace
 
 import cv2
@@ -417,9 +418,10 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
                 num = None
             first_of_mvt = s_.movement and b == 0
             show = None if (first_of_mvt or num is None or num < 1) else num
-            (fi, fb), (li, lb) = bars[a], bars[z - 1]       # a merged rest in the first or last bar of the line
-            r_in = _rest_in_bar(strips[fi], *span(fi, fb))
-            r_out = _rest_in_bar(strips[li], *span(li, lb))
+            rc = [strips[ii].rest_counts[bb] if bb < len(strips[ii].rest_counts) else 0
+                  for ii, bb in bars[a:z]]          # a rest at the start and at the end of the line
+            r_in = sum(itertools.takewhile(lambda v: v > 0, rc))
+            r_out = sum(itertools.takewhile(lambda v: v > 0, reversed(rc)))
             line = Strip(img, s_.staff_x0, top, top + (s_.staff_bottom - s_.staff_top),
                          s_.sp, hdr, show, s_.bar_raise, s_.bar_size,
                          marks=sorted(set(marks)), rest_labels=sorted(labels),
@@ -430,14 +432,6 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
                                        for n, t, b in s_.staff_labels])
             out.append(line)
     return out
-
-
-def _rest_in_bar(s: Strip, x0: int, x1: int) -> int:
-    """_rest_in_bar -> the bars of the merged rest that fills columns x0..x1 of a line, or 0."""
-    for cx, text, *_ in s.rest_labels:
-        if x0 <= cx < x1:
-            return int(text)
-    return 0
 
 
 def whole_reason(s_: Strip, p) -> str:

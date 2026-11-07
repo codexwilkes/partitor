@@ -347,20 +347,19 @@ class TestMergedRestsAtTheEdge(unittest.TestCase):
         self.assertFalse(pt.rest_turn([self.line(), self.line(), self.line()], 2))
 
     def test_a_cut_piece_gets_the_rest_of_its_edge_bar(self):
-        """read_source finds the merged rests among the bars; _pieces gives each piece its edges."""
-        s = self.line()
-        edges = [0] + list(s.bars_x)
-        s2 = dataclasses.replace(s, rest_labels=[((edges[3] + edges[4]) / 2, "4", 0)])
-        st = [music([250 * (k + 1) for k in range(8)], first=True), s2,
+        """read_source keeps the rest counts of the bars; _pieces gives each piece its edges."""
+        s = dataclasses.replace(self.line(), rest_counts=[0, 0, 0, 4, 0, 0, 0, 1])
+        st = [music([250 * (k + 1) for k in range(8)], first=True), s,
               music([250 * (k + 1) for k in range(8)])]
         src = pt.read_source(st, OPTS, 400)
-        self.assertEqual(src.lines[1]["rcount"], [0, 0, 0, 4, 0, 0, 0, 0])
+        self.assertEqual(src.lines[1]["rcount"], [0, 0, 0, 4, 0, 0, 0, 1])
         pieces, wide = pt._pieces(src, src.lines[1]["copy"] + 700)    # about 2.8 bars of 250 px
         self.assertIsNone(wide)
         mine = [p for p in pieces if p[0] == 1]
         self.assertGreater(len(mine), 1)
         self.assertEqual(sum(1 for p in mine if 4 in (p[2], p[3])), 1)  # one piece has the merged rest at an edge
-        self.assertTrue(all(p[2] in (0, 4) and p[3] in (0, 4) for p in mine))
+        self.assertEqual(mine[-1][3], 1)                                # the last bar is a one-bar rest at the end
+        self.assertTrue(all(p[2] in (0, 4) for p in mine))
 
     def test_the_planner_takes_the_rest_turn_it_could_not_see_before(self):
         """Two lines per page: with a 3-bar rest ending the first line of a spread, the plan has a rest turn there."""
