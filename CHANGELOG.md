@@ -8,6 +8,15 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.14 — 2026-11-06
+
+### Fixed
+
+- A merged multi-bar rest inside a line of a group score (0.8.11) showed its
+  count above the top staff only. It now shows the count above every staff. A
+  line saved by 0.8.11 to 0.8.13 still loads (its count stays above the top
+  staff until the part is rebuilt).
+
 ## 0.8.13 — 2026-11-06
 
 ### Changed

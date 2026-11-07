@@ -45,7 +45,7 @@ def pad_left(s: Strip, n: int) -> Strip:
         marks=[(mx + n, t) for mx, t in s.marks],
         bars_x=[b + n for b in s.bars_x],
         rest_label=None if s.rest_label is None else (s.rest_label[0] + n, s.rest_label[1]),
-        rest_labels=[(cx + n, tx) for cx, tx in s.rest_labels])
+        rest_labels=[(cx + n, *rest) for cx, *rest in s.rest_labels])
 
 
 def staff_end(s: Strip) -> int:
@@ -120,7 +120,7 @@ def justify(s: Strip, target: int) -> Strip:
         s, img=rp(s.img), hdr=rp(s.hdr), num_mask=rp(s.num_mask),
         marks=[(int(start[min(mx, len(start) - 1)]), t) for mx, t in s.marks],
         bars_x=[int(start[min(b, len(start) - 1)]) for b in s.bars_x],
-        rest_labels=[(float(start[min(int(cx), len(start) - 1)]), tx) for cx, tx in s.rest_labels])
+        rest_labels=[(float(start[min(int(cx), len(start) - 1)]), *rest) for cx, *rest in s.rest_labels])
 
 
 def short_name(name: str) -> str:
@@ -567,8 +567,8 @@ def _merge_run(s: Strip, b0: int, b1: int, pre_x: int) -> Strip:
     # the merged bar keeps the number of its first bar
     nums = [n for k, n in enumerate(s.bar_nums) if not (b0 < k <= b1)]
     marks = [(mx if mx < xa else mx + delta, t) for mx, t in s.marks]
-    labels = [(cx if cx < xa else cx + delta, t) for cx, t in s.rest_labels]
-    labels.append((xa + w / 2.0, str(b1 - b0 + 1)))
+    labels = [(cx if cx < xa else cx + delta, *rest) for cx, *rest in s.rest_labels]
+    labels += [(xa + w / 2.0, str(b1 - b0 + 1), t - s.staff_top) for t in tops]     # a count above each staff
     labels.sort()
     return dc_replace(s, img=img, hdr=splice(s.hdr, None), num_mask=splice(s.num_mask, None),
                       bars_x=bars_x, bar_nums=nums, marks=marks, rest_labels=labels)

@@ -149,7 +149,7 @@ plan.
 ## Rests
 
 Bars that hold only rests on every staff are merged into one multi-bar rest
-(count above the top staff) before the lines are cut and paged. This makes
+(count above every staff) before the lines are cut and paged. This makes
 lines shorter and gives the planner more turn points. A bar with a note, a
 rehearsal mark or a printed number is never merged. Set `rests: keep` to print
 every bar as engraved.

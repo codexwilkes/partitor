@@ -266,7 +266,7 @@ def profiles(s: Strip, nbins: int, bin_px: float
     t_hdr, _ = profile(s.hdr, a, nbins, bin_px)
     _, bot = profile(s.img, a, nbins, bin_px)
     boxes = [(x0, top, x1) for x0, top, x1, *_ in reh_boxes(s)]
-    boxes.extend(rb[:3] for rb in rest_boxes(s))
+    boxes.extend(rb[:3] for rb in rest_boxes(s, top_only=True))
     if s.bar_no is not None:
         _, top, wpx = bar_mark(s)
         c0 = bar_x(s)
@@ -291,23 +291,27 @@ def rest_text(n: str) -> tuple[str, str, float, float]:
 def rest_box(s: Strip, label: tuple | None = None) -> tuple[float, float, float, float, float, str, str] | None:
     """rest_box -> (x0, top, x1, baseline, font size, text, font kind) of
     the multi-bar rest count, centred above the H-bar, in strip px; None
-    without one. label: (x, text) of one count (default: the line's own)."""
+    without one. label: (x, text[, rows below the top line]) of one count (default:
+    the line's own, above the top staff)."""
     label = label or s.rest_label
     if not label:
         return None
-    cx, n = label
+    cx, n = label[0], label[1]
+    below = label[2] if len(label) > 2 else 0
     t, kind, size, raise_ = rest_text(n)
     fs = size * s.sp
     w = text_len(t, kind, fs)
-    base = s.staff_top - raise_ * s.sp
+    base = s.staff_top + below - raise_ * s.sp
     top = base - (1.0 * s.sp if kind == "music" else 0.72 * fs)
     return (cx - w / 2, top, cx + w / 2, base, fs, t, kind)
 
 
-def rest_boxes(s: Strip) -> list[tuple[float, float, float, float, float, str, str]]:
+def rest_boxes(s: Strip, top_only: bool = False) -> list[tuple[float, float, float, float, float, str, str]]:
     """rest_boxes -> the rest_box of every count of a line: the line's own
-    (a line that is only a rest) and those of merged bars inside it."""
-    return [b for b in (rest_box(s), *(rest_box(s, lb) for lb in s.rest_labels)) if b]
+    (a line that is only a rest) and those of merged bars inside it, one above
+    each staff (top_only: those above the top staff, which the line spacing keeps free)."""
+    labels = [lb for lb in s.rest_labels if not top_only or (len(lb) < 3 or lb[2] == 0)]
+    return [b for b in (rest_box(s), *(rest_box(s, lb) for lb in labels)) if b]
 
 
 REH_SIZE = 2.6        # rehearsal letter size, staff spaces

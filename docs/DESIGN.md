@@ -250,7 +250,7 @@ notehead, slur or word goes whole to one owner.
    `lines`, before re-flow): a run of 2 or more bars is one measure when every
    staff of the line holds, in that bar, one filled rest block (a whole or half
    rest) and nothing else but staff lines and barlines. The bar becomes an
-   H-bar with brackets on each staff and the count above the top staff
+   H-bar with brackets on each staff and the count above every staff
    (`Strip.rest_labels`); the barlines inside the run go, the merged bar keeps
    the number of its first bar, and the line gets shorter, so re-flow and the
    planner see fewer lines. The test is made for certain: a note, a stem, a

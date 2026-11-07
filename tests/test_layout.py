@@ -1055,17 +1055,33 @@ class TestMergeRestBars(unittest.TestCase):
         self.assertEqual(len(out.bars_x), 2)
         self.assertEqual(out.bar_nums, [10, 13])                      # the merged bar keeps its first number
         self.assertLess(out.img.shape[1], s.img.shape[1])
-        self.assertEqual(len(out.rest_labels), 1)
-        cx, text = out.rest_labels[0]
-        self.assertEqual(text, "3")
-        self.assertTrue(self.PRE < cx < out.bars_x[0])
+        self.assertEqual([(tx, off) for _, tx, off in out.rest_labels], [("3", 0), ("3", 100), ("3", 200)])
+        self.assertTrue(all(self.PRE < cx < out.bars_x[0] for cx, _, _ in out.rest_labels))
         for t0 in (40, 140, 240):                                     # an H-bar on every staff
             self.assertGreater(int(out.img[t0 + 20, self.PRE + 30:out.bars_x[0] - 30].sum()), 0)
         d = out.bars_x[1] - s.bars_x[3]                               # the last bar is the old one, moved
         self.assertTrue((out.img[:, s.bars_x[2] + 10 + d:s.bars_x[3] + 2 + d]
                          == s.img[:, s.bars_x[2] + 10:s.bars_x[3] + 2]).all())
         self.assertEqual(out.img.shape, out.hdr.shape)
-        self.assertEqual(len(pt.rest_boxes(out)), 1)
+        self.assertEqual(len(pt.rest_boxes(out)), 3)                  # a count above every staff
+
+    def test_the_count_stands_above_every_staff(self):
+        out = self.merged(staves=3)
+        boxes = pt.rest_boxes(out)
+        bases = sorted(b[3] for b in boxes)
+        self.assertEqual(len(bases), 3)
+        for base, t0 in zip(bases, (40, 140, 240)):
+            self.assertLess(base, t0)                                   # above its staff ...
+            self.assertGreater(base, t0 - 100 + 40)                     # ... and below the staff above it
+        self.assertEqual(len(pt.rest_boxes(out, top_only=True)), 1)     # line spacing keeps only the top one free
+
+    def test_a_count_without_a_row_is_above_the_top_staff(self):
+        """Saved lines of 0.8.11 have (x, text) counts."""
+        s = self.merged(staves=3)
+        import dataclasses
+        old = dataclasses.replace(s, rest_labels=[(cx, tx) for cx, tx, _ in s.rest_labels[:1]])
+        box = pt.rest_boxes(old)[0]
+        self.assertLess(box[3], old.staff_top)
 
     def test_every_staff_line_runs_across_the_new_measure(self):
         out = self.merged(staves=3)
@@ -1096,7 +1112,7 @@ class TestMergeRestBars(unittest.TestCase):
     def test_the_count_moves_with_re_flow(self):
         out = self.merged()
         cut = pt.reflow([out], 150.0, pre=[(self.PRE, 0)])
-        self.assertEqual([t for s_ in cut for _, t in s_.rest_labels], ["3"])
+        self.assertEqual([t for s_ in cut for _, t, _ in s_.rest_labels], ["3"])
 
     def test_the_planner_sees_the_shorter_line(self):
         s = self.line(staves=3)

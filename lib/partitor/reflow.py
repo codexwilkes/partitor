@@ -405,9 +405,9 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
                     for mx, t in ps.marks:
                         if (lo <= mx < hi) and not (n_ == 0 and mx >= x1):
                             marks.append((x + max(0, mx - x0), t))
-                    for cx, t in ps.rest_labels:         # the count of a merged rest moves with its bar
+                    for cx, *rest in ps.rest_labels:     # the count of a merged rest moves with its bar
                         if x0 <= cx < x1:
-                            labels.append((x + cx - x0, t))
+                            labels.append((x + cx - x0, *rest))
                 x += x1 - x0
             if b < len(s_.bar_nums):
                 num = s_.bar_nums[b]
