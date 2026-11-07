@@ -1120,5 +1120,34 @@ class TestMergeRestBars(unittest.TestCase):
         after = pt.read_source([self.merged(staves=3)], {}, 150).lines[0]["whole"]
         self.assertLess(after, before)
 
+    def test_justify_stretches_the_h_bar_and_keeps_the_count_in_its_middle(self):
+        """A merged rest that fills most of the line: its H-bar is not mistaken for a staff line,
+        takes most of the extra space, and the count stays centred over it."""
+        s = self.merged(staves=3)
+        wide = pt.justify(s, s.img.shape[1] + 200)
+        self.assertGreater(pt.staff_end(wide) - wide.staff_x0, pt.staff_end(s) - s.staff_x0)
+        mid = 40 + 20
+        band = lambda st: st.img[mid - 4:mid + 5].all(axis=0)
 
+        def hbar(st):
+            cx = int(st.rest_labels[0][0])
+            b = band(st)
+            a = z = cx
+            while a > 0 and b[a - 1]:
+                a -= 1
+            while z + 1 < len(b) and b[z + 1]:
+                z += 1
+            return a, z + 1
+        a0, z0 = hbar(s)
+        a1, z1 = hbar(wide)
+        self.assertGreater(z1 - a1, z0 - a0 + 100)                    # most of the 200 px went into the bar
+        self.assertLessEqual(abs(wide.rest_labels[0][0] - (a1 + z1) / 2.0), 1.0)    # the count is centred
+        self.assertEqual(len({round(c) for c, _, _ in wide.rest_labels}), 1)        # one column for all staves
+
+    def test_a_rest_that_fills_the_line_keeps_its_staff_lines(self):
+        """Few bars, mostly H-bar: the staff lines are still found from the staff, not the ink."""
+        s = self.merged(staves=3)
+        self.assertEqual(len(pt.staff_lines(s)), 3)
+        wide = pt.justify(s, s.img.shape[1] + 120)
+        self.assertEqual(len(pt.staff_lines(wide)), 3)
 

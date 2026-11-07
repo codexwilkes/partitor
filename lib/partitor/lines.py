@@ -85,6 +85,13 @@ def justify(s: Strip, target: int) -> Strip:
     if x1 <= x0:
         return s
     rows = s.img[:, x0:x1].mean(axis=1) > 0.6            # staff line rows
+    if s.rest_labels:                    # a merged rest's H-bar can cover most of the line: take the rows
+        sl = staff_lines(s)              # from the staff lines, not from the ink
+        if sl:
+            rows = np.zeros(s.img.shape[0], bool)
+            for ln in sl:
+                for c in ln:
+                    rows[int(round(c))] = True
     rows = cv2.dilate(rows.astype(np.uint8)[:, None], np.ones((5, 1), np.uint8))[:, 0] > 0
     ink = s.img & ~rows[:, None]
     # text (lyrics, titles) lies outside the staff band: a gap between its
@@ -108,19 +115,58 @@ def justify(s: Strip, target: int) -> Strip:
     # (the edge column of a thick line is often only partly inked: look 3 columns in)
     runs = [(a, b) for a, b in runs
             if not (b - a < sp and bar(range(a - 3, a)) and bar(range(b, b + 4)))]
-    if not runs:
+    hspans = _hbar_spans(s)               # the H-bars of merged rests take most of the extra space
+    if not runs and not hspans:
         return s
     counts = np.ones(s.img.shape[1], np.int64)
-    base, rem = divmod(int(extra), len(runs))
-    for j, (a, b) in enumerate(runs):
-        counts[(a + b) // 2] += base + (1 if j < rem else 0)
+    if not hspans:
+        base, rem = divmod(int(extra), len(runs))
+        for j, (a, b) in enumerate(runs):
+            counts[(a + b) // 2] += base + (1 if j < rem else 0)
+    else:
+        points = [((a + b) // 2, 1) for a, b in runs] + [((a + b) // 2, HBAR_WEIGHT) for a, b in hspans]
+        total = sum(w for _, w in points)
+        done = 0
+        for x_, w in sorted(points):
+            counts[x_] += round(int(extra) * (done + w) / total) - round(int(extra) * done / total)
+            done += w
     start = np.cumsum(counts) - counts                   # new x of each old column
+
+    def centre(cx: float) -> float:                      # a count stays on the middle of its H-bar
+        for a, b in hspans:
+            if a <= cx < b:
+                return (start[a] + start[b - 1] + counts[b - 1]) / 2.0
+        return float(start[min(int(cx), len(start) - 1)])
     rp = lambda m: None if m is None else np.repeat(m, counts, axis=1)
     return dc_replace(
         s, img=rp(s.img), hdr=rp(s.hdr), num_mask=rp(s.num_mask),
         marks=[(int(start[min(mx, len(start) - 1)]), t) for mx, t in s.marks],
         bars_x=[int(start[min(b, len(start) - 1)]) for b in s.bars_x],
-        rest_labels=[(float(start[min(int(cx), len(start) - 1)]), *rest) for cx, *rest in s.rest_labels])
+        rest_labels=[(centre(cx), *rest) for cx, *rest in s.rest_labels])
+
+
+HBAR_WEIGHT = 3         # justify: an H-bar takes this many shares of the extra space, a blank gap one
+
+
+def _hbar_spans(s: Strip) -> list[tuple[int, int]]:
+    """_hbar_spans -> [(first column, end)] of the H-bar under each merged rest count of the
+    line, read from the image (columns where the band around the middle line of the top staff
+    is solid)."""
+    sp = s.sp
+    mid = int(round(s.staff_top + 2 * sp))
+    band = s.img[max(0, mid - int(0.4 * sp)):mid + int(0.4 * sp) + 1].all(axis=0)
+    out = []
+    for cx in sorted({int(c) for c, *_ in s.rest_labels}):
+        if not 0 <= cx < len(band) or not band[cx]:
+            continue
+        a = b = cx
+        while a > 0 and band[a - 1]:
+            a -= 1
+        while b + 1 < len(band) and band[b + 1]:
+            b += 1
+        if (a, b + 1) not in out:
+            out.append((a, b + 1))
+    return out
 
 
 def short_name(name: str) -> str:

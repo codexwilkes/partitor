@@ -8,6 +8,16 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.15 — 2026-11-06
+
+### Fixed
+
+- A merged multi-bar rest (0.8.11) on a line that was mostly rest was stretched
+  wrongly when the line was justified: its H-bar was taken for a staff line, the
+  space went into the blanks around it, the bar looked short and the count
+  stood left of its middle. The staff lines are now read from the staff, the
+  H-bar takes most of the extra space, and the count stays on its middle.
+
 ## 0.8.14 — 2026-11-06
 
 ### Fixed
