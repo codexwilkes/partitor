@@ -602,7 +602,7 @@ def cmd_contract(a: argparse.Namespace) -> int:
 
 
 PLAN_KEYS = ("margin_top", "margin_bottom", "margin_side", "gutter", "binding", "duplex",
-             "title_page", "gap", "gap_min", "clearance", "foldside")     # layout keys `plan` reads
+             "title_page", "gap", "gap_min", "clearance", "foldside", "breaks")     # layout keys `plan` reads
 
 
 def plan_names(data: dict, built: dict, words: list[str]) -> list[str]:
@@ -636,7 +636,8 @@ def plan_rows(opts_list: list, old: dict, lay: dict, show_all: bool = True) -> l
             continue
         c = o.counts
         note = ", ".join(x for x in ("best" if o.n in best else "", "re-flow" if o.reflow else "",
-                                     "no title page" if not o.title_page else "") if x)
+                                     "no title page" if not o.title_page else "",
+                                     f"{len(o.lost)} break(s) end no line" if o.lost else "") if x)
         out.append(f"{mark} {o.n:>2}  {o.paper:<6} {o.staff_mm:>4.1f} mm {o.pages:>5} {c.get('rest', 0):>5} "
                    f"{c.get('rest1', 0):>5} {c.get('attacca', 0):>7} {o.folds:>8} "
                    f"{c.get('bad', 0) + c.get('bridge', 0):>4}  {note}")
@@ -709,6 +710,7 @@ def plan_table(item: Path, data: dict, built: dict, nm: str, trial: bool = False
         _warn(f"plan:  {nm}: duplex is off (single-sided): page turns follow every page; no plan")
         return None
     o = {**pl["opts"], **{k: lay[k] for k in PLAN_KEYS if lay.get(k) is not None}}
+    o["breaks"] = list(lay.get("breaks") or [])          # the breaks of the settings, not those of the last build
     cur = lay.get("paper") or "letter"
     papers = ("letter", "ledger") + (() if cur in ("letter", "ledger") else (cur,))   # fixed order: the numbers stay
     if src is None:                         # a build before 0.8.6: the justified saved lines
@@ -716,8 +718,12 @@ def plan_table(item: Path, data: dict, built: dict, nm: str, trial: bool = False
     rows = options(src, o, papers, floor_mm=float(lay.get("min_staff_mm") or 5.0))
     old = built[nm]
     if lay.get("breaks"):
-        _note(f"plan:  {nm}: manual page breaks (after bars {', '.join(str(b) for b in lay['breaks'])}) are not "
-              f"in this estimate; see them with: partitor pages {data['id']} {nm}")
+        if any("span" in ln for ln in src.lines):
+            _note(f"plan:  {nm}: the estimates keep the manual page breaks (after bars "
+                  f"{', '.join(str(b) for b in lay['breaks'])}); see them with: partitor pages {data['id']} {nm}")
+        else:
+            _note(f"plan:  {nm}: manual page breaks (after bars {', '.join(str(b) for b in lay['breaks'])}) are "
+                  f"not in these estimates (the saved plan data has no bar numbers: rebuild the part once)")
     _head(f"Plan: {nm}")
     c0 = old.get("content_pages", old["pages"])
     est = estimate(src, o, o["paper"], float(old["staff_mm"]))
@@ -863,9 +869,16 @@ def cmd_pages(a: argparse.Namespace) -> int:
         # change them. Pin the ends a trial paging would move.
         cur = [int(x) for x in (part_layout(data, nm).get("breaks") or [])]
         gone = {int(p.rsplit("=", 1)[1][1:]) for p in pairs if "=-" in p}
-        after = {r["j"] for r in report(sorted((set(cur) - gone) | {bar}))}
-        pairs += [f"{nm}:breaks=+{r['last']}" for r in rows
-                  if r["j"] < row["j"] and r["j"] not in after and r["last"] is not None and r["last"] not in cur]
+        base = (set(cur) - gone) | {bar}
+        after = {r["j"] for r in report(sorted(base))}
+        pins = [r["last"] for r in rows
+                if r["j"] < row["j"] and r["j"] not in after and r["last"] is not None and r["last"] not in cur]
+        # a break is a limit, not a command: the page must now start where it did and end at j
+        if (row["i"], j) not in {(r["i"], r["j"]) for r in report(sorted(base | set(pins)))}:
+            _die(f"pages: page {page}: no room for the move" if n < 0 else
+                 f"pages: page {page}: the move does not give a page end there",
+                 "See the room column. Move a system off the page first, or move less")
+        pairs += [f"{nm}:breaks=+{b_}" for b_ in pins]
     if pairs:
         kept = copy.deepcopy(data)
         try:

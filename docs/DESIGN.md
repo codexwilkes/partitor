@@ -869,8 +869,12 @@ again; `--clear` is `breaks=none`. A manual break is only a limit in the planner
 the planner optimises the whole part, so one break can change the pages before it. `--move` therefore pins
 the ends of the earlier pages that a trial paging would change (extra `breaks=+BAR`). One `--move` for each
 call (each move changes the rows after it). `--dry-run` shows the result and saves nothing. If the repage
-fails, the settings are put back. `plan` does not put manual breaks into its estimate (it says so). Sections
-5.1 to 5.8 keep their numbers.
+fails, the settings are put back. A move whose page would not start where it did and end at the new break
+(a move up to a full page: the planner would cut the page short) is refused. `plan` keeps the manual
+breaks: `read_source` saves the bar span of each line (`span`); `_pieces` gives each cut piece the number of
+its last bar (a merged rest holds several; numbers that are not a plain run are unknown); `estimate` forces
+a page end after a piece whose last bar has a break, and `Option.lost` lists the breaks that end no piece.
+Sections 5.1 to 5.8 keep their numbers.
 
 ## 6. CLI
 

@@ -1809,18 +1809,19 @@ class TestPagesReport(unittest.TestCase):
                     os.environ["PARTITOR_LIBRARY"] = old_share
 
 
-@needs_deps
-class TestPagesSafety(unittest.TestCase):
-    """0.8.20: `pages` pins earlier pages, takes one move, rolls back, has a dry run."""
+class _PagesItem(unittest.TestCase):
+    """A built item for the `pages` and `plan` commands. SHEETS pages of SYSTEMS systems."""
+    SYSTEMS, SHEETS = 2, 6
+    __test__ = False
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         tmp = self.tmp.name
         one = Path(tmp, "page.pdf")
-        make_score_pdf(str(one), systems=2, staves=2, labels=("Alto", "Bass"), title="")
+        make_score_pdf(str(one), systems=self.SYSTEMS, staves=2, labels=("Alto", "Bass"), title="")
         doc = pymupdf.open()
-        for _ in range(6):
+        for _ in range(self.SHEETS):
             doc.insert_pdf(pymupdf.open(str(one)))
         self.share = Path(tmp, "share")
         (self.share / "inbox").mkdir(parents=True)
@@ -1831,7 +1832,7 @@ class TestPagesSafety(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(pt.run_detect(self.item, None, "T", "C D"), 0)
             d = pt.load_item(self.item)
-            pt.apply_set(d, ["pages=5", "max_staff_mm=8"])
+            pt.apply_set(d, ["pages=30", "max_staff_mm=8"])
             pt.save_item(self.item, d)
             self.assertEqual(build.run_build(self.item), 0)
         old = os.environ.get("PARTITOR_LIBRARY")
@@ -1850,12 +1851,23 @@ class TestPagesSafety(unittest.TestCase):
     def breaks(self):
         return pt.load_item(self.item).get("layout", {}).get("parts", {}).get("Alto", {}).get("breaks")
 
+    def table(self, out):
+        """-> {page number: (first bar, last bar)} read from the printed table."""
+        rows = [ln.split() for ln in out.splitlines() if "/" in ln[:15] and ln.strip()[:1].isdigit()]
+        return {r[0].split("/")[0]: tuple(int(x) for x in r[1].split("-")) for r in rows}
+
     def multi_page(self):
         rc, out = self.run_pages()
         rows = [ln.split() for ln in out.splitlines() if "/" in ln[:15] and ln.strip()[:1].isdigit()]
         page = next((r[0].split("/")[0] for r in rows if int(r[2]) > 1), None)
         self.assertIsNotNone(page, out)
         return page
+
+
+@needs_deps
+class TestPagesSafety(_PagesItem):
+    """0.8.20: `pages` pins earlier pages, takes one move, rolls back, has a dry run."""
+    __test__ = True
 
     def test_all_is_not_one_part(self):
         rc, out = self.run_pages(part="all")
@@ -1925,3 +1937,46 @@ class TestPagesPins(unittest.TestCase):
         pinned = pt.page_report(st, 400, {**T.OPTS, "breaks": sorted(set(pins) | {bar})})
         self.assertNotEqual([r["j"] for r in free[:3]], [r["j"] for r in base[:3]])   # the defect
         self.assertEqual([r["j"] for r in pinned[:len(base) - 2]], [r["j"] for r in base[:-2]])
+
+
+@needs_deps
+class TestPagesPinning(_PagesItem):
+    """0.8.20: a move on a part with many pages keeps the earlier pages (the command, end to end).
+    0.8.21: `plan` keeps the manual breaks in its estimates."""
+    SYSTEMS, SHEETS = 3, 14
+    __test__ = True
+
+    def test_a_move_pins_the_earlier_pages_and_they_do_not_change(self):
+        rc, out = self.run_pages()
+        before = self.table(out)
+        self.assertGreaterEqual(len(before), 5, out)
+        last = str(len(before))
+        rc, out = self.run_pages(move=[f"{last}=1"])          # the last system of the last page to a new page
+        self.assertEqual(rc, 0, out)
+        after = self.table(out)
+        self.assertEqual(len(after), len(before) + 1, out)
+        saved = self.breaks()
+        for p in before:
+            if p != last:
+                self.assertEqual(after[p], before[p], out)     # earlier pages: the same bars
+                self.assertIn(before[p][1], saved)             # and pinned
+        rc, out = self.run_pages(clear=True)
+        self.assertEqual(self.table(out), before)              # --clear brings back the first paging
+
+    def test_a_move_up_to_a_page_with_no_room_is_refused(self):
+        rc, out = self.run_pages()
+        self.assertEqual(rc, 0, out)
+        rc, out = self.run_pages(move=["2=-1"])               # every page is full
+        self.assertNotEqual(rc, 0)
+        self.assertIn("no room", out)
+        self.assertIsNone(self.breaks())
+
+    def test_plan_keeps_the_manual_breaks_in_its_estimates(self):
+        rc, out = self.run_pages(move=[f"{len(self.table(self.run_pages()[1]))}=1"])
+        self.assertEqual(rc, 0, out)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            pt._engine_step(cli_items.cmd_plan, argparse.Namespace(id="2026-10-0001", words=["Alto"], group=[], all=True))
+        txt = buf.getvalue()
+        self.assertIn("keep the manual page breaks", txt)
+        self.assertNotIn("Traceback", txt)

@@ -8,6 +8,21 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
 
+## 0.8.21 — 2026-11-07
+
+### Changed
+
+- `partitor plan` keeps the manual page breaks in its estimates: a break after
+  bar N ends a page where a line ends after bar N. A row says "N break(s) end no
+  line" when a break falls inside a line at that size. The plan data of a part
+  now holds the bar numbers of its lines; a part built before this release says
+  so and needs one rebuild.
+
+### Fixed
+
+- `pages --move` up to a page with no room did nothing useful: the page got
+  shorter. It is now refused, with a message.
+
 ## 0.8.20 — 2026-11-07
 
 ### Fixed

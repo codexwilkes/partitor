@@ -185,9 +185,14 @@ room for a system. A move pages the part again with `turns=rest` and keeps that
 setting; if the repage fails, the settings are put back. In the item menu (key
 `l`) `pages` asks for a move after the table.
 
-`plan` does not use manual breaks in its estimates (it says so). After
-`plan ID PART N`, check the breaks with `pages`; if a break no longer ends a
-line, drop them with `--clear`.
+A move up to a page with no room is refused: a break is a limit, so the page would
+only get shorter. Move a system off that page first.
+
+`plan` keeps the manual breaks in its estimates (a break after bar N ends a page
+where a line ends after bar N). A row says "N break(s) end no line" when a break
+falls inside a line at that size. After `plan ID PART N`, check the breaks with
+`pages`; if a break no longer ends a line, drop them with `--clear`. A part built
+before 0.8.21 has no bar numbers in its plan data: `plan` says so; rebuild once.
 
 ## Settings
 

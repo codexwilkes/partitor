@@ -19,7 +19,7 @@ from types import SimpleNamespace
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from support import flow_line, needs_deps, np, pt  # noqa: E402,F401
+from support import cli_items, flow_line, needs_deps, np, pt  # noqa: E402,F401
 from support import setUpModule, tearDownModule  # noqa: E402,F401
 
 
@@ -373,3 +373,87 @@ class TestMergedRestsAtTheEdge(unittest.TestCase):
                              a.counts.get("bad", 0) + a.counts.get("bridge", 0))
         self.assertGreaterEqual(b.counts.get("rest", 0), a.counts.get("rest", 0))
 
+
+
+class TestManualBreaksInPlan(unittest.TestCase):
+    """0.8.21: the estimates keep the manual page breaks (a break after a bar)."""
+
+    def numbered(self, n=24, **kw):
+        out = []
+        for k in range(n):
+            ln = music([250 * (j + 1) for j in range(8)], first=(k == 0))
+            out.append(dataclasses.replace(ln, bar_nums=[], bar_no=1 + 8 * k, **kw))
+        return out
+
+    O = {**OPTS, "paper": "letter", "foldouts": "off", "title_page": "off"}
+
+    def test_the_source_keeps_the_bar_span_of_each_line(self):
+        src = pt.read_source(self.numbered(4), self.O, 400)
+        self.assertEqual([ln["span"] for ln in src.lines], [[1, 8], [9, 16], [17, 24], None])   # the last line: unknown
+
+    def test_a_piece_knows_its_last_bar(self):
+        src = pt.read_source(self.numbered(4), self.O, 400)
+        pieces, _ = pt._pieces(src, 1e9)
+        self.assertEqual([p[4] for p in pieces], [8, 16, 24, None])
+
+    def test_a_cut_line_gives_each_piece_its_last_bar(self):
+        src = pt.read_source(self.numbered(3), self.O, 400)
+        pieces, _ = pt._pieces(src, src.lines[1]["copy"] + 700)         # about 2.8 bars of 250 px
+        mine = [p[4] for p in pieces if p[0] == 1]
+        self.assertGreater(len(mine), 1)
+        self.assertEqual(mine, sorted(mine))
+        self.assertEqual(mine[-1], 16)                                   # the line ends at bar 16
+        self.assertTrue(all(9 <= b <= 16 for b in mine))
+
+    def test_a_merged_rest_counts_for_all_its_bars(self):
+        st = self.numbered(3)
+        st[1] = dataclasses.replace(st[1], rest_counts=[0, 0, 0, 4, 0, 0, 0, 1])      # 8 entries, 11 bars
+        st[2] = dataclasses.replace(st[2], bar_no=20)
+        src = pt.read_source(st, self.O, 400)
+        self.assertEqual(src.lines[1]["span"], [9, 19])
+        pieces, _ = pt._pieces(src, src.lines[1]["copy"] + 700)
+        mine = [p[4] for p in pieces if p[0] == 1]
+        self.assertEqual(mine[-1], 19)
+        self.assertIn(15, mine + [15] if len(mine) == 1 else mine)      # after the 4-bar rest or before: never inside it
+
+    def test_numbers_that_are_not_a_plain_run_are_unknown(self):
+        st = self.numbered(3)
+        st[1] = dataclasses.replace(st[1], bar_no=9)
+        st[2] = dataclasses.replace(st[2], bar_no=30)                    # 8 bars, but the line spans 9-29
+        src = pt.read_source(st, self.O, 400)
+        pieces, _ = pt._pieces(src, 1e9)
+        self.assertIsNone(pieces[1][4])
+
+    def test_a_manual_break_ends_a_page_in_the_estimate(self):
+        src = pt.read_source(self.numbered(24), self.O, 400)
+        base = pt.estimate(src, self.O, "letter", 8.0)
+
+        def ends(o):
+            return sorted(j for g in o.plan.groups for _, j in g.pages)
+        moved = []
+        for bar in range(1, 190):
+            got = pt.estimate(src, {**self.O, "breaks": [bar]}, "letter", 8.0)
+            if got.lost == () and ends(got) != ends(base):
+                moved.append((bar, got))
+        self.assertTrue(moved, "no break changed the pages")
+
+    def test_a_break_that_ends_no_line_is_reported_lost(self):
+        src = pt.read_source(self.numbered(24), self.O, 400)
+        got = pt.estimate(src, {**self.O, "breaks": [5, 999]}, "letter", 8.0)    # bar 5 is inside a line
+        self.assertEqual(got.lost, (5, 999))
+        self.assertEqual(pt.estimate(src, self.O, "letter", 8.0).lost, ())
+
+    def test_the_table_says_when_a_break_is_lost(self):
+        src = pt.read_source(self.numbered(24), self.O, 400)
+        o = pt.estimate(src, {**self.O, "breaks": [5]}, "letter", 8.0)
+        rows = cli_items.plan_rows([dataclasses.replace(o, n=1)], {"staff_mm": 8.0}, {"paper": "letter"})
+        self.assertTrue(any("1 break(s) end no line" in r for r in rows), rows)
+
+    def test_old_plan_data_without_spans_still_loads(self):
+        src = pt.read_source(self.numbered(6), self.O, 400)
+        d = src.to_dict()
+        for ln in d["lines"]:
+            ln.pop("span")
+        back = pt.Source.from_dict(d)
+        o = pt.estimate(back, {**self.O, "breaks": [8]}, "letter", 8.0)
+        self.assertTrue(o.ok)

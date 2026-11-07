@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 from .config import PAPER
 from .reflow import _break_lines, find_prefixes
-from .render import LARGE, RUN_HEAD, TITLE_BAND, fold_sides, page_box, usable_width
+from .render import LARGE, RUN_HEAD, TITLE_BAND, fold_sides, line_spans, page_box, usable_width
 from .strips import BAR_END_SP, pitches
 from .turnplan import Boundary, Plan, plan_turns
 
@@ -38,6 +38,7 @@ class Option:
     plan: Plan | None = None
     reflow: bool = False    # the lines are cut: re-flow is needed
     n: int = 0              # row number, from 1
+    lost: tuple = ()        # manual breaks (bar numbers) that end no line at this size: not in the estimate
     cap_mm: float = 0.0     # `max_staff_mm` that gives this row (the staff shrinks to fit the label column)
     budget: int = 0         # pages at that size, before the shrink: the page budget the build needs
 
@@ -83,13 +84,15 @@ def read_source(strips: list, opts: dict, dpi: int, share: float = 1.0, label_px
     pre = find_prefixes(strips)
     pit = pitches(strips, opts) + [0.0]
     src = Source(dpi, float(strips[0].sp), exact=share >= 1.0, label_px=float(label_px))
+    spans = line_spans(strips)
     for i, s in enumerate(strips):
         rest = s.rest_src[2].bars if s.rest_src is not None else 0
         ends = s.ends_at_bar or 0.0 <= s.end_gap_sp <= BAR_END_SP
         ln = {"rest": rest, "rin": int(s.rest_in), "rout": int(s.rest_out),
               "movement": bool(s.movement), "pit": float(pit[i]),
               "top": float(s.staff_top), "h": float(s.img.shape[0]),
-              "whole": s.img.shape[1] * share, "bars": None, "copy": 0.0}
+              "whole": s.img.shape[1] * share, "bars": None, "copy": 0.0,
+              "span": list(spans[i]) if spans[i] and spans[i][1] is not None else None}   # first and last bar number
         p_ = pre[i]
         if p_ is None and s.ambitus_marks and not s.staff_labels:
             # the first line shows the ambitus in place of the staff names, so a saved
@@ -111,22 +114,32 @@ def read_source(strips: list, opts: dict, dpi: int, share: float = 1.0, label_px
 
 def _pieces(src: Source, width_px: float):
     """_pieces -> (pieces, too wide): the lines cut for a text width. A piece:
-    (source line, first piece of its line, bars of a merged rest at its start, at its end)."""
+    (source line, first piece of its line, bars of a merged rest at its start, at its end, number of
+    its last bar or None when the saved data cannot say: a manual break after that bar ends the piece)."""
     out, wide = [], None
     for i, ln in enumerate(src.lines):
         if ln["bars"] is None:
             if not ln["rest"] and ln["whole"] > width_px:
                 wide = wide or (i, ln["whole"])
-            out.append((i, True, ln.get("rin", 0), ln.get("rout", 0)))
+            out.append((i, True, ln.get("rin", 0), ln.get("rout", 0), (ln.get("span") or [None, None])[1]))
             continue
         starts = _break_lines(ln["bars"], ln["copy"], width_px)
+        rc = ln.get("rcount")
+        sp_ = ln.get("span")
+        num = None                      # the number of the last bar of each bar entry (a merged rest holds several)
+        if sp_:
+            num, at = [], sp_[0] - 1
+            for b in range(len(ln["bars"])):
+                at += max(1, rc[b]) if rc else 1
+                num.append(at)
+            if num[-1] != sp_[1]:
+                num = None              # the numbers are not a plain run (a repeat, a movement): unknown
         for k, a in enumerate(starts):
             z = starts[k + 1] if k + 1 < len(starts) else len(ln["bars"])
             piece = (ln["copy"] if k else 0.0) + sum(ln["bars"][a:z])
             if z - a == 1 and piece > width_px:          # one bar wider than a line
                 wide = wide or (i, piece)
-            rc = ln.get("rcount")
-            out.append((i, k == 0, rc[a] if rc else 0, rc[z - 1] if rc else 0))
+            out.append((i, k == 0, rc[a] if rc else 0, rc[z - 1] if rc else 0, num[z - 1] if num else None))
     return out, wide
 
 
@@ -171,7 +184,10 @@ def estimate(src: Source, opts: dict, paper: str, staff_mm: float) -> Option:
     bounds = [Boundary()] + [
         Boundary(rest_bars=max(L[j - 1]["rest"], L[j]["rest"], pieces[j - 1][3], pieces[j][2]),
                  movement=bool(pieces[j][1] and L[j]["movement"])) for j in range(1, n)]
-    forced = tuple(opts.get("_breaks") or [])
+    want = {int(b) for b in opts.get("breaks") or []}
+    at = {j for j in range(1, n) if pieces[j - 1][4] in want}          # a manual break after a bar ends a page
+    lost = tuple(sorted(b for b in want if not any(p[4] == b for p in pieces[:-1])))
+    forced = tuple(sorted(set(opts.get("_breaks") or []) | at))
     fold = paper in LARGE and opts.get("duplex", "auto") != "off"
 
     def plan(title: bool, k: float) -> Plan:
@@ -187,7 +203,7 @@ def estimate(src: Source, opts: dict, paper: str, staff_mm: float) -> Option:
     budget = plan(title, k0).pages                       # the build lays the cut lines out at k0 first
     cut = any(ln["bars"] is not None for ln in src.lines) and n > len(src.lines)
     return Option(paper, staff_mm, True, "", best.pages, title, best, reflow=cut,
-                  cap_mm=s0 * 4.0 * sp * 25.4 / dpi, budget=budget)
+                  lost=lost, cap_mm=s0 * 4.0 * sp * 25.4 / dpi, budget=budget)
 
 
 def options(src: Source, opts: dict, papers: tuple, sizes: tuple = SIZES,
