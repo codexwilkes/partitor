@@ -28,8 +28,10 @@ from support import (  # noqa: E402,F401
     SRC,
     build,
     cli_items,
+    cli_parts,
     cv2,
     make_score_pdf,
+    mock_attr,
     needs_deps,
     np,
     package_holders,
@@ -534,6 +536,67 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(maps, [["B", "C"], ["A", "-"]])
         self.assertEqual(pt.item_status(pt.load_item(item)), "ready to build")
 
+    def test_system_cut_and_set_join(self):
+        item = self.share / "library" / "2026-004-j"
+        item.mkdir()
+        pt.save_item(item, {"id": "2026-004", "slug": "j", "parts": ["A", "B"],
+                            "systems": [{"id": "p5.s1", "staves": 4, "map": ["?"] * 4},
+                                        {"id": "p5.s2", "staves": 13, "map": ["B"] * 13},
+                                        {"id": "p6.s1", "staves": 17, "map": ["B"] * 17}]})
+        data = pt.load_item(item)
+        self.assertEqual(pt.system_cut(data, "p5.s1"), "p5:4")
+        self.assertEqual(pt.system_cut(data, "p5.s2"), "")        # nothing below it
+        self.assertEqual(pt.system_cut(data, "p6.s1"), "")
+        self.assertEqual(pt.system_cut(data, "p9.s1"), "")
+        self.assertEqual(pt.system_cut(data, "nonsense"), "")
+        self.assertEqual(pt.set_join(item, "p5:4"), "")
+        self.assertEqual(pt.set_join(item, "p2:3"), "")
+        self.assertEqual(pt.load_item(item)["system_joins"], ["p2:3", "p5:4"])   # page order
+        self.assertIn("already", pt.set_join(item, "p5:4"))
+        self.assertIn("not a join", pt.set_join(item, "5:4"))
+        self.assertEqual(pt.set_join(item, "p5:4", False), "")
+        self.assertIn("not joined", pt.set_join(item, "p5:4", False))
+        self.assertEqual(pt.set_join(item, "p2:3", False), "")
+        self.assertNotIn("system_joins", pt.load_item(item))
+
+    def test_choose_maps_j_joins_and_asks_again(self):
+        item = self.share / "library" / "2026-005-k"
+        item.mkdir()
+        pt.save_item(item, {"id": "2026-005", "slug": "k", "parts": ["A", "B", "C"],
+                            "systems": [{"id": "p1.s1", "staves": 1, "map": ["?"],
+                                         "suggest": ["C"]},
+                                        {"id": "p1.s2", "staves": 2, "map": ["A", "B"]}]})
+        calls = []
+
+        def fake_reanalyse(it):
+            # what the real analysis gives after the join: one system of three staves
+            calls.append(pt.load_item(it).get("system_joins"))
+            d = pt.load_item(it)
+            d["systems"] = [{"id": "p1.s1", "staves": 3, "map": ["?"] * 3,
+                             "suggest": ["A", "B", "C"]}]
+            pt.save_item(it, d)
+            return 0
+        with mock_attr(cli_parts, "reanalyse", fake_reanalyse):
+            # j on the one-staff system; then Enter on the joined system
+            _, out = self.quiet_input(["j", ""], pt.choose_maps, item)
+        self.assertEqual(calls, [["p1:1"]])          # the join was stored before the analysis
+        self.assertIn("p1.s1 and the system below it are one system (p1:1)", out)
+        data = pt.load_item(item)
+        self.assertEqual([s["map"] for s in data["systems"]], [["A", "B", "C"]])
+        self.assertEqual(data["system_joins"], ["p1:1"])
+
+    def test_choose_maps_j_on_the_last_system_is_refused(self):
+        item = self.share / "library" / "2026-006-l"
+        item.mkdir()
+        pt.save_item(item, {"id": "2026-006", "slug": "l", "parts": ["A", "B"],
+                            "systems": [{"id": "p1.s1", "staves": 2, "map": ["?", "?"],
+                                         "suggest": ["A", "B"]}]})
+        with mock_attr(cli_parts, "reanalyse", lambda it: self.fail("no analysis")):
+            _, out = self.quiet_input(["j", ""], pt.choose_maps, item)
+        self.assertIn("no system below p1.s1 on its page to join", out)
+        self.assertEqual(pt.load_item(item)["systems"][0]["map"], ["A", "B"])
+        self.assertNotIn("system_joins", pt.load_item(item))
+
     def test_choose_maps_answer_becomes_later_suggestion(self):
         item = self.share / "library" / "2026-003-z"
         item.mkdir()
@@ -788,6 +851,35 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(data["groups"], {"Low": ["T", "B"]})
         self.assertEqual(data["title"], "Other Title")
         self.assertIn("analysed again", data["pending"])
+
+    def test_analyse_join_and_unjoin_end_to_end(self):
+        # two systems of three staves; `analyse --join p1:3` makes one of six,
+        # every later analysis keeps it, `--unjoin` takes it back
+        make_score_pdf(str(self.share / "inbox" / "chorale.pdf"))
+        r = self.run_cli("new", stdin="1\n\nTest Chorale\nJ. H. Schein\n\nA,T,B\n\n\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        item = next((self.share / "library").iterdir())
+        self.assertEqual([s["staves"] for s in pt.load_item(item)["systems"]], [3, 3])
+        r = self.run_cli("analyse", "1", "--join", "p1:3", "--yes")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("join:  p1:3 joined", r.stdout)
+        data = pt.load_item(item)
+        self.assertEqual([s["staves"] for s in data["systems"]], [6])
+        self.assertEqual(data["system_joins"], ["p1:3"])
+        r = self.run_cli("analyse", "1", "--yes")                  # kept by a later analysis
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("1 join(s) kept", r.stdout)
+        data = pt.load_item(item)
+        self.assertEqual([s["staves"] for s in data["systems"]], [6])
+        self.assertEqual(data["system_joins"], ["p1:3"])
+        r = self.run_cli("analyse", "1", "--join", "p1:3")          # twice: refused
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("joined already", r.stdout + r.stderr)
+        r = self.run_cli("analyse", "1", "--unjoin", "p1:3", "--yes")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        data = pt.load_item(item)
+        self.assertEqual([s["staves"] for s in data["systems"]], [3, 3])
+        self.assertNotIn("system_joins", data)
 
     def test_bars_menu_marks_by_bar_number(self):
         make_score_pdf(str(self.share / "inbox" / "chorale.pdf"))

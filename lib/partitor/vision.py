@@ -398,6 +398,26 @@ def group_systems(ink: np.ndarray, staves: list[Staff], sp: float, thick: int
         n_bar = sum(1 for zm in zone_max if zm >= 0.5)
         joined = [True if j else bool(g <= lim and (zm >= 0.15 or n_bar < 2))
                   for g, j, zm in zip(gaps_all, joined, zone_max)]
+        # ... and not a cut inside a run of equal gaps: a gap with no ink at
+        # all that equals (within 3%) a neighbouring gap the rules above
+        # joined, and that has no ink at the system start either, stays
+        # joined (a neighbour with a bracket or barline makes the blank gap a
+        # real break: Biber p38, systems of 4 and 3 staves). A blank system start (the connector missing on
+        # some pages, or measured left of it after extend_starts) must not cut
+        # seven equal gaps at the one place (Biber p5: 4 + 13 staves instead
+        # of 17). A real cut between systems is wider than the gaps in them.
+        for _ in range(len(joined)):
+            more = False
+            for i, (g, zm) in enumerate(zip(gaps_all, zone_max)):
+                if joined[i] or zm >= 0.15 or g > lim:
+                    continue
+                for k in (i - 1, i + 1):
+                    if 0 <= k < len(joined) and joined[k] and zone_max[k] < 0.15 \
+                            and abs(gaps_all[k] - g) <= 0.03 * g:
+                        joined[i] = more = True
+                        break
+            if not more:
+                break
     if not any(j for j in joined) and len(staves) > 1:
         gaps = np.array([b.top - a.bottom for a, b in zip(staves, staves[1:])])
         if gaps.max() / max(gaps.min(), 1.0) >= 1.4:
@@ -414,6 +434,27 @@ def group_systems(ink: np.ndarray, staves: list[Staff], sp: float, thick: int
             cur = [st]
     groups.append(cur)
     return groups
+
+
+def join_groups(groups: list[list[Staff]], cuts: "tuple[int, ...] | list[int]"
+                ) -> list[list[Staff]]:
+    """join_groups -> systems with the breaks after the given staves removed.
+
+    cuts: staff numbers on the page, counted from the top from 1; "after
+    staff 4" joins the system that ends with staff 4 to the one below it.
+    This is the operator's correction of a wrong split (`system_joins` in the
+    layout). A number that is no system end is ignored."""
+    if not cuts:
+        return groups
+    out: list[list[Staff]] = []
+    seen = 0
+    for g in groups:
+        if out and seen in cuts:
+            out[-1] = out[-1] + g
+        else:
+            out.append(list(g))
+        seen += len(g)
+    return out
 
 
 # =============================================================================

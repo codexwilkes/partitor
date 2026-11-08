@@ -105,6 +105,14 @@ class TestStageCache(unittest.TestCase):
     def test_key_changes_with_the_system_base(self):
         self.assertNotEqual(self.cache.key(0, 0), self.cache.key(0, 3))
 
+    def test_key_changes_with_the_system_joins(self):
+        self.assertNotEqual(self.cache.key(0, 0), self.cache.key(0, 0, (3,)))
+        self.assertNotEqual(self.cache.key(0, 0, (3,)), self.cache.key(0, 0, (4,)))
+        self.assertEqual(self.cache.key(0, 0, (3, 4)), self.cache.key(0, 0, (4, 3)))
+
+    def test_key_without_joins_is_the_old_key(self):
+        self.assertEqual(self.cache.key(0, 0), self.cache.key(0, 0, ()))
+
     def test_key_changes_with_the_dpi(self):
         other = stagecache.StageCache(self.dir, "a" * 64, 400, False, "env")
         self.assertNotEqual(self.cache.key(0, 0), other.key(0, 0))

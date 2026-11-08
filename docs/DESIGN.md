@@ -326,7 +326,14 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
      alignment for an unlabelled staff costs at most 0.9.
    - Systems: a narrow gap without bracket or barline evidence is joined only
      when it has some ink (0.15) at the system start or the page has fewer
-     than two bracket-joined gaps. Safety gate: a staff track within 1.6 sp of
+     than two bracket-joined gaps; and then it is cut only when no neighbouring
+     gap of the same size (within 3%) is joined without ink at the system start
+     either (0.8.22: seven equal gaps on a page without a start connector are one
+     system; a neighbour with a bracket makes the blank gap a real break).
+     The operator can join two systems the analysis took apart:
+     `system_joins` in the layout (`p5:4` = no system ends after staff 4 of
+     source page 5; `vision.join_groups`, applied right after `group_systems`).
+     Safety gate: a staff track within 1.6 sp of
      an accepted staff counts as that staff.
    - Costs: a part in the previous system -0.4 also when the staff count
      changes; clef of another family +0.8, another line +0.3; two braced
@@ -902,7 +909,7 @@ partitor rebuild <id> [part ...] [--jobs N|auto]
 partitor repage <id> [part ...]           page breaks again from the saved lines
 partitor plan <id> [part] [N]             options of a part; with N: set option N (not in --help yet)
 partitor plan <id> --group Name=A,B       try a group of parts in a temporary copy (read-only)
-partitor analyse <id> [--yes] | analyse --all
+partitor analyse <id> [--yes] [--join pP:N] [--unjoin pP:N] | analyse --all
 partitor bars | parts | groups | meta | proof <id>
 ```
 
@@ -981,6 +988,11 @@ Details:
      extracted and the ambitus set by hand. A system still uncertain suggests its
      previous answer (Enter). Choices and bar corrections are asked again.
      `analyse ID --yes` asks nothing (open choices stay for `rebuild`);
+     `analyse ID --join p5:4` says that no system ends after staff 4 of source
+     page 5 (two systems taken apart are one; `--unjoin` takes it back): saved
+     as `system_joins`, kept by every later analysis, then the analysis runs
+     again. In the choices, `j` does the same for the system asked about and
+     the one below it, and the questions start over;
      `analyse --all` analyses every library item that way (after an engine
      update); one failure does not stop the rest. The proof rings each part's
      lowest and highest note in green, named with bar, page and system, and page
@@ -1268,7 +1280,8 @@ of analysing it. The cache holds the result **before** the operator's bar edits;
 applies those edits to every result, read or new.
 
 - **Key.** SHA-256 of: the PDF content hash, page number, dpi, OCR on or off, the system base
-  (always 0 with the cache), `TUNE["page_header_sp"]`, `ANALYSIS_CACHE_FORMAT`, a
+  (always 0 with the cache), the operator's system joins on that page (only when there are
+  some: a page without joins keeps its entry, 0.8.22), `TUNE["page_header_sp"]`, `ANALYSIS_CACHE_FORMAT`, a
   hash of the source of every module that `ownership` reaches by relative imports
   (so a code change cannot give a stale hit, with or without a new release number), the
   versions of cv2,

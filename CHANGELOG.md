@@ -7,6 +7,27 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.22 — 2026-11-08
+
+### Fixed
+
+- A page with seven equal gaps between staves and no connector at the system
+  start was cut into two systems (Biber, pages 5 to 12 and 14: 4 + 13 staves
+  instead of 17). Since 0.8.1 the staff start moves to the page edge, and the
+  connector is looked for at that place. A gap with no ink at the system start
+  now stays joined when a neighbouring gap of the same size is joined and has no
+  ink there either. A gap next to a bracket or barline is still a break.
+  The effect was a wrong part suggestion and bar numbers counted twice on those
+  pages. Analyse such an item again.
+
+### Added
+
+- `partitor analyse ID --join p5:4` (and `--unjoin`): no system ends after staff
+  4 of source page 5, for two systems the analysis took apart. In the choices,
+  answer `j` to join the system asked about with the one below it; the analysis
+  runs again and the questions start over. The join is saved as `system_joins`
+  and kept by every later analysis. The options are not in `--help` yet: that
+  text is part of the G0 golden.
 
 ## 0.8.21 — 2026-11-07
 

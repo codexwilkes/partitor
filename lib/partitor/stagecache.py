@@ -108,35 +108,41 @@ class StageCache:
         self.base = f"{pdf_sha}|dpi={dpi}|ocr={int(ocr)}|{env}"
         self._noted = False
 
-    def key(self, pno: int, sys_base: int) -> str:
+    def key(self, pno: int, sys_base: int, joins: tuple[int, ...] = ()) -> str:
         """key -> hash of every input of analyse_page for this page. The
-        page header limit is read now: detect and build set it first."""
+        page header limit is read now: detect and build set it first. joins
+        (the operator's system joins on this page) are part of the key only
+        when there are some, so a page without them keeps its entry."""
         raw = f"{self.base}|page={pno}|sys_base={sys_base}|" \
               f"header_sp={config.TUNE['page_header_sp']!r}"
+        if joins:
+            raw += f"|joins={','.join(str(j) for j in sorted(joins))}"
         return hashlib.sha256(raw.encode()).hexdigest()
 
-    def path(self, pno: int, sys_base: int) -> Path:
-        return self.folder / f"p{pno + 1:04d}-{self.key(pno, sys_base)[:32]}{CACHE_SUFFIX}"
+    def path(self, pno: int, sys_base: int, joins: tuple[int, ...] = ()) -> Path:
+        return self.folder / f"p{pno + 1:04d}-{self.key(pno, sys_base, joins)[:32]}{CACHE_SUFFIX}"
 
-    def present(self, pages: list[int], sys_base: int = 0) -> int:
+    def present(self, pages: list[int], sys_base: int = 0,
+                joins: "dict[int, tuple[int, ...]] | None" = None) -> int:
         """present -> how many of the pages have an entry for the current key."""
-        return sum(1 for p in pages if self.path(p, sys_base).is_file())
+        return sum(1 for p in pages
+                   if self.path(p, sys_base, (joins or {}).get(p, ())).is_file())
 
     def _note_once(self, text: str) -> None:
         if not self._noted:
             self._noted = True
             _note(text)
 
-    def get(self, pno: int, sys_base: int) -> PageResult | None:
+    def get(self, pno: int, sys_base: int, joins: tuple[int, ...] = ()) -> PageResult | None:
         """get -> the stored PageResult, or None (a miss)."""
-        path = self.path(pno, sys_base)
+        path = self.path(pno, sys_base, joins)
         if not path.is_file():
             return None
         try:
             with gzip.open(path, "rb") as f:
                 d = _CacheUnpickler(f).load()
             if not isinstance(d, dict) or d.get("format") != ANALYSIS_CACHE_FORMAT \
-               or d.get("key") != self.key(pno, sys_base) \
+               or d.get("key") != self.key(pno, sys_base, joins) \
                or not isinstance(d.get("result"), PageResult):
                 raise ValueError("wrong format or key")
             return d["result"]
@@ -150,14 +156,14 @@ class StageCache:
                 pass
             return None
 
-    def put(self, pno: int, sys_base: int, res: PageResult) -> None:
+    def put(self, pno: int, sys_base: int, res: PageResult, joins: tuple[int, ...] = ()) -> None:
         """put: write the entry (temp name, then rename) and remove the other
         entries of this page. A write that fails is skipped, with one note."""
-        path = self.path(pno, sys_base)
+        path = self.path(pno, sys_base, joins)
         tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
         try:
             self.folder.mkdir(parents=True, exist_ok=True)
-            payload = {"format": ANALYSIS_CACHE_FORMAT, "key": self.key(pno, sys_base),
+            payload = {"format": ANALYSIS_CACHE_FORMAT, "key": self.key(pno, sys_base, joins),
                        "version": VERSION, "result": res}
             with gzip.GzipFile(tmp, "wb", compresslevel=1) as f:
                 pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)

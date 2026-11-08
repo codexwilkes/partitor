@@ -21,8 +21,8 @@ from .config import (
 from .model import PageResult, Staff
 from .vision import (
     binarize, clean_label, clean_title, detect_staves, dewarp, estimate_skew, flatten,
-    group_systems, is_cue_text, is_footer_text, looks_like_text, ocr_line, read_text,
-    render_page, rotate, run_lengths, staff_tracks, text_in_rect,
+    group_systems, is_cue_text, is_footer_text, join_groups, looks_like_text, ocr_line,
+    read_text, render_page, rotate, run_lengths, staff_tracks, text_in_rect,
 )
 
 
@@ -243,12 +243,13 @@ def align_system_start(grp: list[Staff], sp: float) -> None:
 
 
 def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
-                 ocr: bool = True) -> PageResult:
+                 ocr: bool = True, joins: tuple[int, ...] = ()) -> PageResult:
     """analyse_page -> PageResult with a complete owner image.
 
     Every ink pixel gets exactly one owner: a staff index, the header of a
     system (OWN_HEADER_BASE + global system index), or a discard class.
-    The safety gate results are in PageResult.gate."""
+    The safety gate results are in PageResult.gate. joins: staff numbers on
+    this page after which the operator says no system ends (join_groups)."""
     ink, skew, dmax, thick, gap, tracks = prepare(page, dpi)
     sp = float(thick + gap)
     h, w = ink.shape
@@ -276,7 +277,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
             res.gate.append(f"staff track at y={int(yc)} not accepted as a staff")
             res.gate_boxes.append((0, int(yc - 3 * sp), w, int(6 * sp)))
 
-    systems = group_systems(ink, staves, sp, thick)
+    systems = join_groups(group_systems(ink, staves, sp, thick), joins)
     for k, grp in enumerate(systems):
         for st in grp:
             st.system = sys_base + k

@@ -115,7 +115,7 @@ html { scroll-behavior: smooth; }
 
 <div class="wrap">
 <header>
-  <span class="eyebrow">partitor 0.8.21</span>
+  <span class="eyebrow">partitor 0.8.22</span>
   <h1>From score to parts</h1>
   <p class="lede">How to turn a score PDF into large-print parts for your ensemble. You work on your phone or PC over SSH; partitor runs on your partitor host and keeps everything in the library folder (local, or on a NAS). Only the build takes a long time, so you make every change first, review it, and build once.</p>
 </header>
@@ -198,11 +198,12 @@ html { scroll-behavior: smooth; }
      3 staves, clefs top to bottom: F4 G2 F4
      suggestion: Bass Trombone, Continuo, Continuo  (= 6 7 7)
   part number for each of the 3 staves, top first (Enter = suggestion;
-  0 = leave out; same number twice = one part on two staves): <b>6 7 7</b></pre>
+  0 = leave out; same number twice = one part on two staves; j = join with the system below): <b>6 7 7</b></pre>
   <ul class="plain">
     <li><kbd>Enter</kbd> takes the suggestion.</li>
     <li>A corrected answer becomes the suggestion for the next systems with the same clefs: press <kbd>Enter</kbd> there.</li>
     <li><code>0</code> leaves a staff out (a staff you left out shows as “(left out)” and 0 in the suggestion); the same number twice puts one part on two staves.</li>
+    <li><kbd>j</kbd> says that this system and the one below it on the page are one system (the analysis took them apart: a system of 4 staves above one of 13 on a page that has 17). The analysis runs again and the questions start over; the join is kept by every later analysis. From the command line: <code>partitor analyse ID --join p5:4</code> (no system ends after staff 4 of source page 5; <code>--unjoin p5:4</code> takes it back).</li>
     <li><kbd>q</kbd> stops the questions; continue later with <kbd>r</kbd> in the item menu.</li>
     <li>The proof is drawn again after each answer.</li>
   </ul>
@@ -301,6 +302,7 @@ html { scroll-behavior: smooth; }
       <tr><td>“library folder not reachable”</td><td>The library folder or the NAS is not reachable. Check it, wait a minute, run <code>partitor</code> again. See <code>STORAGE-SMB.md</code>.</td></tr>
       <tr><td>The wizard stopped (<kbd>q</kbd>, lost connection)</td><td>The item is kept. Open it from the menu and continue; <kbd>r</kbd> asks what is still open.</td></tr>
       <tr><td>A part is missing on some lines</td><td>Check the red systems on the proof; correct with <kbd>t</kbd> or analyse again with <kbd>y</kbd>.</td></tr>
+      <tr><td>A page shows two systems (for example 4 and 13 staves) where the score has one</td><td>Answer <kbd>j</kbd> in the choices, or <code>partitor analyse ID --join p5:4</code>. The bar numbers of that page are then counted once.</td></tr>
       <tr><td>Bar numbers are off from some line on</td><td><kbd>n</kbd>, then <code>f N=B</code> for the first wrong line.</td></tr>
       <tr><td>A part rests for whole systems</td><td>Normal: those bars become one rest line with the count (for example 14), so the numbers continue.</td></tr>
     </tbody>
@@ -309,7 +311,7 @@ html { scroll-behavior: smooth; }
 
 <footer>
   <div class="staff" role="presentation"></div>
-  <p>partitor 0.8.21. Install: <code>INSTALL.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Design: <code>DESIGN.md</code>.</p>
+  <p>partitor 0.8.22. Install: <code>INSTALL.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Design: <code>DESIGN.md</code>.</p>
 </footer>
 </div>
 </body>

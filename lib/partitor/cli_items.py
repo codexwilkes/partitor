@@ -16,7 +16,8 @@ from . import VERSION
 from .clef import ambitus_report, part_clefs
 from .cli_bars import confirm_bar_rules
 from .cli_common import _cmd_step, _item_or_die, _lib_or_die, bar_summary, saved
-from .cli_parts import choose_maps, confirm_ambitus, rename_parts
+from . import cli_parts
+from .cli_parts import choose_maps, confirm_ambitus, rename_parts, set_join
 from .config import (
     LAYOUT_DEFAULTS, PART_LAYOUT_KEY, SCORE_FILE, SKIP_KEY, composer_surname, make_slug,
 )
@@ -366,43 +367,13 @@ def cmd_meta(a: argparse.Namespace) -> int:
     return saved(item, a, start)
 
 
-def reference_names(data: dict) -> str:
-    """reference_names -> --parts for detect: one name per staff of the
-    fullest system, from its map ('-' for a staff left out, a name twice
-    for a two-staff part). The parts list alone has fewer names when a
-    staff is left out or joined, and detect then fell back to the printed
-    labels (Maria: "Canto I Yoce"; the operator's names, groups lost)."""
-    systems = data.get("systems") or []
-    if systems:
-        ref = max(systems, key=lambda e: (len(e.get("map") or []), -systems.index(e)))
-        m = ref.get("map") or []
-        if m and "?" not in m:
-            return ",".join(m)
-    return ",".join(data.get("parts") or [])
-
-
 def analyse_item(item: Path, interactive: bool = True) -> int:
     """analyse_item -> 0 or 1: detect again, keep the operator's names,
     groups, skip list, ambitus and settings; previous answers become the
     suggestions of systems still uncertain. Not interactive: no question
     is asked (open choices stay for partitor rebuild)."""
-    from .build import run_detect
-    data = load_item(item)
-    rc = run_detect(item, data.get("pages"), data.get("title", ""),
-                    data.get("composer", ""), reference_names(data))
-    if rc:
-        _reset_counts()
-        if (item / "preview").is_dir():
-            proof_from_preview(item)       # one place to look, also after a failure
-        _fail(f"analyse:  {item.name} failed (see above; proof: "
-              f"{item_file(item, 'proof.pdf').name})")
+    if cli_parts.reanalyse(item):      # patched by tests: read on its owner (rule R1)
         return 1
-    keep = {**data}
-    if data.get("built"):
-        keep["pending"] = list(data.get("pending") or []) + ["analysed again"]
-    merge_item_keys(item, keep, again=True)
-    proof_from_preview(item)
-    _reset_counts()
     new = load_item(item)
     open_ = [e["id"] for e in new.get("systems") or [] if "?" in (e.get("map") or [])]
     _ok(f"analysed:  {item.name}  proof {item_file(item, 'proof.pdf').name}"
@@ -439,10 +410,17 @@ def cmd_analyse(a: argparse.Namespace) -> int:
     if not a.id:
         _die("analyse: an item id or --all")
     item = _item_or_die(a.id)
-    data = load_item(item)
     quiet = bool(getattr(a, "yes", False))
+    edits = [(c, True) for c in getattr(a, "join", None) or []] + \
+            [(c, False) for c in getattr(a, "unjoin", None) or []]
+    for cut, on in edits:
+        err = set_join(item, cut, on)
+        if err:
+            _die(f"analyse: {err}")
+        _ok(f"join:  {cut} {'joined' if on else 'taken back'}")
+    data = load_item(item)
     try:
-        if data.get("systems") and not quiet and not yes(
+        if data.get("systems") and not quiet and not edits and not yes(
                 "Analyse again? Names, groups and settings are kept; choices and "
                 "bar corrections are asked again", False):
             return 0

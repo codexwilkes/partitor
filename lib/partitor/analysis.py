@@ -36,9 +36,25 @@ def parse_pages(spec: str | None, count: int) -> list[int]:
     return list(range(a - 1, b))
 
 
+JOIN_RE = re.compile(r"p(\d+):(\d+)")
+
+
+def parse_joins(items: "list[str] | None") -> dict[int, tuple[int, ...]]:
+    """parse_joins -> {zero-based page: staff numbers} from the layout key
+    `system_joins` (strings 'p5:4' = no system break after staff 4 of page
+    5, staves counted from the top from 1). A bad string is skipped."""
+    out: dict[int, set[int]] = {}
+    for t in items or []:
+        m = JOIN_RE.fullmatch(str(t).strip())
+        if m and int(m.group(1)) >= 1 and int(m.group(2)) >= 1:
+            out.setdefault(int(m.group(1)) - 1, set()).add(int(m.group(2)))
+    return {p: tuple(sorted(v)) for p, v in out.items()}
+
+
 def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: bool = True,
                 bar_edits: dict | None = None,
-                cache: StageCache | None = None) -> tuple[PageResult, list[dict]]:
+                cache: StageCache | None = None,
+                joins: "dict[int, tuple[int, ...]] | None" = None) -> tuple[PageResult, list[dict]]:
     """analyse_one -> (PageResult, system records) of one page.
 
     nsys: the number of systems on the pages before (only a base for the
@@ -50,12 +66,14 @@ def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: boo
     bar_edits_by_system): the operator's corrections are applied to the
     barlines of those systems (build). cache: the stage cache of the item (DESIGN.md
     §12.4); the result of analyse_page is read from it or stored in it, before
-    bar_edits are applied."""
-    res = cache.get(pno, nsys) if cache is not None else None
+    bar_edits are applied. joins ({page: staff numbers}, parse_joins): the
+    operator's system joins; they are part of the cache key."""
+    jn = (joins or {}).get(pno, ())
+    res = cache.get(pno, nsys, jn) if cache is not None else None
     if res is None:
-        res = ownership.analyse_page(doc[pno], pno, dpi, nsys, ocr=ocr)
+        res = ownership.analyse_page(doc[pno], pno, dpi, nsys, ocr=ocr, joins=jn)
         if cache is not None:
-            cache.put(pno, nsys, res)
+            cache.put(pno, nsys, res, jn)
     for j, grp in enumerate(res.systems):
         eds = (bar_edits or {}).get(f"p{pno + 1}.s{j + 1}")
         if not eds:
@@ -92,7 +110,8 @@ def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: boo
 
 
 def iter_pages(pdf: Path, dpi: int, pages: list[int], ocr: bool = True,
-               bar_edits: dict | None = None, cache: StageCache | None = None):
+               bar_edits: dict | None = None, cache: StageCache | None = None,
+               joins: "dict[int, tuple[int, ...]] | None" = None):
     """iter_pages -> yields (PageResult, system records of that page).
 
     One page at a time, in this process: the caller uses the owner image,
@@ -105,7 +124,7 @@ def iter_pages(pdf: Path, dpi: int, pages: list[int], ocr: bool = True,
     for k, pno in enumerate(pages):
         _progress(f"page {pno + 1} ({k + 1}/{len(pages)}): analysing")
         res, recs = analyse_one(doc, pno, dpi, 0 if cache is not None else nsys, ocr=ocr,
-                                bar_edits=bar_edits, cache=cache)
+                                bar_edits=bar_edits, cache=cache, joins=joins)
         nsys += len(res.systems)
         _progress_end()
         yield res, recs

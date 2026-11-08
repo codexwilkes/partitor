@@ -144,6 +144,62 @@ class TestStaffTracking(unittest.TestCase):
             ink[y:y + 3, 100:103] = True
         self.assertEqual([len(g) for g in pt.group_systems(ink, st, 24, 3)], [2])
 
+    @staticmethod
+    def _gap_staves(n):
+        return [pt.Staff(0, i, [t + k * 24 for k in range(5)], 100, 1800)
+                for i, t in enumerate(range(100, 100 + 200 * n, 200))]
+
+    @staticmethod
+    def _link(ink, st, i, x, w=3):
+        """A vertical line over the gap between staff i and i + 1."""
+        ink[int(st[i].bottom):int(st[i + 1].top) + 1, x:x + w] = True
+
+    def test_join_groups(self):
+        st = self._gap_staves(7)
+        groups = [st[:2], st[2:4], st[4:]]
+        self.assertEqual([len(g) for g in pt.join_groups(groups, (2,))], [4, 3])
+        self.assertEqual([len(g) for g in pt.join_groups(groups, (2, 4))], [7])
+        self.assertEqual([len(g) for g in pt.join_groups(groups, (3, 7, 0))], [2, 2, 3])
+        self.assertEqual([len(g) for g in pt.join_groups(groups, ())], [2, 2, 3])
+        self.assertEqual([len(g) for g in groups], [2, 2, 3])          # the input is kept
+
+    def test_parse_joins(self):
+        self.assertEqual(analysis.parse_joins(["p5:4", "p5:2", "p12:3", "x", "p0:1", "p3:0"]),
+                         {4: (2, 4), 11: (3,)})
+        self.assertEqual(analysis.parse_joins(None), {})
+
+    def test_group_systems_blank_gap_between_blank_joined_gaps(self):
+        # Biber p5 after extend_starts: no ink at the system start in the
+        # gaps 0-1 and 3-4 (joined by two barlines inside the staves), a
+        # bracket on the gaps 5-6, and the equal gap 2 blank: one system
+        st = self._gap_staves(8)
+        ink = np.zeros((1800, 1900), bool)
+        for i in (0, 1, 3, 4):
+            self._link(ink, st, i, 600)
+            self._link(ink, st, i, 1000)
+        for i in (5, 6):
+            self._link(ink, st, i, 100)
+        self.assertEqual([len(g) for g in pt.group_systems(ink, st, 24, 3)], [8])
+
+    def test_group_systems_blank_gap_next_to_bracket_stays_a_cut(self):
+        # Biber p38: the neighbours have a bracket, the blank gap between
+        # them is a real break (two systems of two staves)
+        st = self._gap_staves(4)
+        ink = np.zeros((1000, 1900), bool)
+        self._link(ink, st, 0, 100)
+        self._link(ink, st, 2, 100)
+        self.assertEqual([len(g) for g in pt.group_systems(ink, st, 24, 3)], [2, 2])
+
+    def test_group_systems_wider_blank_gap_stays_a_cut(self):
+        st = self._gap_staves(6)
+        for s_ in st[3:]:                      # gap 2 is 40% wider than the rest
+            s_.lines = [x + 100 for x in s_.lines]
+        ink = np.zeros((1800, 1900), bool)
+        for i in (0, 1, 3, 4):
+            self._link(ink, st, i, 600)
+            self._link(ink, st, i, 1000)
+        self.assertEqual([len(g) for g in pt.group_systems(ink, st, 24, 3)], [3, 3])
+
 
 @needs_deps
 class TestPageAnalysis(unittest.TestCase):
@@ -165,6 +221,18 @@ class TestPageAnalysis(unittest.TestCase):
     def test_one_start_per_system(self):
         for grp in self.res.systems:
             self.assertEqual(len({s.x0 for s in grp}), 1)
+
+    def test_joins_make_one_system(self):
+        # the synthetic page has two systems of three staves; "no system
+        # ends after staff 3" joins them (the operator's correction)
+        res = pt.analyse_page(pymupdf.open(self.vec)[0], 0, 400, 0, joins=(3,))
+        self.assertEqual([len(g) for g in res.systems], [6])
+        self.assertEqual(len({s.x0 for s in res.systems[0]}), 1)     # one start
+        self.assertEqual({s.system for s in res.systems[0]}, {0})
+
+    def test_a_join_that_is_no_system_end_is_ignored(self):
+        res = pt.analyse_page(pymupdf.open(self.vec)[0], 0, 400, 0, joins=(2, 5, 9))
+        self.assertEqual([len(g) for g in res.systems], [3, 3])
 
     def test_barlines_found_and_clef_zone_ignored(self):
         # synthetic score: barlines at x0+150, x0+300 and the end per staff

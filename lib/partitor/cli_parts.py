@@ -11,10 +11,89 @@ from pathlib import Path
 from .clef import ambitus_report, part_clefs
 from .cli_common import _item_or_die, cmd_set, saved
 from .config import PART_LAYOUT_KEY, SKIP_KEY
-from .console import Abort, DIM, RST, YLW, _die, _head, _ok, _warn, ask
-from .library import load_item, mark_pending, part_names, save_item
+from .console import Abort, DIM, RST, YLW, _die, _fail, _head, _ok, _reset_counts, _warn, ask
+from .library import item_file, load_item, mark_pending, merge_item_keys, part_names, save_item
 from .mapping import clefs_compatible
-from .proof import _proof_pages, annotate_proof
+from .proof import _proof_pages, annotate_proof, proof_from_preview
+
+
+def reference_names(data: dict) -> str:
+    """reference_names -> --parts for detect: one name per staff of the
+    fullest system, from its map ('-' for a staff left out, a name twice
+    for a two-staff part). The parts list alone has fewer names when a
+    staff is left out or joined, and detect then fell back to the printed
+    labels (Maria: "Canto I Yoce"; the operator's names, groups lost)."""
+    systems = data.get("systems") or []
+    if systems:
+        ref = max(systems, key=lambda e: (len(e.get("map") or []), -systems.index(e)))
+        m = ref.get("map") or []
+        if m and "?" not in m:
+            return ",".join(m)
+    return ",".join(data.get("parts") or [])
+
+
+
+def reanalyse(item: Path) -> int:
+    """reanalyse -> 0 or 1: detect again and put back the operator's names,
+    groups, skip list, ambitus, settings and system joins; previous answers
+    become the suggestions of systems still uncertain. No question is asked.
+    A failure is reported and the proof is drawn for it."""
+    from .build import run_detect          # lazy: light commands load no image package
+    data = load_item(item)
+    rc = run_detect(item, data.get("pages"), data.get("title", ""),
+                    data.get("composer", ""), reference_names(data))
+    if rc:
+        _reset_counts()
+        if (item / "preview").is_dir():
+            proof_from_preview(item)       # one place to look, also after a failure
+        _fail(f"analyse:  {item.name} failed (see above; proof: "
+              f"{item_file(item, 'proof.pdf').name})")
+        return 1
+    keep = {**data}
+    if data.get("built"):
+        keep["pending"] = list(data.get("pending") or []) + ["analysed again"]
+    merge_item_keys(item, keep, again=True)
+    proof_from_preview(item)
+    _reset_counts()
+    return 0
+
+
+def system_cut(data: dict, system_id: str) -> str:
+    """system_cut -> 'p5:4' for the end of a system: the page and the number of
+    staves down to its last staff (from the top, from 1), the form of
+    `system_joins`. '' when the id is unknown or no system follows it on the
+    page (a join needs the system below)."""
+    m = re.fullmatch(r"p(\d+)\.s(\d+)", system_id or "")
+    if not m:
+        return ""
+    pno, sno = int(m.group(1)), int(m.group(2))
+    on_page = [x for x in data.get("systems") or [] if x.get("id", "").startswith(f"p{pno}.")]
+    if not 1 <= sno < len(on_page):
+        return ""
+    return f"p{pno}:{sum(int(x.get('staves') or 0) for x in on_page[:sno])}"
+
+
+def set_join(item: Path, cut: str, on: bool = True) -> str:
+    """set_join -> '' or an error: add (on) or remove a join ('p5:4') in the
+    item's `system_joins`. The analysis is not run here."""
+    if not re.fullmatch(r"p[1-9]\d*:[1-9]\d*", cut or ""):
+        return f"not a join: {cut!r} (p5:4 = no system ends after staff 4 of page 5)"
+    data = load_item(item)
+    joins = list(data.get("system_joins") or [])
+    if on and cut in joins:
+        return f"{cut} is joined already"
+    if not on and cut not in joins:
+        return f"{cut} is not joined"
+    if on:
+        joins.append(cut)
+    else:
+        joins.remove(cut)
+    if joins:
+        data["system_joins"] = sorted(joins, key=lambda t: tuple(int(x) for x in t[1:].split(":")))
+    else:
+        data.pop("system_joins", None)
+    save_item(item, data)
+    return ""
 
 
 def confirm_ambitus(item: Path) -> None:
@@ -78,8 +157,19 @@ def choose_maps(item: Path) -> bool:
     """Ask for every system marked '?'. For each: where it is (source and
     proof page, red frame on the proof), its clefs and printed labels, and
     the suggestion. Answer: Enter = suggestion, or one part number per
-    staff, top staff first ('2 3 4'; 0 leaves a staff out). True when all
-    systems are set."""
+    staff, top staff first ('2 3 4'; 0 leaves a staff out), or j: the
+    system and the one below it on the page are one system (the analysis
+    took them apart; it is run again and the questions start over). True
+    when all systems are set."""
+    while True:
+        again = _choose_maps(item)
+        if again is not None:
+            return again
+
+
+def _choose_maps(item: Path) -> bool | None:
+    """One round of choose_maps: True when all are set; None when the
+    operator joined two systems and the analysis ran again."""
     data = load_item(item)
     parts = data.get("parts") or []
     todo = [s_ for s_ in data.get("systems", []) if "?" in s_.get("map", [])]
@@ -105,7 +195,22 @@ def choose_maps(item: Path) -> bool:
                 print(f"     suggestion: {', '.join(shown)}  (= {' '.join(nums)})")
             ans = ask(f"part number for each of the {n} staves, top first "
                       "(Enter = suggestion; 0 = leave out; same number twice = "
-                      "one part on two staves; q = stop, continue later with rebuild)")
+                      "one part on two staves; j = join with the system below; "
+                      "q = stop, continue later with rebuild)")
+            if ans.strip().lower() == "j":
+                cut = system_cut(data, s_["id"])
+                if not cut:
+                    print(f"     {YLW}no system below {s_['id']} on its page to join{RST}")
+                    continue
+                err = set_join(item, cut)
+                if err:
+                    print(f"     {YLW}{err}{RST}")
+                    continue
+                _ok(f"join:  {s_['id']} and the system below it are one system ({cut}); "
+                    "analysing again")
+                if reanalyse(item):
+                    raise Abort()
+                return None
             if not ans and len(sug) == n:
                 s_["map"] = list(sug)
                 break
@@ -117,7 +222,7 @@ def choose_maps(item: Path) -> bool:
                   for x in sug] if len(sug) == n else []
             ex = " ".join(sn) if sn and "?" not in sn else " ".join(["1"] * n)
             print(f"     {YLW}need {n} numbers from 0 to {len(parts)}, one per staff, "
-                  f"e.g. {ex} (0 = staff left out){RST}")
+                  f"e.g. {ex} (0 = staff left out), or j to join{RST}")
         # the answer becomes the suggestion for the systems still to come
         # with the same staff count and clefs (operator request 2026-10-24: they kept
         # the wrong suggestion)

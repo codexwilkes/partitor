@@ -13,4 +13,5 @@ run_build
 cmd_build
 cmd_rebuild
 analyse_page
+reanalyse
 ANALYSIS_CACHE_FORMAT
