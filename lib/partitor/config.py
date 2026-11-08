@@ -130,7 +130,7 @@ LAYOUT_HELP = """\
 #   bar_size: bar number size, sp (2; --bar-size)
 #   ink: normal | darker (normal; --ink)
 #   large: on | off; on = also a large-print copy per part: Letter -> 11x17
-#     with crop marks at the cut line, A4 -> A3 (on; --large)
+#     with a dotted cut line, A4 -> A3 (on; --large)
 #   small_mm: below this staff height (held by the source line width) the
 #     CLI offers re-flow (6.5), when reflow_offer is on
 #   reflow_offer: on | off; off = no re-flow question after a build and no

@@ -102,7 +102,7 @@ class TestRepeatsAndExtras(unittest.TestCase):
 
     def test_large_copies(self):
         with tempfile.TemporaryDirectory() as d:
-            for paper, size, marks in (("letter", (792.0, 1224.0), 2), ("a4", (841.89, 1190.55), 0)):
+            for paper, size, marks in (("letter", (792.0, 1224.0), 1), ("a4", (841.89, 1190.55), 0)):
                 src = Path(d, f"{paper}.pdf")
                 doc = pymupdf.open()
                 doc.new_page(width=pt.PAPER[paper][0], height=pt.PAPER[paper][1])
@@ -117,6 +117,18 @@ class TestRepeatsAndExtras(unittest.TestCase):
                     if marks:
                         y = 792.0 * 792.0 / 612.0
                         self.assertAlmostEqual(lines[0]["rect"].y0, y, delta=0.5)
+                        self.assertAlmostEqual(lines[0]["rect"].width, size[0], delta=0.5)
+
+    def test_large_copy_cut_line_is_dotted(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d, "p.pdf")
+            doc = pymupdf.open()
+            doc.new_page(width=612.0, height=792.0)
+            doc.save(src)
+            dr = pymupdf.open(pt.large_copy(src, "letter"))[0].get_drawings()
+        self.assertEqual(len(dr), 1)
+        self.assertTrue(dr[0].get("dashes"), dr[0].get("dashes"))
+        self.assertNotIn("[] 0", dr[0]["dashes"])
 
 
 @needs_deps

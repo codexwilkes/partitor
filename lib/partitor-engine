@@ -147,8 +147,8 @@
 #       spine margin is that much wider and gutter is not used.
 #   --large on|off
 #       Also write a large-print copy of each part (default on): Letter ->
-#       11x17 (page scaled to the 11 in width, at the top, crop marks at
-#       the cut line), A4 -> A3. File <part>-11x17.pdf / <part>-A3.pdf.
+#       11x17 (page scaled to the 11 in width, at the top, a dotted
+#       cut line below it), A4 -> A3. File <part>-11x17.pdf / <part>-A3.pdf.
 #       Paper ledger: no copy (the sheet is 11x17 already).
 #   --ink normal|darker
 #       darker makes thin, light print bolder (1 px at 400 dpi).

@@ -735,9 +735,9 @@ PDF (`large: on`, default):
 
 - Letter -> 11x17 (ledger): the Letter page as is, scaled to the 11 in width
   (x1.294), at the top of the sheet; the content is 11 x 14.24 in and about
-  2.76 in stays blank at the bottom. Short crop marks at both side edges at the
-  cut line, for a manual paper cutter.
-- A4 -> A3: exact (x1.414), the whole sheet, no crop marks.
+  2.76 in stays blank at the bottom. A dotted grey line across the sheet at the
+  cut line (14.24 in from the top), for a manual paper cutter.
+- A4 -> A3: exact (x1.414), the whole sheet, no cut line.
 - File names: `<part>-11x17.pdf`, `<part>-A3.pdf`, next to the part.
 - Paper `ledger` has no large-print copy (the sheet is 11x17 already); the build
   says so once: `large copy: skipped (paper ledger is already 11x17)`.

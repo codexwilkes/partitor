@@ -234,15 +234,15 @@ def fit_scale(strips: list[Strip], dpi: int, opts: dict) -> float:
 
 LARGE = {"letter": ((792.0, 1224.0), "11x17"),      # Letter -> 11x17 (ledger)
          "a4": ((841.89, 1190.55), "A3")}           # A4 -> A3 (exact sqrt 2)
-CROP_MARK = (14.4, 50.4)   # pt from each side edge: the cut line marks
+CUT_DASHES = "[4 3] 0"     # the dotted cut line of the large-print copy
 
 
 def large_copy(src: Path, paper: str) -> Path:
     """large_copy -> path of the large-print copy of a part: each page
     scaled to the full width of the larger sheet (Letter -> 11x17, x1.294;
     A4 -> A3, x1.414), at the top of the sheet. Where the scaled page is
-    shorter than the sheet (11x17: 14.24 in of 17 in), short crop marks at
-    both sides show the cut line."""
+    shorter than the sheet (11x17: 14.24 in of 17 in), a dotted
+    line across the sheet shows the cut line."""
     (sw, sh), tag = LARGE[paper]
     pw, ph = PAPER[paper]
     f = sw / pw
@@ -254,8 +254,8 @@ def large_copy(src: Path, paper: str) -> Path:
         page.show_pdf_page(pymupdf.Rect(0, 0, sw, ph * f), doc, pno)
         cut = ph * f
         if sh - cut > 1.0:
-            for a, b in ((CROP_MARK[0], CROP_MARK[1]), (sw - CROP_MARK[1], sw - CROP_MARK[0])):
-                page.draw_line((a, cut), (b, cut), color=(0, 0, 0), width=0.5)
+            page.draw_line((0, cut), (sw, cut), color=(0.5, 0.5, 0.5), width=0.6,
+                           dashes=CUT_DASHES)
     big.save(out, garbage=3, deflate=True)
     return out
 

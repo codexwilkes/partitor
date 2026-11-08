@@ -7,6 +7,16 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.24 — 2026-11-08
+
+### Changed
+
+- The large-print copy (`-11x17`) shows the cut line as one dotted grey line
+  across the full sheet, at the foot of the scaled page (14.24 in from the
+  top). It replaces the two short crop marks at the side edges. The pages are
+  the same.
+
+
 ## 0.8.23 — 2026-11-08
 
 ### Fixed
