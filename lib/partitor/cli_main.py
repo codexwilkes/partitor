@@ -287,7 +287,8 @@ def main() -> int:
                     "or auto (default: PARTITOR_JOBS, else auto)")
     ls_ = sub.add_parser("list", help="all library items, or those matching words")
     ls_.add_argument("words", nargs="*", help="e.g. Schein (composer, title, part, id)")
-    sub.add_parser("show").add_argument("id", help="12 or 2026-10-0012")
+    sub.add_parser("show", help="one item: status, parts, settings and what is not built yet"
+                   ).add_argument("id", help="12 or 2026-10-0012")
     sub.add_parser("plan", help="choose paper, staff size and fold-outs of a part by its page turns "
                    "(read-only until you pick an option; partitor plan --help)")
     rb = sub.add_parser("rebuild", help="build; with parts or groups: only those "
@@ -314,68 +315,101 @@ def main() -> int:
                     help="numbers, names or all; default: every built part")
     sub.add_parser("proof", help="draw proof.pdf again (names, ambitus, bar numbers, letters)"
                    ).add_argument("id", help="12 or 2026-10-0012")
+    edit_help = {
+        "expand": "one step larger: one more page, then more space between staves",
+        "contract": "one step smaller: one page less, then less space between staves",
+        "bars": "bar numbers and rehearsal marks (menu)",
+        "parts": "part names, parts not extracted, parts joined (menu)",
+        "groups": "group scores: several parts printed together (menu)",
+        "meta": "title, subtitle and composer (menu)"}
     for name in ("expand", "contract", "bars", "parts", "groups", "meta"):
-        sp_ = sub.add_parser(name, help="edit; saved, not built (--build: build too)")
+        sp_ = sub.add_parser(name, help=f"{edit_help[name]}; saved, not built "
+                             "(--build: build too)")
         sp_.add_argument("id", help="12 or 2026-10-0012")
         if name in ("expand", "contract"):
             sp_.add_argument("part", nargs="?", help="one part or group only (default: all)")
         sp_.add_argument("--build", action="store_true", help="build after the edit")
     sub.add_parser("reid", help="old YYYY-NNN item: new id YYYY-MM-NNNN (renames files)"
-                   ).add_argument("id")
+                   ).add_argument("id", help="12 or 2026-10-0012 (the old id)")
     sub.add_parser("rename", help="folder name follows the title and composer"
-                   ).add_argument("id")
+                   ).add_argument("id", help="12 or 2026-10-0012")
     an = sub.add_parser("analyse", help="analyse the source again (proof, allocation)")
     an.add_argument("id", nargs="?", help="12 or 2026-10-0012 (or --all)")
     an.add_argument("--yes", action="store_true", help="ask nothing; open choices stay for rebuild")
     an.add_argument("--all", action="store_true", help="every library item, as --yes")
-    # not in --help yet: that text is part of the G0 golden (docs: DESIGN.md, operator-flow.html)
-    an.add_argument("--join", action="append", default=[], metavar="pP:N", help=argparse.SUPPRESS)
-    an.add_argument("--unjoin", action="append", default=[], metavar="pP:N", help=argparse.SUPPRESS)
+    an.add_argument("--join", action="append", default=[], metavar="pP:N",
+                    help="no system ends after staff N of source page P: two systems the analysis "
+                         "took apart are one (p5:4); saved, kept by every analysis; then analyse")
+    an.add_argument("--unjoin", action="append", default=[], metavar="pP:N",
+                    help="take a join back")
     st = sub.add_parser("set", help="change settings; saved, not built (--build: build too)")
-    st.add_argument("id")
-    st.add_argument("pairs", nargs="+", metavar="key=value")
+    st.add_argument("id", help="12 or 2026-10-0012")
+    st.add_argument("pairs", nargs="+", metavar="key=value",
+                    help="title=..., gap=11, pages=3, ...; one part: \"Continuo:pages=4\" "
+                         "(keys: DESIGN.md, partitor set)")
     st.add_argument("--build", action="store_true", help="build after the change")
-    pc = sub.add_parser("pieces")
-    pc.add_argument("pdf")
-    d = sub.add_parser("detect")
-    d.add_argument("pdf")
-    d.add_argument("--pages")
-    d.add_argument("--parts", default="")
-    d.add_argument("--title", default="")
-    d.add_argument("--subtitle", default="")
-    d.add_argument("--composer", default="")
-    d.add_argument("--dpi", type=int, default=400)
+    pc = sub.add_parser("pieces", help="list the pieces of a PDF: runs of music pages "
+                        "(no library, no files written)")
+    pc.add_argument("pdf", help="the score PDF")
+    d = sub.add_parser("detect", help="analyse a PDF without the library: writes layout.yaml and "
+                       "the preview (then edit it, then build)")
+    d.add_argument("pdf", help="the score PDF")
+    d.add_argument("--pages", help="pages to analyse: N or A-B (default: all)")
+    d.add_argument("--parts", default="", help="part names, comma separated, top staff first "
+                    "(default: read from the printed labels)")
+    d.add_argument("--title", default="", help="title (default: read from the PDF)")
+    d.add_argument("--subtitle", default="", help="subtitle")
+    d.add_argument("--composer", default="", help="composer (default: read from the PDF)")
+    d.add_argument("--dpi", type=int, default=400, help="analysis resolution (400)")
     d.add_argument("--page-header-sp", dest="page_header_sp", type=float,
-                   default=PAGE_HEADER_SP)
-    d.add_argument("--out")
-    d.add_argument("--force", action="store_true")
+                   default=PAGE_HEADER_SP,
+                   help="text above a page's first staff farther than this, in staff spaces, "
+                        "is dropped (page title, running header)")
+    d.add_argument("--out", help="output folder (default: <pdf name>.partitor next to the PDF)")
+    d.add_argument("--force", action="store_true", help="overwrite an existing layout.yaml")
     d.add_argument("--jobs", help="worker processes for the page analysis: a number or auto "
                    "(default: PARTITOR_JOBS, else auto)")
-    b = sub.add_parser("build")
-    b.add_argument("pdf")
-    b.add_argument("--pages")
-    b.add_argument("--out")
-    b.add_argument("--paper", choices=sorted(PAPER))
-    b.add_argument("--scale", type=float)
-    b.add_argument("--gap", type=float)
-    b.add_argument("--min-gap", dest="gap_min", type=float)
-    b.add_argument("--clearance", type=float)
-    b.add_argument("--page-count", dest="page_count", type=int)
-    b.add_argument("--min-staff-mm", dest="min_staff_mm", type=float)
-    b.add_argument("--ink", choices=["normal", "darker"])
-    b.add_argument("--bar-numbers", dest="bar_numbers", choices=["start", "none"])
-    b.add_argument("--bar-raise", dest="bar_raise", type=float)
-    b.add_argument("--bar-size", dest="bar_size", type=float)
-    b.add_argument("--margin-top", dest="margin_top", type=float)
-    b.add_argument("--margin-bottom", dest="margin_bottom", type=float)
-    b.add_argument("--margin-side", dest="margin_side", type=float)
-    b.add_argument("--gutter", type=float)
-    b.add_argument("--duplex", choices=["auto", "on", "off"])
-    b.add_argument("--large", choices=["on", "off"])
-    b.add_argument("--reflow", choices=["on", "off"])
-    b.add_argument("--max-staff-mm", dest="max_staff_mm", type=float)
-    b.add_argument("--title-page", dest="title_page", choices=["auto", "off"])
-    b.add_argument("--rests", choices=["compress", "keep"])
+    b = sub.add_parser("build", help="build the parts of a PDF from its layout.yaml (no library); "
+                       "options override the layout")
+    b.add_argument("pdf", help="the score PDF (run detect first)")
+    b.add_argument("--pages", help="pages to build: N or A-B (as in detect)")
+    b.add_argument("--out", help="folder of layout.yaml and the parts (default: <pdf name>.partitor next to the PDF)")
+    b.add_argument("--paper", choices=sorted(PAPER), help="paper size (letter)")
+    b.add_argument("--scale", type=float, help="largest size, 1 = source size (default: up to "
+                   "--max-staff-mm)")
+    b.add_argument("--gap", type=float, help="staff spaces between staves, the widest (10)")
+    b.add_argument("--min-gap", dest="gap_min", type=float,
+                   help="smallest space between staves, to save a page turn (7)")
+    b.add_argument("--clearance", type=float, help="least space between the ink of two lines, "
+                   "in staff spaces (1)")
+    b.add_argument("--page-count", dest="page_count", type=int, help="force this many pages")
+    b.add_argument("--min-staff-mm", dest="min_staff_mm", type=float,
+                   help="smallest staff height, mm (5)")
+    b.add_argument("--ink", choices=["normal", "darker"], help="ink strength (normal)")
+    b.add_argument("--bar-numbers", dest="bar_numbers", choices=["start", "none"],
+                   help="bar number at each line start, or none (start)")
+    b.add_argument("--bar-raise", dest="bar_raise", type=float,
+                   help="least height of a bar number above the staff, staff spaces (1)")
+    b.add_argument("--bar-size", dest="bar_size", type=float,
+                   help="bar number size, staff spaces (2)")
+    b.add_argument("--margin-top", dest="margin_top", type=float, help="top margin, mm (15)")
+    b.add_argument("--margin-bottom", dest="margin_bottom", type=float,
+                   help="bottom margin, mm (15)")
+    b.add_argument("--margin-side", dest="margin_side", type=float, help="side margin, mm (15)")
+    b.add_argument("--gutter", type=float, help="mm added at the spine in double-sided print (5)")
+    b.add_argument("--duplex", choices=["auto", "on", "off"],
+                   help="double-sided print; auto = over 2 pages (auto)")
+    b.add_argument("--large", choices=["on", "off"],
+                   help="also a large-print copy per part (on)")
+    b.add_argument("--reflow", choices=["on", "off"],
+                   help="cut new lines at barlines for a larger staff (off; on hold)")
+    b.add_argument("--max-staff-mm", dest="max_staff_mm", type=float,
+                   help="largest staff height, mm (8)")
+    b.add_argument("--title-page", dest="title_page", choices=["auto", "off"],
+                   help="title page for 3+ pages of music printed double-sided (auto)")
+    b.add_argument("--rests", choices=["compress", "keep"],
+                   help="compress = empty staves and rest-only bars become multi-bar rests "
+                        "(compress)")
     b.add_argument("--jobs", help="worker processes: a number or auto (default: PARTITOR_JOBS, else auto)")
     b.add_argument("--only", nargs="+", metavar="NAME", help="build these parts or groups only")
     a = p.parse_args()

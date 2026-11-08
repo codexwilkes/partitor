@@ -328,7 +328,9 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
      when it has some ink (0.15) at the system start or the page has fewer
      than two bracket-joined gaps; and then it is cut only when no neighbouring
      gap of the same size (within 3%) is joined without ink at the system start
-     either (0.8.22: seven equal gaps on a page without a start connector are one
+     either; the connector is looked for at the start of the staves as found and
+     at the start after `extend_starts` (`Staff.x0_found`, 0.8.23: Biber p17)
+     (0.8.22: seven equal gaps on a page without a start connector are one
      system; a neighbour with a bracket makes the blank gap a real break).
      The operator can join two systems the analysis took apart:
      `system_joins` in the layout (`p5:4` = no system ends after staff 4 of
@@ -907,7 +909,7 @@ partitor rename <id>           folder name follows title and composer
 partitor reid <id>             old YYYY-NNN item -> YYYY-MM-NNNN
 partitor rebuild <id> [part ...] [--jobs N|auto]
 partitor repage <id> [part ...]           page breaks again from the saved lines
-partitor plan <id> [part] [N]             options of a part; with N: set option N (not in --help yet)
+partitor plan <id> [part] [N]             options of a part; with N: set option N
 partitor plan <id> --group Name=A,B       try a group of parts in a temporary copy (read-only)
 partitor analyse <id> [--yes] [--join pP:N] [--unjoin pP:N] | analyse --all
 partitor bars | parts | groups | meta | proof <id>

@@ -181,6 +181,29 @@ class TestStaffTracking(unittest.TestCase):
             self._link(ink, st, i, 100)
         self.assertEqual([len(g) for g in pt.group_systems(ink, st, 24, 3)], [8])
 
+    def test_group_systems_connector_where_the_start_was_found(self):
+        # Biber p17: the staves start at x 404 where the system barline
+        # stands; extend_starts moved the start 58 px left, out of the zone.
+        # Staves 0-3 are one system (connector at the start as found), 4-6
+        # another (bracket at the moved start).
+        st = self._gap_staves(7)
+        for s_ in st[:4]:
+            s_.x0, s_.x0_found = 100, 400
+        ink = np.zeros((1700, 1900), bool)
+        for i in range(3):
+            self._link(ink, st, i, 401)
+        for i in (4, 5):
+            self._link(ink, st, i, 100)
+        self.assertEqual([len(g) for g in pt.group_systems(ink, st, 24, 3)], [4, 3])
+        for s_ in st:                           # start not known: the connector is missed
+            s_.x0_found = -1
+        self.assertEqual([len(g) for g in pt.group_systems(ink, st, 24, 3)], [1, 1, 1, 1, 3])
+
+    def test_detect_staves_keeps_the_start_as_found(self):
+        img, th, sp = self.synthetic(0)
+        staves, _ = pt.detect_staves(img, th, sp - th, 0)
+        self.assertTrue(all(s.x0_found >= 0 and s.x0 <= s.x0_found for s in staves))
+
     def test_group_systems_blank_gap_next_to_bracket_stays_a_cut(self):
         # Biber p38: the neighbours have a bracket, the blank gap between
         # them is a real break (two systems of two staves)

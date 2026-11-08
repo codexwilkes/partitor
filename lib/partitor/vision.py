@@ -260,7 +260,7 @@ def detect_staves(ink: np.ndarray, thick: int, gap: int, page: int
                 ext = (refine_start(raw, grp, thick, sp, ext[0]), ext[1])
             if ext is not None and ext[1] - ext[0] >= 8 * sp:
                 staves.append(Staff(page, len(staves), [g[0] for g in grp],
-                                    ext[0], ext[1]))
+                                    ext[0], ext[1], x0_found=ext[0]))
                 i += 5
                 continue
         i += 1
@@ -373,8 +373,12 @@ def group_systems(ink: np.ndarray, staves: list[Staff], sp: float, thick: int
     zone_max: list[float] = []
     for a, b in zip(staves, staves[1:]):
         frac = gap_column_fraction(ink, a, b, thick)
-        zx0 = max(0, min(a.x0, b.x0) - int(3 * sp))
-        zx1 = min(ink.shape[1], max(a.x0, b.x0) + int(1 * sp))
+        # the starts as found count too: extend_starts may have moved a start
+        # left over the connector (Biber p17: staves start at x 404, the system
+        # barline stands there, the start moved to 346)
+        xs = [x for s_ in (a, b) for x in (s_.x0, s_.x0_found) if x >= 0]
+        zx0 = max(0, min(xs) - int(3 * sp))
+        zx1 = min(ink.shape[1], max(xs) + int(1 * sp))
         zm = float(frac[zx0:zx1].max()) if frac[zx0:zx1].size else 0.0
         zone_max.append(zm)
         if zm >= 0.5:

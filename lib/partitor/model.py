@@ -22,6 +22,7 @@ class Staff:
     clef: str = "?"       # clef signature: G, F, C3, C4, ... or ?
     brace: int = -1       # bracket group id on the page
     steps: tuple | None = None   # (lowest, highest, x low, x high, bar index low, bar index high)
+    x0_found: int = -1    # start as found by detect_staves, before extend_starts (-1: not known)
 
     @property
     def top(self) -> float:

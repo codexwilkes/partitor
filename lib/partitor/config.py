@@ -141,6 +141,10 @@ LAYOUT_HELP = """\
 # skip: parts not extracted (no PDF); they stay in parts and in the maps.
 # groups: {name: [parts]}: group scores; the staves of the parts printed
 #   together, joined by a bracket, one more PDF per group.
+# system_joins: ['p5:4', ...]: no system ends after staff 4 (from the top, from 1)
+#   on source page 5: two systems that the analysis took apart are one. Set in
+#   the choices of the analysis (answer j) or with partitor analyse <id> --join
+#   p5:4 (--unjoin p5:4 takes it back); kept by every analysis again.
 # bar_rules: pickup (movement-first system ids: first bar is bar 0), split
 #   ('<system id>:<bar index>': that bar completes the bar before it and
 #   keeps its number), fix ({system id: first bar}); bar and marks

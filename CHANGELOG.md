@@ -7,6 +7,27 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.23 — 2026-11-08
+
+### Fixed
+
+- Biber page 17 was still cut into two systems (3 + 13 staves instead of 16)
+  after 0.8.22. The staves start where the system barline stands; the start was
+  moved to the page edge (0.8.1) and the barline was looked for left of it.
+  The connector is now also looked for at the start as found. Over the 70 pages
+  of the Biber, the systems are the same as without that move. Analyse such an
+  item again.
+
+### Changed
+
+- Help texts. `partitor analyse --help` lists `--join` and `--unjoin`. Every
+  command, option and argument now has a description: `show`, `pieces`,
+  `detect` and `build` (all options, with their defaults), `set`, `reid`,
+  `rename`, and the commands `expand`, `contract`, `bars`, `parts`, `groups`
+  and `meta`, which shared one line. The layout file explains `system_joins`.
+  A test fails when a command, option or argument has no description.
+  Builds are the same as 0.8.22.
+
 ## 0.8.22 — 2026-11-08
 
 ### Fixed

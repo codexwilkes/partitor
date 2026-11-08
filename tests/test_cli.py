@@ -46,6 +46,48 @@ class TestCommands(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("usage: partitor plan", r.stdout)             # the plan parser, not the stub
 
+    @staticmethod
+    def _undescribed(text):
+        """Names of the options and arguments in an argparse help text that
+        have no description (a help line is the name, two spaces or a line
+        break, then the text)."""
+        bare, name = [], None
+        for line in text.splitlines():
+            if line.startswith("  ") and not line.startswith("   "):
+                if name is not None:
+                    bare.append(name)
+                body = line.strip()
+                parts = __import__("re").split(r"\s{2,}", body, maxsplit=1)
+                name = None if len(parts) > 1 else parts[0]
+            elif name is not None and line.startswith("   ") and line.strip():
+                name = None                      # the description wraps to the next line
+            elif not line.strip() or not line.startswith(" "):
+                if name is not None:
+                    bare.append(name)
+                name = None
+        if name is not None:
+            bare.append(name)
+        return [b for b in bare if b not in ("-h, --help",)]
+
+    def test_every_command_option_and_argument_has_a_help_text(self):
+        top = self.run_cli("--help").stdout
+        cmds = __import__("re").search(r"\{([a-z,]+)\}", top).group(1).split(",")
+        self.assertIn("analyse", cmds)
+        # the sub-commands listed in the top help have a description each
+        listed = [l.split()[0] for l in top.split("positional arguments:")[1].splitlines()
+                  if l.startswith("    ") and not l.startswith("     ")]
+        self.assertEqual(sorted(listed), sorted(cmds), "a command has no help line")
+        for cmd in cmds:
+            with self.subTest(cmd=cmd):
+                r = self.run_cli(cmd, "--help")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(self._undescribed(r.stdout), [], cmd)
+
+    def test_analyse_help_names_the_join_options(self):
+        out = self.run_cli("analyse", "--help").stdout
+        self.assertIn("--join pP:N", out)
+        self.assertIn("--unjoin pP:N", out)
+
     def test_detect_and_build_end_to_end(self):
         with tempfile.TemporaryDirectory() as d:
             pdf = os.path.join(d, "s.pdf")
