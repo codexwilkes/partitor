@@ -744,6 +744,19 @@ class TestGroupReflow(unittest.TestCase):
         self.assertFalse(np.array_equal(moved.img, a.img))
         self.assertEqual(int(moved.img[40:81].sum()), int(a.img[40:81].sum()))  # the top staff is untouched
 
+    def test_barline_inside_the_prefix_gives_a_bar_without_width_not_a_crash(self):
+        """A line whose first barline lies inside its own prefix (a bar cut by a line
+        break leaves no music after the key signature): the bar has no width. It
+        gave a negative width and a ValueError in the composition."""
+        ls = self.lines()
+        ls[1] = group_line([(75, 20), (120, 12)], [50, 150, 198])
+        pre = pt.find_prefixes(ls)
+        self.assertGreater(pre[1][0], 50)                           # the barline is inside the prefix
+        out = pt.reflow(ls, 140.0, pre)
+        self.assertGreater(len(out), len(ls))
+        for o in out:
+            self.assertGreater(o.img.shape[1], 0)
+
     def test_label_column_is_equal_on_every_re_flowed_line(self):
         ls = self.lines()
         out = pt.finish_lines(pt.reflow(ls, 140.0, pt.find_prefixes(ls)), "G", True)

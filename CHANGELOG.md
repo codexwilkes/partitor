@@ -7,6 +7,17 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.28 — 2026-11-09
+
+### Fixed
+
+- Re-flow stopped with `ValueError: operands could not be broadcast together`
+  when the first barline of a line lay inside its clef and key prefix (a bar cut
+  by a line break leaves no music after the key signature). The bar had a negative
+  width. It now has no width. The error showed in 0.8.27 on a group score, where a
+  line that used to stay whole is now cut. The same input stops 0.8.26 too.
+
+
 ## 0.8.27 — 2026-11-09
 
 ### Fixed

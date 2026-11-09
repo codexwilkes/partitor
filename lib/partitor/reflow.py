@@ -403,9 +403,9 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
             s_ = strips[i]
             x0 = pre[i][0] if b == 0 else s_.bars_x[b - 1] + bw(s_)
             if b == len(s_.bars_x) - 1:              # line end: whole final/repeat barline
-                return x0, s_.img.shape[1]
+                return x0, max(x0, s_.img.shape[1])
             x1 = min(s_.img.shape[1], s_.bars_x[b] + bw(s_))
-            return x0, x1
+            return x0, max(x0, x1)       # a barline inside the prefix: a bar with no width, not a negative one
         widths = [span(i, b)[1] - span(i, b)[0] for i, b in bars]
         i0 = bars[0][0]
         starts = _break_lines(widths, pre[pre[i0][1]][0], W)
