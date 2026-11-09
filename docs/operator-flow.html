@@ -115,7 +115,7 @@ html { scroll-behavior: smooth; }
 
 <div class="wrap">
 <header>
-  <span class="eyebrow">partitor 0.8.24</span>
+  <span class="eyebrow">partitor 0.8.26</span>
   <h1>From score to parts</h1>
   <p class="lede">How to turn a score PDF into large-print parts for your ensemble. You work on your phone or PC over SSH; partitor runs on your partitor host and keeps everything in the library folder (local, or on a NAS). Only the build takes a long time, so you make every change first, review it, and build once.</p>
 </header>
@@ -286,7 +286,7 @@ html { scroll-behavior: smooth; }
 08-trombones-Bach-Example--2026-10-0001.pdf</pre>
   <ul class="plain">
     <li><strong>Normal copy:</strong> Letter (or A4), printed double-sided. Page turns fall at movement starts, new sections or rests; a section that fits on two pages stands on a facing pair.</li>
-    <li><strong>Large-print copy</strong> (<code>-11x17</code>): print on 11×17 (ledger) paper at 100 %, then cut at the dotted line. A4 scores give an <code>-A3</code> copy instead, no cutting. Paper <code>ledger</code> gives no large copy: the sheet is 11×17 already.</li>
+    <li><strong>Large-print copy</strong> (<code>-11x17</code>): print on 11×17 (ledger) paper at 100 %, then cut at the dotted line (set <code>cutline=marks</code> for short crop marks, <code>off</code> for none). A4 scores give an <code>-A3</code> copy instead, no cutting. Paper <code>ledger</code> gives no large copy: the sheet is 11×17 already.</li>
     <li><strong>Ledger</strong> (<code>paper=ledger</code>, menu <kbd>a</kbd>): 17×11 in, landscape, for a larger staff (up to 8 mm; Letter holds 3.6–3.8 mm on long lines). The lines are 2.2 times as wide, so there are about twice as many pages. Print double-sided, flip on the short edge (the 11 in side, like a book). Stands for two pages side by side are wide: check the stand first. The staff is as large as the page allows (up to 8 mm) and the pages follow. To fit more systems on a page, set <code>Trombones:group_gap=5</code> (staff spaces between the staves of a group; also a part on two staves) or <code>gap=7</code> (space between lines).</li>
   </ul>
   <p class="note"><strong>Small print.</strong> When the score's lines are long, the staff can come out small. partitor then offers re-flow (experimental, off by default; for a larger staff use <code>paper=ledger</code>): lines cut at barlines with the clef copied, for a staff up to 8 mm, on more pages. It shows the size and pages before and after; you keep it or not. A group (for example the trombones) is cut only at barlines that all its staves have, and stays within 1.5 times its pages unless you set <code>pages</code>. The build prints a <code>re-flow:</code> line: how many lines can be cut and why the others stay whole.</p>
@@ -311,7 +311,7 @@ html { scroll-behavior: smooth; }
 
 <footer>
   <div class="staff" role="presentation"></div>
-  <p>partitor 0.8.24. Install: <code>INSTALL.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Design: <code>DESIGN.md</code>.</p>
+  <p>partitor 0.8.26. Install: <code>INSTALL.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Design: <code>DESIGN.md</code>.</p>
 </footer>
 </div>
 </body>

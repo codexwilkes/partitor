@@ -7,6 +7,32 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.26 — 2026-11-08
+
+### Changed
+
+- The layout key `cutline` now also sets the cut line of the fold-out sheets
+  and flaps. `dotted` (default, as before): a dotted line. `marks`: a short
+  crop mark at the top and one at the foot. `off`: no line; the notes say to
+  trim 1/2 in off the free edge. The notes on the pages and `-assemble.txt`
+  name the form chosen. The fold line stays dotted. Rebuild to apply it.
+
+
+## 0.8.25 — 2026-11-08
+
+### Added
+
+- Layout key `cutline` (`partitor set ID cutline=dotted|marks|off`) for the cut
+  line of the large-print copy. `dotted` (default, as 0.8.24): one dotted line
+  across the sheet, for scissors or a knife. `marks`: two short crop marks at
+  the side edges, for a paper cutter. `off`: no line. Rebuild to apply it.
+- `CONTRIBUTING.md` has a section on how to add a choice, and a test checks
+  that every choice key is set, described and documented.
+
+### Changed
+
+- The layout file help now describes `foldouts` and `foldside`.
+
 ## 0.8.24 — 2026-11-08
 
 ### Changed

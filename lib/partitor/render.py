@@ -22,8 +22,9 @@ from .strips import (
     REH_PAD, ambitus_width, anchor, bar_mark, bar_x, pitches, reh_boxes, rest_boxes,
 )
 from .typography import (
-    FILL_COST, MIN_LAST_LINES, PAGE_COST, REPAGE_FILL, REST_TURN_MIN, SHORT_LAST, TURN_BAD,
-    TURN_HARD, TURN_MOVE, put_text, text_len,
+    CROP_MARK, CUT_DASHES, FILL_COST, MIN_LAST_LINES, PAGE_COST, REPAGE_FILL, REST_TURN_MIN,
+    SHORT_LAST, TURN_BAD, TURN_HARD, TURN_MOVE, cut_words, flap_guides, put_text, sheet_guides,
+    text_len,
 )
 
 
@@ -234,15 +235,15 @@ def fit_scale(strips: list[Strip], dpi: int, opts: dict) -> float:
 
 LARGE = {"letter": ((792.0, 1224.0), "11x17"),      # Letter -> 11x17 (ledger)
          "a4": ((841.89, 1190.55), "A3")}           # A4 -> A3 (exact sqrt 2)
-CUT_DASHES = "[4 3] 0"     # the dotted cut line of the large-print copy
 
 
-def large_copy(src: Path, paper: str) -> Path:
+def large_copy(src: Path, paper: str, cutline: str = "dotted") -> Path:
     """large_copy -> path of the large-print copy of a part: each page
     scaled to the full width of the larger sheet (Letter -> 11x17, x1.294;
     A4 -> A3, x1.414), at the top of the sheet. Where the scaled page is
-    shorter than the sheet (11x17: 14.24 in of 17 in), a dotted
-    line across the sheet shows the cut line."""
+    shorter than the sheet (11x17: 14.24 in of 17 in), cutline shows the cut:
+    dotted = a dotted line across the sheet (scissors, knife); marks = short
+    marks at both side edges (paper cutter); off = nothing."""
     (sw, sh), tag = LARGE[paper]
     pw, ph = PAPER[paper]
     f = sw / pw
@@ -254,8 +255,12 @@ def large_copy(src: Path, paper: str) -> Path:
         page.show_pdf_page(pymupdf.Rect(0, 0, sw, ph * f), doc, pno)
         cut = ph * f
         if sh - cut > 1.0:
-            page.draw_line((0, cut), (sw, cut), color=(0.5, 0.5, 0.5), width=0.6,
-                           dashes=CUT_DASHES)
+            if cutline == "dotted":
+                page.draw_line((0, cut), (sw, cut), color=(0.5, 0.5, 0.5), width=0.6,
+                               dashes=CUT_DASHES)
+            elif cutline == "marks":
+                for a, b in ((CROP_MARK[0], CROP_MARK[1]), (sw - CROP_MARK[1], sw - CROP_MARK[0])):
+                    page.draw_line((a, cut), (b, cut), color=(0, 0, 0), width=0.5)
     big.save(out, garbage=3, deflate=True)
     return out
 
@@ -1003,6 +1008,7 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
     its free edge and folds forward over its page. <out>-assemble.txt says how to
     print the files and how each fold-out is made."""
     pw, ph = PAPER[opts["paper"]]
+    cl = opts.get("cutline", "dotted")
     k = 72.0 / dpi * (opts.get("scale") or 1.0)
     left_ink = max(anchor(s) for s in strips)
     faces, total = build_faces(plan, pages, title_page)
@@ -1060,19 +1066,19 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
             if left:                 # flap | verso (spine at the right edge)
                 put(front, ff, TRIM_PT, flap_w, (em, fm))
                 put(front, fb, pw)
-                _sheet_guides(front, pw, ph, TRIM_PT, mt,
-                              f"{name}: fold-out {ff['leaf']}a / {fb['leaf']}b. Cut at the left dotted "
-                              f"line, fold at the middle, flap forward over {fb['leaf']}b.", hint)
+                sheet_guides(front, pw, ph, TRIM_PT, mt,
+                              f"{name}: fold-out {ff['leaf']}a / {fb['leaf']}b. {cut_words(cl, 'left')}, "
+                              f"fold at the middle, flap forward over {fb['leaf']}b.", hint, cutline=cl)
             else:                    # recto (spine at the left edge) | flap
                 put(front, fb, 0.0)
                 put(front, ff, pw, flap_w, (fm, em))
-                _sheet_guides(front, pw, ph, 2 * pw - TRIM_PT, mt,
-                              f"{name}: fold-out {fb['leaf']}a / {fb['leaf']}b. Cut at the right dotted "
-                              f"line, fold at the middle, flap forward over {fb['leaf']}a.", hint)
+                sheet_guides(front, pw, ph, 2 * pw - TRIM_PT, mt,
+                              f"{name}: fold-out {fb['leaf']}a / {fb['leaf']}b. {cut_words(cl, 'right')}, "
+                              f"fold at the middle, flap forward over {fb['leaf']}a.", hint, cutline=cl)
             back = sheets.new_page(width=2 * pw, height=ph)
             if other is not None:    # left: previous recto | flap outside; right: flap outside | next verso
                 put(back, other, 0.0 if left else pw)
-            _sheet_guides(back, pw, ph, 2 * pw - TRIM_PT if left else TRIM_PT, mt,
+            sheet_guides(back, pw, ph, 2 * pw - TRIM_PT if left else TRIM_PT, mt,
                           "Back of the sheet (outside of the flap: blank). Cut and fold on the front lines.",
                           hint, lines=False)
         sheets.save(foldout, garbage=3, deflate=True)
@@ -1089,15 +1095,15 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
                 put(pg, ff, TRIM_PT, flap_w, (em, fm))
             else:                    # the fold edge is the left edge of the page
                 put(pg, ff, 0.0, flap_w, (fm, em))
-            _flap_guides(pg, TRIM_PT if left else flap_w, pw if left else 0.0, ph, mt,
-                         f"{name}: flap {ff['label']}. Cut at the dotted line.",
+            flap_guides(pg, TRIM_PT if left else flap_w, pw if left else 0.0, ph, mt,
+                         f"{name}: flap {ff['label']}. {cut_words(cl)}.",
                          f"Flap {pl['sheet']} of {len(places)}. Print on one side only. Tape the "
                          f"{'right' if left else 'left'} edge of this page to the {pl['edge']} edge of "
-                         f"page {pl['bound_label']}.")
+                         f"page {pl['bound_label']}.", cutline=cl)
         flaps.save(flaps_pdf, garbage=3, deflate=True)
         assemble = out.with_name(out.stem + ASSEMBLE_TAIL)
         assemble.write_text(assemble_text(name, out.name, foldout.name, flaps_pdf.name, pw, ph, places,
-                                          len(doc)), encoding="utf-8")
+                                          len(doc), cl), encoding="utf-8")
     LAST_RENDER.update(content=nfaces, title_page=title_page, foldouts=plan.folds,
                        foldout=foldout.name if foldout else None,
                        flaps=flaps_pdf.name if foldout else None,
@@ -1156,9 +1162,13 @@ def page_ranges(pages: list[int], total: int) -> str:
 
 
 def assemble_text(name: str, part_file: str, sheet_file: str, flap_file: str, pw: float, ph: float,
-                  places: dict, total: int) -> str:
+                  places: dict, total: int, cutline: str = "dotted") -> str:
     """assemble_text -> the text of <part>-assemble.txt: the two ways to make the
-    fold-outs, what to print for each, and where each one goes."""
+    fold-outs, what to print for each, and where each one goes. cutline: the layout
+    key of that name (how the cut is shown)."""
+    cut = {"dotted": "cut at the dotted line marked 'cut'. This takes 1/2 in off the flap.",
+           "marks": "cut between the crop marks marked 'cut'. This takes 1/2 in off the flap.",
+           "off": "trim 1/2 in off the free edge of the flap. No cut line is printed."}[cutline]
     if (pw, ph) == PAPER["letter"]:
         big = "ledger paper (17 x 11 in)"
     elif (pw, ph) == PAPER["a4"]:
@@ -1180,7 +1190,7 @@ def assemble_text(name: str, part_file: str, sheet_file: str, flap_file: str, pw
            "2. Print the sheet file", f"   {sheet_file}",
            f"   on {big}, double-sided. Flip on the short edge.",
            "   Each sheet is two PDF pages: the front, then the back.",
-           "3. On each sheet, cut at the dotted line marked 'cut'. This takes 1/2 in off the flap.",
+           f"3. On each sheet, {cut}",
            "4. Fold each sheet at the dotted line in the middle. The flap folds forward over its page.",
            "5. Put each sheet in its place in the printed stack:", ""]
     for gi in sorted(places):
@@ -1191,7 +1201,7 @@ def assemble_text(name: str, part_file: str, sheet_file: str, flap_file: str, pw
             f"   on {small}, double-sided, all pages. Flip on the long edge.",
             "2. Print the flap file", f"   {flap_file}",
             f"   on {small}, one side only. Each page is one flap.",
-            "3. On each flap page, cut at the dotted line marked 'cut'. This takes 1/2 in off the flap.",
+            f"3. On each flap page, {cut}",
             "4. Put the flap next to its page, edge to edge, the printed sides up. Tape the joint on",
             "   the back with narrow tape. Fold the flap forward over its page.",
             "5. Join each flap to its page:", ""]
@@ -1203,33 +1213,6 @@ def assemble_text(name: str, part_file: str, sheet_file: str, flap_file: str, pw
     out += ["", "Then punch or bind the stack.", "",
             "A fold-out needs a rest at both ends: unfold the flap at the start, fold it in before the turn."]
     return "\n".join(out) + "\n"
-
-
-def _sheet_guides(page: pymupdf.Page, fold_x: float, ph: float, cut_x: float, mt: float,
-                  note: str, hint: str = "", lines: bool = True) -> None:
-    """Dotted fold line and dotted cut line on a fold-out sheet, with a note and
-    a line for the printer at the foot (sheet number, flip edge, place)."""
-    if lines:                # front only: a second set on the back would never meet the first
-        for x in (fold_x, cut_x):
-            page.draw_line((x, 0), (x, ph), color=(0.5, 0.5, 0.5), width=0.6, dashes="[4 3] 0")
-        put_text(page, (fold_x + 3, ph - 6), "fold", "regular", 6.5)
-        put_text(page, (cut_x + (3 if cut_x < fold_x else -34), 10), "cut 1/2 in", "regular", 6.5)
-    put_text(page, (fold_x - text_len(note, "italic", 7) / 2, max(mt - 10, 10)), note, "italic", 7)
-    if hint:
-        put_text(page, (fold_x - text_len(hint, "italic", 7) / 2, ph - 16), hint, "italic", 7)
-
-
-def _flap_guides(page: pymupdf.Page, cut_x: float, tape_x: float, ph: float, mt: float,
-                 note: str, hint: str) -> None:
-    """Dotted cut line of a flap on a Letter page (the 1/2 in beyond it is cut off), a mark
-    at the tape edge, a note and a line for the printer at the foot."""
-    page.draw_line((cut_x, 0), (cut_x, ph), color=(0.5, 0.5, 0.5), width=0.6, dashes="[4 3] 0")
-    put_text(page, (cut_x + (3 if cut_x < tape_x else -34), 10), "cut 1/2 in", "regular", 6.5)
-    on_left = tape_x < cut_x
-    put_text(page, (tape_x + (3 if on_left else -34), ph - 6), "tape edge", "regular", 6.5)
-    mid = (cut_x + tape_x) / 2
-    put_text(page, (mid - text_len(note, "italic", 7) / 2, max(mt - 10, 10)), note, "italic", 7)
-    put_text(page, (mid - text_len(hint, "italic", 7) / 2, ph - 16), hint, "italic", 7)
 
 
 def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,

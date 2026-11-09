@@ -735,8 +735,10 @@ PDF (`large: on`, default):
 
 - Letter -> 11x17 (ledger): the Letter page as is, scaled to the 11 in width
   (x1.294), at the top of the sheet; the content is 11 x 14.24 in and about
-  2.76 in stays blank at the bottom. A dotted grey line across the sheet at the
-  cut line (14.24 in from the top), for a manual paper cutter.
+  2.76 in stays blank at the bottom. The cut line is at 14.24 in from the
+  top. Layout key `cutline` (`set ID cutline=...`): `dotted` (default) = one
+  dotted grey line across the sheet, for scissors or a knife; `marks` = two
+  short crop marks at the side edges, for a paper cutter; `off` = no line.
 - A4 -> A3: exact (x1.414), the whole sheet, no cut line.
 - File names: `<part>-11x17.pdf`, `<part>-A3.pdf`, next to the part.
 - Paper `ledger` has no large-print copy (the sheet is 11x17 already); the build
@@ -790,15 +792,19 @@ one of two ways, by the printer the person has; both give the same pages:
   printer: sheet number, flip edge and the place in the part file.
 - `NN-part-foldout-flaps.pdf` (tape route, Letter only): one Letter page per flap, printed on one
   side. The flap sits at the page edge that is its fold edge (left for a right fold-out, right for a
-  left one); a dotted line marks the cut, 1/2 in off the free edge, and `tape edge` marks the edge to
+  left one); the cut line (key `cutline`, below) marks the cut, 1/2 in off the free edge, and `tape edge` marks the edge to
   tape to the outer edge of its page in the part file. The same text width and margins as on the sheet.
 - `NN-part-assemble.txt`: both ways, step by step, and for each fold-out the part file pages a sheet
   replaces and the page and edge a flap is taped to. Written only when a part has fold-outs, with
   the PDF files; the build and `plan N` name them.
-  - The dotted lines are on the front only: a second set on the back would not meet the first on paper.
+  - The lines are on the front only: a second set on the back would not meet the first on paper.
+  - Cut line (layout key `cutline`, as for the large-print copy): `dotted` (default) = a dotted line
+    over the full height; `marks` = a short crop mark (0.5 in) at the top and one at the foot;
+    `off` = no line, and the printed notes say to trim 1/2 in off the free edge. The fold line is
+    always dotted. The notes and `-assemble.txt` name the form chosen.
   - Right fold-out. Front: the bound face (the recto, spine at the left) and the flap. A dotted line
-    marks the fold (the middle) and a dotted line the cut: 1/2 in off the flap's free edge, so the
-    folded flap does not stand out. The staves stop inside the margins, so no dotted line crosses ink.
+    marks the fold (the middle) and the cut line the cut: 1/2 in off the flap's free edge, so the
+    folded flap does not stand out. The staves stop inside the margins, so no line crosses ink.
     Back: the outside of the flap is blank; behind the bound face is the verso that follows (spine at
     the right edge), the first face of the next group. The flap folds forward over the bound face.
   - Left fold-out. Front: the flap (free edge at the left, cut line 1/2 in from it) and the verso
@@ -956,7 +962,7 @@ Details:
   (not below `min_gap`).
 - `set` keys: title, subtitle, composer, composer_short, pages (auto or N), paper (letter, a4 or
   ledger), gap, min_gap, ink, scale, min_staff_mm, margin_top, margin_bottom,
-  margin_side, gutter, binding, duplex, bar_numbers, bar_raise, bar_size, large, logo,
+  margin_side, gutter, binding, duplex, bar_numbers, bar_raise, bar_size, large, cutline (dotted, marks or off), logo,
   reflow, reflow_offer, max_staff_mm, title_page, group_gap, rests, turns, foldouts, foldside, and per part
   breaks
   (per part, as `Name:key=value`: pages, gap, min_gap, scale, min_staff_mm, max_staff_mm,

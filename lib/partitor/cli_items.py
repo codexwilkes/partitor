@@ -1029,7 +1029,7 @@ def cmd_repage(a: argparse.Namespace) -> int:
             _die(f"repage: {nm}: {e}", "parts/ is unchanged")
         tl = list(LAST_RENDER.get("turns") or [])
         nbad = count_bad_turns(tl, o)
-        big = (large_copy(fn, o["paper"])
+        big = (large_copy(fn, o["paper"], o.get("cutline", "dotted"))
                if o.get("large") == "on" and o["paper"] in LARGE else None)
         rec = {k: v for k, v in old.items() if k not in ("large", "foldout", "foldouts", "flaps", "assemble")}
         rec.update(pages=n, content_pages=LAST_RENDER.get("content", n),

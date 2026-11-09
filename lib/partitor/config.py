@@ -130,7 +130,13 @@ LAYOUT_HELP = """\
 #   bar_size: bar number size, sp (2; --bar-size)
 #   ink: normal | darker (normal; --ink)
 #   large: on | off; on = also a large-print copy per part: Letter -> 11x17
-#     with a dotted cut line, A4 -> A3 (on; --large)
+#     with a cut line, A4 -> A3 (on; --large)
+#   cutline: dotted | marks | off; the cut line of the 11x17 copy and of the
+#     fold-out sheets and flaps: dotted = one dotted line (scissors, knife);
+#     marks = short crop marks (paper cutter); off = none (dotted; set cutline)
+#   foldouts: off | on; on = a part may use fold-out sheets to save page turns
+#     (off; per part; `set ID "Trombones:foldouts=on"`, see PLAN-AND-FOLDOUTS.md)
+#   foldside: right | left | auto; the side of a fold-out flap (right; per part)
 #   small_mm: below this staff height (held by the source line width) the
 #     CLI offers re-flow (6.5), when reflow_offer is on
 #   reflow_offer: on | off; off = no re-flow question after a build and no
@@ -179,7 +185,7 @@ LAYOUT_DEFAULTS = {"paper": "letter", "scale": None, "gap": 10.0, "gap_min": 7.0
                    "ink": "normal", "bar_numbers": "start",
                    "margin_top": 15.0, "margin_bottom": 15.0, "margin_side": 15.0,
                    "gutter": 5.0, "binding": 0.0, "duplex": "auto",
-                   "bar_raise": 1.0, "bar_size": 2.0, "large": "on", "logo": "on",
+                   "bar_raise": 1.0, "bar_size": 2.0, "large": "on", "cutline": "dotted", "logo": "on",
                    "title_page": "auto", "reflow": "off", "rests": "compress", "max_staff_mm": 8.0,
                    "small_mm": 6.5, "group_gap": None, "reflow_offer": "off",
                    "turns": "any", "breaks": None, "foldouts": "off",

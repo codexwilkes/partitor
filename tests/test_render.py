@@ -742,6 +742,24 @@ class TestFoldoutRender(unittest.TestCase):
             self.assertFalse(Path(d, "p-assemble.txt").exists())
             self.assertFalse(Path(d, "p-foldout-flaps.pdf").exists())
 
+    def test_cutline_choice_shapes_the_foldout_cut_lines(self):
+        import re
+        want = {"dotted": (1, 0), "marks": (2, 0), "off": (0, 0)}    # cut drawings beyond the fold
+        for c in ("dotted", "marks", "off"):
+            with tempfile.TemporaryDirectory() as d:
+                self.render(d, self.music(56), cutline=c)
+                front = pymupdf.open(Path(d, "p-foldout-sheets.pdf"))[0]
+                flap = pymupdf.open(Path(d, "p-foldout-flaps.pdf"))[0]
+                txt = Path(d, "p-assemble.txt").read_text(encoding="utf-8")
+                with self.subTest(cutline=c):
+                    n = len(front.get_drawings())
+                    self.assertEqual(n, 1 + want[c][0])               # the fold line + the cut
+                    self.assertEqual(len(flap.get_drawings()), want[c][0])
+                    self.assertEqual("cut 1/2 in" in front.get_text(), c != "off")
+                    self.assertEqual("crop marks" in txt, c == "marks")
+                    self.assertEqual("No cut line is printed" in txt, c == "off")
+                    self.assertEqual("dotted line marked" in txt, c == "dotted")
+
     def test_the_dotted_guides_are_on_the_front_only(self):
         for side in ("right", "left"):
             with tempfile.TemporaryDirectory() as d:

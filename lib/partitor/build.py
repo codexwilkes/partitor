@@ -733,7 +733,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                   + "  (no rest to turn in; set breaks or accept)")
         if lines_dir is not None:
             save_lines(lines_path(lines_dir, name), name, dpi, {**meta, **extra}, o, strips, plan_src)
-        big = (large_copy(fn, opts["paper"])
+        big = (large_copy(fn, opts["paper"], opts.get("cutline", "dotted"))
                if opts.get("large") == "on" and opts["paper"] in LARGE else None)
         rec = {"part": name, "pages": n, "reflow": opts.get("reflow") == "on",
                "width_mm": round(h_width, 2),

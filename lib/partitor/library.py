@@ -55,6 +55,7 @@ SET_KEYS = {          # set key -> (layout key or None for metadata, parser)
     "bar_numbers": ("bar_numbers", ("start", "none")),
     "bar_raise": ("bar_raise", float), "bar_size": ("bar_size", float),
     "large": ("large", ("on", "off")),
+    "cutline": ("cutline", ("dotted", "marks", "off")),
     "logo": ("logo", ("on", "off")),
     "reflow": ("reflow", ("on", "off")), "reflow_offer": ("reflow_offer", ("on", "off")),
     "max_staff_mm": ("max_staff_mm", float),

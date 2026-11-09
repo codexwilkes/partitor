@@ -123,7 +123,9 @@ printer allows. Different people can print different parts in different ways.
    `-assemble.txt` lists (the sheets replace the others).
 2. Sheet file: ledger paper, double-sided, flip on the short edge.
 3. Cut each sheet along the dotted "cut" line. This takes about ½ in off the
-   free edge of the flap.
+   free edge of the flap. With `cutline=marks` the sheet has short crop marks
+   at the top and foot instead; with `cutline=off` it has no line (trim ½ in
+   by eye).
 4. Fold along the dotted line in the middle. The flap folds forward over its page.
 5. Put each sheet in the place that `-assemble.txt` gives ("in place of pages
    3 and 4 of the part file").
@@ -198,6 +200,7 @@ before 0.8.21 has no bar numbers in its plan data: `plan` says so; rebuild once.
 
 Set with `partitor set ID PART:key=value`. `plan PART N` sets `paper`,
 `max_staff_mm`, `reflow`, `foldouts` and `pages` for you. All keys: `paper`, `max_staff_mm`, `reflow`, `foldouts` (`on` or `off`),
+`cutline` (`dotted`, `marks`, `off`: how the cut is shown, also on the large-print copy),
 `foldside` (`right`, `left`, `auto`), `binding` (mm at the spine), `pages`
 (page limit), `duplex`. A part with `duplex=off` is single-sided and has no
 plan.

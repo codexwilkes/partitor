@@ -119,6 +119,18 @@ class TestRepeatsAndExtras(unittest.TestCase):
                         self.assertAlmostEqual(lines[0]["rect"].y0, y, delta=0.5)
                         self.assertAlmostEqual(lines[0]["rect"].width, size[0], delta=0.5)
 
+    def test_large_copy_cutline_choices(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d, "p.pdf")
+            doc = pymupdf.open()
+            doc.new_page(width=612.0, height=792.0)
+            doc.save(src)
+            got = {}
+            for c in ("dotted", "marks", "off"):
+                got[c] = pymupdf.open(pt.large_copy(src, "letter", c))[0].get_drawings()
+        self.assertEqual([len(got[c]) for c in ("dotted", "marks", "off")], [1, 2, 0])
+        self.assertLess(got["marks"][0]["rect"].width, 100)
+
     def test_large_copy_cut_line_is_dotted(self):
         with tempfile.TemporaryDirectory() as d:
             src = Path(d, "p.pdf")

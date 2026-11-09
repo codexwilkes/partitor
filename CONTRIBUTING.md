@@ -28,6 +28,24 @@ Ubuntu LTS on x86-64 with systemd. Other platforms are best effort.
   new text as a new subsection.
 - Keep English plain and short.
 
+## Add a choice (a user setting)
+
+Add a choice only when the right answer depends on the player's equipment or
+habit, not on the score. Keep the old behaviour as the default, so an item
+built before the choice builds the same.
+
+- One lowercase key. Use an enum (`dotted | marks | off`), not a boolean, when a
+  third value is plausible.
+- Put it in `LAYOUT_DEFAULTS` (`lib/partitor/config.py`) and describe it in
+  `LAYOUT_HELP` there.
+- Put it in `SET_KEYS` (`lib/partitor/library.py`), so `partitor set` accepts it.
+- Add a `--flag` in `lib/partitor/cli_main.py` only for a build option.
+- Pass it where it acts (read it with `opts.get(key, default)`).
+- Name it in `docs/DESIGN.md`, and add a CHANGELOG entry.
+
+`tests/test_choices.py` fails when an enum key misses `SET_KEYS`,
+`LAYOUT_HELP` or `docs/DESIGN.md`.
+
 ## Run the checks
 
 CI (`.github/workflows/ci.yml`) runs the same checks on every pull request:
