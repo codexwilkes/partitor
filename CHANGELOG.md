@@ -7,6 +7,20 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.27 — 2026-11-09
+
+### Fixed
+
+- Re-flow of a group score: one line could stay whole only because its staves
+  lay 2 to 3 px (0.2 sp) off the staves of every other line of the scan. No line
+  could lend it a clef and key prefix, and its width capped the staff of the whole
+  part (Letter: 4.2 mm instead of about 6 mm or more). A line now borrows a prefix
+  from a line whose staves lie within 0.3 sp, and the copied clef and key are moved,
+  staff by staff, to the rows of the line that takes them. Two lines still share
+  an output line only within 0.07 sp. Parts without this case build the same as
+  0.8.26. Rebuild a part whose `plan` says `line N cannot be cut`.
+
+
 ## 0.8.26 — 2026-11-08
 
 ### Changed

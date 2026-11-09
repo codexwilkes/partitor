@@ -694,6 +694,56 @@ class TestGroupReflow(unittest.TestCase):
         ls[3].movement = True                                       # another movement: no donor
         self.assertIsNone(pt.find_prefixes(ls)[3])
 
+    def odd_lone(self, tops):
+        """Two lines, a multi-bar rest line, and a lone line whose staves lie a few px off the
+        others (scan jitter). The lone line has no gap of its own to compare: it must borrow."""
+        from types import SimpleNamespace
+        ls = self.lines()[:2]
+        rest = group_line([], [198])
+        rest.staff_labels = []
+        rest.rest_src = (None, None, SimpleNamespace(bars=6))
+        return ls + [rest, group_line([(72, 12), (125, 4)], [110, 160, 198], tops=tops)]
+
+    def test_line_with_staves_a_few_px_off_still_borrows_a_prefix(self):
+        """Real item: one line of a trombone group had its staves 2 and 3 px off
+        (0.2 sp) from every other line, so no line could lend it a prefix: it
+        stayed whole and its width capped the staff of the whole part."""
+        ls = self.odd_lone((40, 168, 298))
+        self.assertFalse(pt._same_stack(ls[0], ls[3]))              # beyond the join tolerance
+        self.assertTrue(pt._same_stack(ls[0], ls[3], pt.REFLOW_STACK_SP))
+        pre = pt.find_prefixes(ls)
+        self.assertIsNotNone(pre[3])
+        self.assertIn(pre[3][1], (0, 1))
+        self.assertEqual(pt.whole_reason(ls[3], pre[3]), "")
+
+    def test_a_staff_far_off_gets_no_prefix(self):
+        ls = self.odd_lone((40, 176, 300))                          # 6 px: 0.6 sp
+        self.assertIsNone(pt.find_prefixes(ls)[3])
+
+    def test_borrowed_prefix_is_moved_to_the_staves_of_its_line(self):
+        ls = self.odd_lone((40, 168, 298))
+        out = pt.reflow(ls, 140.0, pt.find_prefixes(ls))
+        mine = [o for o in out if [t - o.staff_top for _, t, _ in o.staff_labels] == [0, 128, 258]]
+        self.assertGreater(len(mine), 1)                            # the lone line is cut
+        for o in mine:
+            for _, t, _ in o.staff_labels:
+                # the staff lines run through the copied clef and key without a step
+                self.assertTrue(o.img[t:t + 41:10, 0:60].any(axis=1).all(), t)
+                self.assertTrue(o.img[t - 12:t + 54, 6:25].any())   # the copied clef sits on its staff
+                self.assertTrue(o.img[t + 4:t + 22, 36:56].any())   # and the key signature
+
+    def test_restack_leaves_equal_stacks_alone_and_moves_the_others(self):
+        a = group_line([(70, 4)], [100, 198], first=True)
+        same = group_line([(75, 20)], [105, 198], tops=(40, 170, 300))
+        self.assertIs(pt._restack(a, same), a)                      # builds that work are unchanged
+        far = group_line([(75, 20)], [105, 198], tops=(40, 167, 296))
+        moved = pt._restack(a, far)
+        self.assertIsNot(moved, a)
+        self.assertEqual(moved.img.shape, a.img.shape)
+        self.assertTrue(moved.img[167:167 + 41:10, 0:60].any(axis=1).all())    # staff 2 lines at the new rows
+        self.assertFalse(np.array_equal(moved.img, a.img))
+        self.assertEqual(int(moved.img[40:81].sum()), int(a.img[40:81].sum()))  # the top staff is untouched
+
     def test_label_column_is_equal_on_every_re_flowed_line(self):
         ls = self.lines()
         out = pt.finish_lines(pt.reflow(ls, 140.0, pt.find_prefixes(ls)), "G", True)

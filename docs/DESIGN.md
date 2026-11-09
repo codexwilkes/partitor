@@ -424,9 +424,11 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
       through the full staff height at the system barline). A line with no
       common barline at its end stays whole, and the build says why. A
       continuation line copies the clef and key of every staff from a line
-      with the same staves at the same distances (0.07 sp). Lines with other
-      staves, or the same staves at other distances, never share a prefix or
-      an output line. A multi-bar rest line is never cut and keeps its
+      with the same staves at distances within 0.3 sp (0.8.27; scan lines lie
+      a few px apart); the copy is moved, staff by staff, to the rows of the
+      line it joins. Two lines share an output line only at distances within
+      0.07 sp. Lines with other staves, or the same staves at other
+      distances, never share a prefix or an output line. A multi-bar rest line is never cut and keeps its
       bracket.
     - Page budget: a group has several staves per line, so pages grow with the
       square of the staff size. With `pages=auto` a re-flowed group may use

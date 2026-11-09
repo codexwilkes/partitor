@@ -18,6 +18,7 @@ from .model import Strip
 REFLOW_MAX_PREFIX_SP = 12.0     # clef + key signature: never wider than this
 REFLOW_SAME_SP = 1.2            # lines equal this far past the gap (sp) look like one structure (a longer key)
 REFLOW_CLEAR_SP = 2.5           # but a blank this wide after the gap ends the key signature
+REFLOW_STACK_SP = 0.3           # a line borrows a prefix from a line whose staves lie this close (sp); the copy is moved to fit
 
 
 def _x0(s: Strip) -> int:
@@ -148,13 +149,38 @@ def _staff_offs(s: Strip) -> tuple:
     return tuple(int(t - s.staff_top) for _, t, _ in s.staff_labels) if len(s.staff_labels) > 1 else ()
 
 
-def _same_stack(a: Strip, b: Strip) -> bool:
-    """Same staves at the same distances (within 0.07 sp): pieces of the two
-    lines can stand side by side with their staff lines joined."""
+def _same_stack(a: Strip, b: Strip, tol_sp: float = 0.07) -> bool:
+    """Same staves at the same distances (within tol_sp, 0.07 sp unless said):
+    pieces of the two lines can stand side by side with their staff lines
+    joined."""
     if _staff_set(a) != _staff_set(b):
         return False
-    tol = max(1.0, 0.07 * a.sp)
+    tol = max(1.0, tol_sp * a.sp)
     return all(abs(x - y) <= tol for x, y in zip(_staff_offs(a), _staff_offs(b)))
+
+
+def _restack(donor: Strip, target: Strip) -> Strip:
+    """_restack -> the donor with each staff of a group moved up or down to the
+    row it has in target (the lines of one scan lie a few px apart), so that
+    the copied clef and key meet the music of target with the staff lines
+    joined. The donor itself when the two stacks are the same already."""
+    if _same_stack(donor, target):
+        return donor
+    h = donor.img.shape[0]
+    lab = donor.staff_labels
+    cuts = [0] + [(lab[m - 1][2] + lab[m][1]) // 2 for m in range(1, len(lab))] + [h]
+    move = [t_ - d_ for t_, d_ in zip(_staff_offs(target), _staff_offs(donor))]
+
+    def shift(a):
+        out = np.zeros_like(a)
+        for m, dy in enumerate(move):
+            r0, r1 = int(cuts[m]), int(cuts[m + 1])
+            a0, a1 = max(0, r0 + dy), min(h, r1 + dy)
+            if a1 > a0:
+                out[a0:a1] = a[a0 - dy:a1 - dy]
+        return out
+    num = None if donor.num_mask is None else shift(donor.num_mask)
+    return dc_replace(donor, img=shift(donor.img), hdr=shift(donor.hdr), num_mask=num)
 
 
 def _group_view(s: Strip) -> Strip:
@@ -203,7 +229,8 @@ def find_prefixes(strips: list[Strip]) -> list[tuple[int, int] | None]:
     Group lines (several staves, 0.3.0-dev.34) are searched in a one-staff
     view of all their staves (_group_view); a movement is also split where
     the staves of the lines change, and a line borrows a prefix only from a
-    line with the same staves at the same distances."""
+    line with the same staves at distances within REFLOW_STACK_SP (0.3 sp);
+    reflow() moves the copy to the rows of the line that takes it."""
     out: list[tuple[int, int] | None] = [None] * len(strips)
     owns: dict[int, int] = {}          # line -> its own prefix end (img px from the staff start)
     orig = strips
@@ -262,7 +289,7 @@ def find_prefixes(strips: list[Strip]) -> list[tuple[int, int] | None]:
                 continue
             # nearest line with its own prefix that matches this one up to it
             for k in sorted(own, key=lambda k: abs(k - i)):
-                if _same_stack(orig[i], orig[k]) \
+                if _same_stack(orig[i], orig[k], REFLOW_STACK_SP) \
                    and _diverge(strips[i], strips[k]) >= own[k] - 0.5 * sp:
                     out[i] = (0, k)
                     break
@@ -277,7 +304,7 @@ def find_prefixes(strips: list[Strip]) -> list[tuple[int, int] | None]:
         if out[i] is not None or s_.rest_src is not None or not _single(strips[i]):
             continue
         for k in sorted(owns, key=lambda k: abs(k - i)):
-            if mv[k] == mv[i] and _same_stack(orig[i], orig[k]) \
+            if mv[k] == mv[i] and _same_stack(orig[i], orig[k], REFLOW_STACK_SP) \
                and _diverge(strips[i], strips[k]) >= owns[k] - 0.5 * s_.sp:
                 out[i] = (0, k)
                 break
@@ -390,7 +417,7 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
                 pieces = [(s_, 0, pre[i][0], True)] if pre[i][0] > 0 else []
             else:                                    # continuation: copied clef + key
                 k_ = pre[i][1]
-                pieces = [(strips[k_], 0, pre[k_][0], False)]
+                pieces = [(_restack(strips[k_], s_), 0, pre[k_][0], False)]
             for ii, bb in bars[a:z]:
                 x0, x1 = span(ii, bb)
                 pieces.append((strips[ii], x0, x1, True))
