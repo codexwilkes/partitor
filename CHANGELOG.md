@@ -7,6 +7,13 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## Unreleased
+
+### Changed
+
+- Docs: `OPERATING.md` has the steps to change the paper or the staff size of
+  one part, and why a low page limit gives a very small staff.
+
 ## 0.8.28 — 2026-11-09
 
 ### Fixed

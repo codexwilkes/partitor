@@ -39,6 +39,9 @@ bar 45": the number you read on the sheet.
 4. Apply it: `partitor rebuild 12 Trombones`.
 5. Print. If the part has fold-outs, open the file that ends in `-assemble.txt`.
 
+Step 3 also sets the page limit. Without it, the build can shrink the staff
+of a group part to stay inside an old limit (staff 4 mm instead of 6 mm).
+
 `plan` changes nothing until you choose a number. A choice is saved as
 settings of that part only, and `plan` marks it. You can choose again at any
 time. `partitor plan 12` with no part shows the groups and the parts that have

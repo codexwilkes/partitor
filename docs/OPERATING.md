@@ -56,6 +56,30 @@ the `set` keys (`DESIGN.md` §3 and §6.2).
 - **Build time**: minutes for a long score. The run has a time limit
   (`PARTITOR_RUNTIME_MAX`, default 3600 s) and runs at low priority.
 
+## Change the paper or the staff size of one part
+
+Use this when a part prints too small, or on the wrong paper. Example: item 3,
+part Trombones, Letter paper.
+
+1. Show the options: `partitor plan 3 Trombones --all`.
+2. Read the table (`PLAN-AND-FOLDOUTS.md`). Each row is a paper and a staff
+   size. `pages` is the page count of that row. Pick a row with `bad` = 0 and
+   `fold-out` = 0 if you can. Note its number `N`.
+3. Choose the row: `partitor plan 3 Trombones N`. This saves paper, staff size,
+   re-flow and the page limit for that part. It does not build.
+4. Build: `partitor rebuild 3`.
+
+Do not set `pages` by hand. Step 3 sets it to the page count of the row plus
+two spare pages.
+
+Why the page limit matters: a part with several staves per line (a group, for
+example three trombones) grows fast with the staff size. The build keeps the
+page count at or below the limit and shrinks the staff to do it. A small
+limit gives a small staff, for example 4 mm. When the build prints
+`page budget N`, the staff size follows from N. To get a bigger staff, choose
+a row with more pages. The numbers in `plan` are estimates. The build gives
+the real numbers.
+
 ## Problems
 
 | You see | Do |
@@ -67,6 +91,7 @@ the `set` keys (`DESIGN.md` §3 and §6.2).
 | A run stops after an hour | Raise `PARTITOR_RUNTIME_MAX`. |
 | Killed during a detect or a build (out of memory) | Lower `PARTITOR_JOBS` or raise `PARTITOR_MEMORY_MAX`. |
 | A `build` is slow although only the layout changed | The first `detect` or `build` of a PDF fills `cache/` in the item folder; later ones read it (`analysis cache: N of M page(s) found`). A new PDF, a new dpi, a change of the analysis code or of the cv2, numpy, pymupdf or tesseract version analyses again. `PARTITOR_CACHE=0` turns it off; `rm -r cache/` is safe. |
+| A part prints with a very small staff (4 mm) | The page limit is too low. See "Change the paper or the staff size of one part". |
 | Wrong parts or bar numbers | `KNOWN-LIMITS.md`; correct in the item menu; check the proof PDF. |
 
 An interrupted build leaves the previous `parts/` set in place; a build that
