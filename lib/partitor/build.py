@@ -540,6 +540,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                                      bar_no=bar_of.get(srec["id"]), marks=mk,
                                      movement=gsys in res.restart)
                 stp.bar_raise, stp.bar_size = opts["bar_raise"], opts["bar_size"]
+                stp.rest_bar = opts["rest_bar"]
                 set_bar_geometry(stp, res, idx, gsys, nums_of.get(srec["id"], []))
                 ap[part].append(stp)
             for gname, gparts in groups.items():
@@ -562,6 +563,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                                   nums=nums_of.get(srec["id"], []),
                                   gap_sp=own_group_gap(lay, gname, opts))
                 stp.bar_raise, stp.bar_size = opts["bar_raise"], opts["bar_size"]
+                stp.rest_bar = opts["rest_bar"]
                 stp.bracket = len(idx) > 1
                 ag[gname].append(stp)
         return ap, ag, ids

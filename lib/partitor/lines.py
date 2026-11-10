@@ -18,7 +18,8 @@ from . import VERSION
 from .config import file_part_name
 from .mapping import _NUMERALS
 from .model import RestRun, Strip
-from .reflow import MERGE_EDGE_SP, REST_BAR_SP, _diverge, _single, _x0, find_prefixes, rest_bar_block
+from .reflow import (MERGE_EDGE_SP, REST_BAR_SP, _diverge, _single, _x0, draw_hbar,
+                     find_prefixes, rest_bar_block)
 from .strips import anchor
 from .typography import put_text, text_len
 
@@ -71,7 +72,8 @@ def justify(s: Strip, target: int) -> Strip:
     if s.rest_src is not None:
         src, cw, run = s.rest_src
         r = make_rest_strip(s, src, cw, run, {"bar_raise": s.bar_raise,
-                                              "bar_size": s.bar_size},
+                                              "bar_size": s.bar_size,
+                                              "rest_bar": s.rest_bar},
                             staff_len=target)
         r = dc_replace(r, bracket=s.bracket)     # drawn again: keep the group bracket
         return pad_left(dc_replace(r, name_label=s.name_label), s.indent) if s.indent else r
@@ -382,15 +384,9 @@ def make_rest_strip(tpl: Strip, src: Strip | None, cw: int, run: RestRun,
             col[y:y + th] = True
     img[:, cw:] |= col[:, None]
     x0, x1 = cw, cw + wr
-    mid = top + int(round(2 * sp))
+    style = opts.get("rest_bar", tpl.rest_bar)
     if run.bars > 1:                               # H-bar on the middle line
-        a, b = x0 + int(2 * sp), x1 - int(2 * sp)  # across the measure (engraving)
-        img[mid - int(0.45 * sp):mid + int(0.45 * sp) + 1, a:b] = True
-        # brackets at both ends: full staff height, 0.5 sp thick (operator request
-        # 2026-10-24, twice: 0.3 sp from line 2 to 4 was not seen)
-        sw = max(4, int(round(0.5 * sp)))
-        for xx in (a, b - sw):
-            img[top:top + h4 + th, xx:xx + sw] = True
+        draw_hbar(img, top, x0 + int(2 * sp), x1 - int(2 * sp), sp, style)   # across the measure (engraving)
     else:                                          # whole rest: hangs from the 2nd line
         c = (x0 + x1) // 2
         y = top + int(round(sp))
@@ -410,6 +406,7 @@ def make_rest_strip(tpl: Strip, src: Strip | None, cw: int, run: RestRun,
     return Strip(img, x_staff, top, top + h4, sp, hdr,
                  None if run.movement or run.first is None else run.first,
                  opts.get("bar_raise", 1.0), opts.get("bar_size", 2.0),
+                 rest_bar=style,
                  movement=run.movement,
                  rest_label=((x0 + x1) / 2, str(run.bars)) if run.bars > 1 else None,
                  rest_src=(src, cw, run))
@@ -667,7 +664,7 @@ def _merge_run(s: Strip, b0: int, b1: int, pre_x: int) -> Strip:
     xa = pre_x if b0 == 0 else s.bars_x[b0 - 1] + e
     xb = s.bars_x[b1] - e
     tops = [int(round(ln[0])) for ln in staff_lines(s)]
-    block = rest_bar_block(s.img, xa, xb, tops, sp)
+    block = rest_bar_block(s.img, xa, xb, tops, sp, s.rest_bar)
     if block is None:
         return s
     orig = xb - xa
@@ -705,7 +702,8 @@ LINES_FORMAT = 1
 # Fields added to Strip after the format shipped, with their defaults: a file
 # written before the field loads (the lines have none of it); any other
 # difference in the fields still means "rebuild the part".
-_FIELD_DEFAULTS = {"name_labels": list, "rest_labels": list, "rest_in": int, "rest_out": int, "rest_counts": list}
+_FIELD_DEFAULTS = {"name_labels": list, "rest_labels": list, "rest_in": int, "rest_out": int, "rest_counts": list,
+                   "rest_bar": lambda: "engraved"}
 _NP_OK = {"_reconstruct", "ndarray", "dtype", "scalar", "_frombuffer"}
 
 

@@ -412,6 +412,9 @@ def main() -> int:
     b.add_argument("--rests", choices=["compress", "keep"],
                    help="compress = empty staves and rest-only bars become multi-bar rests "
                         "(compress)")
+    b.add_argument("--rest-bar", dest="rest_bar", choices=["engraved", "bold", "heavy"],
+                   help="H-bar of a multi-bar rest: engraved = thin serifs (as in Bravura), "
+                        "bold = thicker, heavy = the look of 0.8.30 (engraved)")
     b.add_argument("--jobs", help="worker processes: a number or auto (default: PARTITOR_JOBS, else auto)")
     b.add_argument("--only", nargs="+", metavar="NAME", help="build these parts or groups only")
     a = p.parse_args()

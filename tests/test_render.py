@@ -1362,6 +1362,7 @@ class TestLinesFileCompatibility(unittest.TestCase):
         for st in d["strips"]:
             self.assertEqual(st.rest_labels, [])
             self.assertEqual((st.rest_in, st.rest_out), (0, 0))
+            self.assertEqual(st.rest_bar, "engraved")        # 0.8.31: the H-bar look of a line saved before
 
     def test_a_file_with_an_unknown_field_is_refused(self):
         import gzip

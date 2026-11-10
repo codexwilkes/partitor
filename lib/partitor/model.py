@@ -75,6 +75,7 @@ class Strip:
     bar_no: int | None = None   # number printed at the line start
     bar_raise: float = 1.0      # least baseline height above the staff, sp
     bar_size: float = 2.0       # number size, sp
+    rest_bar: str = "engraved"   # H-bar look of a multi-bar rest (REST_BAR_STYLES in reflow)
     marks: list = field(default_factory=list)   # [(x in img, letter)] rehearsal marks
     movement: bool = False      # starts a movement (extra space above)
     bracket: bool = False       # group score: draw a bracket at the left

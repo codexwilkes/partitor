@@ -62,6 +62,7 @@ SET_KEYS = {          # set key -> (layout key or None for metadata, parser)
     "title_page": ("title_page", ("auto", "off")),
     "group_gap": ("group_gap", "gapsp"),
     "rests": ("rests", ("compress", "keep")),
+    "rest_bar": ("rest_bar", ("engraved", "bold", "heavy")),
     "turns": ("turns", ("any", "rest")), "breaks": ("breaks", "breaks"),
     "foldouts": ("foldouts", ("off", "on")), "foldside": ("foldside", ("right", "left", "auto")),
 }

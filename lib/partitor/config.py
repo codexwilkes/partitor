@@ -112,6 +112,11 @@ LAYOUT_HELP = """\
 #   rests: compress | keep; compress = empty staves, and runs of bars with only
 #     rests on every staff, become multi-bar rests
 #     (compress; --rests)
+#   rest_bar: engraved | bold | heavy; the look of the H-bar of a multi-bar
+#     rest. engraved = a bar 1 sp thick, thin serifs (0.16 sp) from line 2 to
+#     line 4, as in Bravura; bold = thicker serifs (0.35 sp) over the full staff
+#     height, for a faint print or scan; heavy = the look of 0.8.11 to 0.8.30
+#     (0.5 sp brackets, full height) (engraved; --rest-bar, `set ID rest_bar=...`)
 #   title_page: auto | off; auto = a title page for 3+ pages of music
 #     printed double-sided (auto; --title-page)
 #   logo: on | off; the logo on the first page and the back page: the file of
@@ -186,7 +191,7 @@ LAYOUT_DEFAULTS = {"paper": "letter", "scale": None, "gap": 10.0, "gap_min": 7.0
                    "margin_top": 15.0, "margin_bottom": 15.0, "margin_side": 15.0,
                    "gutter": 5.0, "binding": 0.0, "duplex": "auto",
                    "bar_raise": 1.0, "bar_size": 2.0, "large": "on", "cutline": "dotted", "logo": "on",
-                   "title_page": "auto", "reflow": "off", "rests": "compress", "max_staff_mm": 8.0,
+                   "title_page": "auto", "reflow": "off", "rests": "compress", "rest_bar": "engraved", "max_staff_mm": 8.0,
                    "small_mm": 6.5, "group_gap": None, "reflow_offer": "off",
                    "turns": "any", "breaks": None, "foldouts": "off",
                    "foldside": "right"}

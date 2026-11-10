@@ -7,6 +7,20 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.31 — 2026-11-10
+
+### Changed
+- The H-bar of a multi-bar rest now follows the Bravura restHBar (SMuFL): a bar 1 sp thick on
+  the middle line, with a thin serif (0.16 sp, as a barline) at each end from line 2 to line 4.
+  Before, each end had a bracket 0.5 sp thick over the full staff height.
+- One function (`draw_hbar`) now draws every H-bar: a rest line, a merged measure inside a line
+  and a measure joined by re-flow.
+
+### Added
+- Layout key `rest_bar` (`--rest-bar`, `set ID rest_bar=...`): `engraved` (default), `bold`
+  (serifs 0.35 sp, full staff height, for a faint print or scan) or `heavy` (the look of
+  0.8.11 to 0.8.30).
+
 ## 0.8.30 — 2026-11-10
 
 ### Added

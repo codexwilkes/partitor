@@ -114,6 +114,7 @@ Rules:
 | `groups` | `{trombones: [Trombone, Basso Trombone I]}` | Named group outputs (§4.3 item 11). |
 | `skip` | `[Organ R]` | Parts not extracted (no PDF). They stay in `parts` and in the maps, marked "not extracted". |
 | `ink` | `normal` | `normal` or `darker` (§4.3 item 10). |
+| `rest_bar` | `engraved` | `engraved`, `bold` or `heavy`: the H-bar of a multi-bar rest (§5.5). |
 | `rests` | `compress` | `compress` or `keep`: multi-bar rest lines for left-out staves and for runs of rest-only bars inside a line (§4.2 item 9). |
 | `min_staff_mm`, `max_staff_mm` | `5`, `8` | Staff height floor and ceiling in mm (§5.2). |
 | `reflow_offer` | `off` | `on`: the CLI offers re-flow after a build when the print is small (§4.2 item 2). `reflow=on` works with either value. |
@@ -188,7 +189,7 @@ notehead, slur or word goes whole to one owner.
    - A movement starts a new line. Bars of two source lines share a line only
      when their prefixes match.
    - A line that starts with a merged multi-bar rest is not a donor of the clef and key (0.8.29):
-     its prefix ends after the left bracket of the H-bar, so a copy would bring a stray thick
+     its prefix ends after the left serif of the H-bar, so a copy would bring a stray
      barline. The copy comes from the nearest line of the movement, with the same staves and the
      same clef and key, that does not start with a rest.
    - Bar numbers and rehearsal letters move with their bars. Printed mid-line
@@ -248,13 +249,13 @@ notehead, slur or word goes whole to one owner.
    number is the first bar of the rest. The count is the difference of the
    line-start numbers when the next system has one (a printed number corrects
    a wrong barline count), else the counted bars. A movement start begins a
-   new rest line and keeps the movement title. The H-bar has a bracket at
-   each end: full staff height, 0.5 sp thick. "Tacet" is not built.
+   new rest line and keeps the movement title. The H-bar has a serif at
+   each end; its look is the layout key `rest_bar` (0.8.31, §5.5). "Tacet" is not built.
    Bars of rests inside a line that is printed (0.8.11, `merge_rest_bars` in
    `lines`, before re-flow): a run of 2 or more bars is one measure when every
    staff of the line holds, in that bar, one filled rest block (a whole or half
    rest) and nothing else but staff lines and barlines. The bar becomes an
-   H-bar with brackets on each staff and the count above every staff
+   H-bar with serifs on each staff and the count above every staff
    (`Strip.rest_labels`); the barlines inside the run go, the merged bar keeps
    the number of its first bar, and the line gets shorter, so re-flow and the
    planner see fewer lines. The test is made for certain: a note, a stem, a
@@ -703,9 +704,15 @@ as a rest to turn in; a group line counts as rest only when every staff rests.
   do not count, so lyrics and titles stay whole), the same amount in each gap,
   not before the clef end (4.5 sp). Engraved glyphs are never stretched. A
   movement's last line under 60 % of the width stays short. Multi-bar rest
-  lines are drawn at the width; the H-bar spans the measure, with a bracket at
-  each end (full staff height, 0.5 sp thick). In a group score the rest line
-  keeps the system bracket.
+  lines are drawn at the width; the H-bar spans the measure, with a serif at
+  each end. In a group score the rest line keeps the system bracket.
+- H-bar look (0.8.31, layout key `rest_bar`, `--rest-bar`, `set ID rest_bar=...`; the SMuFL
+  restHBar of Bravura is the model). `engraved` (default): a bar 1 sp thick on the middle line,
+  thin serifs (0.16 sp, as a barline) from line 2 to line 4. `bold`: serifs 0.35 sp thick over
+  the full staff height, for a faint print or scan. `heavy`: the look of 0.8.11 to 0.8.30 (bar
+  0.9 sp, brackets 0.5 sp, full height). A serif is never under 2 px (bold 3, heavy 4). One
+  function (`reflow.draw_hbar`) draws every H-bar: the rest line, the merged measure and the
+  measure joined by re-flow. The style is a Strip field (`rest_bar`), kept by justify.
 - First line: when it is 4 sp or more shorter (the source indents it), it is
   indented by room for the part name (at least the source indent, at most 15 %
   of the width) and justified; the full part name (score.yaml) stands in the
@@ -978,7 +985,7 @@ Details:
 - `set` keys: title, subtitle, composer, composer_short, pages (auto or N), paper (letter, a4 or
   ledger), gap, min_gap, ink, scale, min_staff_mm, margin_top, margin_bottom,
   margin_side, gutter, binding, duplex, bar_numbers, bar_raise, bar_size, large, cutline (dotted, marks or off), logo,
-  reflow, reflow_offer, max_staff_mm, title_page, group_gap, rests, turns, foldouts, foldside, and per part
+  reflow, reflow_offer, max_staff_mm, title_page, group_gap, rests, rest_bar (engraved, bold or heavy), turns, foldouts, foldside, and per part
   breaks
   (per part, as `Name:key=value`: pages, gap, min_gap, scale, min_staff_mm, max_staff_mm,
   group_gap, reflow, title_page, bar_raise, bar_size, ink, turns, breaks, and since 0.8.4

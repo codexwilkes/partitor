@@ -364,32 +364,46 @@ def _compose(pieces: list[tuple[Strip, int, int, bool]]) -> tuple[np.ndarray, np
 # Multi-bar rest measure drawn over a span of a line
 # =============================================================================
 REST_BAR_SP = 26.0      # width of a multi-bar rest (H-bar) measure
+# H-bar look (layout key `rest_bar`): (bar thickness sp, serif thickness sp, first and last staff
+# line the serif spans (0 = top line, 4 = bottom line), least serif width px). `engraved` follows
+# Bravura's restHBar (SMuFL): a thick bar, thin serifs from line 2 to line 4.
+REST_BAR_STYLES = {"engraved": (1.0, 0.16, 1, 3, 2),
+                   "bold": (1.0, 0.35, 0, 4, 3),
+                   "heavy": (0.9, 0.5, 0, 4, 4)}       # the look of 0.8.11 to 0.8.30
+REST_BAR_DEFAULT = "engraved"
 MERGE_EDGE_SP = 0.8     # clear of the barlines (sp)
 MERGE_SAVE_SP = 3.0     # a merge must save this much width (sp)
 MERGE_MIN_SP = 8.0      # narrowest merged measure (sp)
 
 
-def rest_bar_block(img: np.ndarray, xa: int, xb: int, tops: list[int], sp: float) -> np.ndarray | None:
+def draw_hbar(img: np.ndarray, top: int, a: int, b: int, sp: float, style: str = REST_BAR_DEFAULT) -> None:
+    """draw_hbar -> nothing; draws in img the H-bar of one staff from column a to
+    column b: the bar on the middle line, a serif at each end. top: the row of the
+    top line. style: a key of REST_BAR_STYLES (an unknown one draws the default)."""
+    bt, st, k0, k1, least = REST_BAR_STYLES.get(style) or REST_BAR_STYLES[REST_BAR_DEFAULT]
+    th = max(1, int(round(0.1 * sp)))
+    mid = top + int(round(2 * sp))
+    half = int(bt / 2 * sp)
+    img[max(0, mid - half):mid + half + 1, a:b] = True
+    sw = max(least, int(round(st * sp)))
+    for xx in (a, b - sw):
+        img[top + int(round(k0 * sp)):top + int(round(k1 * sp)) + th, xx:xx + sw] = True
+
+
+def rest_bar_block(img: np.ndarray, xa: int, xb: int, tops: list[int], sp: float,
+                   style: str = REST_BAR_DEFAULT) -> np.ndarray | None:
     """rest_bar_block -> the columns of one multi-bar rest measure (an H-bar on
-    each staff, brackets at both ends) that replace img[:, xa:xb], or None when
-    the measure would save less than MERGE_SAVE_SP. The staff lines come from the
-    column of img near xa. tops: the row of the top line of each staff."""
+    each staff, serifs at both ends, see draw_hbar) that replace img[:, xa:xb], or
+    None when the measure would save less than MERGE_SAVE_SP. The staff lines come
+    from the column of img near xa. tops: the row of the top line of each staff."""
     orig = xb - xa
     w = int(max(MERGE_MIN_SP * sp, min(REST_BAR_SP * sp, 0.85 * orig)))
     if orig - w < MERGE_SAVE_SP * sp:
         return None
     col = img[:, min(xb - 1, xa + int(sp))].copy()      # staff lines only
-    h = img.shape[0]
     block = np.repeat(col[:, None], w, axis=1)
-    th = max(1, int(round(0.1 * sp)))
-    h4 = int(round(4 * sp))
-    sw = max(4, int(round(0.5 * sp)))
     for t in tops:
-        mid = t + int(round(2 * sp))
-        a, b = int(2 * sp), w - int(2 * sp)
-        block[max(0, mid - int(0.45 * sp)):mid + int(0.45 * sp) + 1, a:b] = True
-        for xx in (a, b - sw):
-            block[t:min(h, t + h4 + th), xx:xx + sw] = True
+        draw_hbar(block, t, int(2 * sp), w - int(2 * sp), sp, style)
     return block
 
 
@@ -403,7 +417,7 @@ def _starts_with_rest(s: Strip) -> bool:
 
 def _join_rests(img: np.ndarray, hdr: np.ndarray, marks: list, labels: list,
                 bars: list[tuple[int, int, int, int]], sp: float, top: int, bw: int,
-                skip_first: bool) -> tuple[np.ndarray, np.ndarray, list, list]:
+                skip_first: bool, style: str = REST_BAR_DEFAULT) -> tuple[np.ndarray, np.ndarray, list, list]:
     """_join_rests -> (img, hdr, marks, labels) of a re-flowed line where each
     run of bars that hold only rests, and that come from two or more source
     lines, is one multi-bar rest: the two multi-bar rests that touch where two
@@ -432,7 +446,7 @@ def _join_rests(img: np.ndarray, hdr: np.ndarray, marks: list, labels: list,
         xb = x1 - bw - e                                # and of the barline after it
         if not rows or xb <= xa:
             continue
-        block = rest_bar_block(img, xa, xb, [int(round(top + r)) for r in rows], sp)
+        block = rest_bar_block(img, xa, xb, [int(round(top + r)) for r in rows], sp, style)
         if block is None:
             continue
         w, delta = block.shape[1], block.shape[1] - (xb - xa)
@@ -553,7 +567,7 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
             img, hdr, marks, labels = _join_rests(
                 img, hdr, marks, labels,
                 [(xs[n_pre + k], xs[n_pre + k + 1], c, bars[a + k][0]) for k, c in enumerate(rc)],
-                s_.sp, top, bw(s_), skip_first=(b == 0))
+                s_.sp, top, bw(s_), skip_first=(b == 0), style=s_.rest_bar)
             if b < len(s_.bar_nums):
                 num = s_.bar_nums[b]
             elif s_.bar_no is not None:
@@ -566,6 +580,7 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
             r_out = sum(itertools.takewhile(lambda v: v > 0, reversed(rc)))
             line = Strip(img, s_.staff_x0, top, top + (s_.staff_bottom - s_.staff_top),
                          s_.sp, hdr, show, s_.bar_raise, s_.bar_size,
+                         rest_bar=s_.rest_bar,
                          marks=sorted(set(marks)), rest_labels=sorted(labels),
                          rest_in=r_in, rest_out=r_out,
                          movement=first_of_mvt,

@@ -1420,3 +1420,68 @@ class TestMergeRestBars(unittest.TestCase):
         mid = pt.rest_bar_block(img, 30, 230, [40], 10.0)
         self.assertEqual(mid.shape[1], 170)                           # 0.85 of the span
         self.assertIsNone(pt.rest_bar_block(img, 30, 100, [40], 10.0))    # saves too little
+
+    def hbar(self, style=None, sp=20.0, top=40):
+        img = np.zeros((int(top + 6 * sp), 600), bool)
+        if style is None:
+            pt.draw_hbar(img, top, 100, 400, sp)
+        else:
+            pt.draw_hbar(img, top, 100, 400, sp, style)
+        return img
+
+    def staff_strip(self, **kw):
+        img = np.zeros((120, 600), bool)
+        for k in range(5):
+            img[40 + 10 * k, :] = True
+        return pt.Strip(img, 0, 40, 80, 10.0, np.zeros_like(img), **kw)
+
+    def test_the_engraved_h_bar_has_thin_serifs_from_line_2_to_line_4(self):
+        img = self.hbar("engraved")                                    # sp 20: top line row 40, middle line row 80
+        self.assertEqual(int(img[65, 100:110].sum()), 3)               # the left serif: 0.16 sp is 3 px
+        self.assertEqual(int(img[65, 390:400].sum()), 3)               # the right serif ends at the bar's end
+        col = img[:, 100]
+        self.assertFalse(col[:60].any())                               # nothing above line 2
+        self.assertTrue(col[60:102].all())                             # line 2 to line 4 with its thickness
+        self.assertFalse(col[102:].any())                              # nothing below line 4
+        self.assertEqual(int(img[:, 250].sum()), 21)                   # the bar is 1 sp thick
+        self.assertTrue(img[80, 100:400].all())                        # across, on the middle line
+
+    def test_the_heavy_h_bar_is_the_look_of_0_8_30(self):
+        img = self.hbar("heavy")
+        self.assertEqual(int(img[45, 100:130].sum()), 10)              # a bracket 0.5 sp wide
+        self.assertTrue(img[40:122, 100].all())                        # the full staff height
+        self.assertEqual(int(img[:, 250].sum()), 19)                   # a bar 0.9 sp thick
+
+    def test_the_bold_h_bar_has_serifs_of_0_35_sp_over_the_full_staff_height(self):
+        img = self.hbar("bold")
+        self.assertEqual(int(img[45, 100:130].sum()), 7)
+        self.assertTrue(img[40:122, 100].all())
+        self.assertEqual(int(img[:, 250].sum()), 21)
+
+    def test_an_unknown_h_bar_style_draws_the_default_and_a_small_staff_keeps_a_serif(self):
+        self.assertTrue((self.hbar("nonsense") == self.hbar("engraved")).all())
+        self.assertTrue((self.hbar(None) == self.hbar("engraved")).all())
+        tiny = self.hbar("engraved", sp=6.0, top=10)                   # 0.16 sp is 1 px: the serif keeps 2
+        self.assertEqual(int(tiny[17, 100:110].sum()), 2)
+
+    def test_a_merged_block_and_a_rest_line_take_the_h_bar_style(self):
+        img = np.zeros((140, 500), bool)
+        for k in range(5):
+            img[40 + 10 * k, :] = True
+        eng = pt.rest_bar_block(img, 30, 430, [40], 10.0)
+        hvy = pt.rest_bar_block(img, 30, 430, [40], 10.0, "heavy")
+        self.assertFalse(eng[41:49, 20].any())                         # engraved: no serif above line 2
+        self.assertTrue(eng[50:71, 20].all())
+        self.assertTrue(hvy[40:81, 20].all())                          # heavy: a bracket over the full height
+        for style in ("engraved", "bold", "heavy"):
+            s = pt.make_rest_strip(self.staff_strip(), None, 0, pt.RestRun(5, 3), {"rest_bar": style})
+            self.assertEqual(s.rest_bar, style)
+            self.assertEqual(pt.justify(s, 400).rest_bar, style)       # drawn again at the width, same look
+        s = pt.make_rest_strip(self.staff_strip(rest_bar="bold"), None, 0, pt.RestRun(5, 3), {})
+        self.assertEqual(s.rest_bar, "bold")                           # no option: the line's own
+
+    def test_the_rest_bar_key_is_a_layout_default_and_a_set_key(self):
+        self.assertEqual(pt.LAYOUT_DEFAULTS["rest_bar"], "engraved")
+        self.assertEqual(pt.SET_KEYS["rest_bar"], ("rest_bar", ("engraved", "bold", "heavy")))
+        self.assertEqual(set(pt.REST_BAR_STYLES), {"engraved", "bold", "heavy"})
+        self.assertEqual(pt.Strip.__dataclass_fields__["rest_bar"].default, "engraved")
