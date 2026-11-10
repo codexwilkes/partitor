@@ -93,6 +93,7 @@ class Strip:
     indent: int = 0             # px left of the staff start kept free (first line, labels)
     name_label: str | None = None       # full part name in the indent (small caps)
     staff_labels: list = field(default_factory=list)  # [(name, top row, bottom row)] group staves
+    name_labels: list = field(default_factory=list)  # [(full name, top row, bottom row)] left of the ambitus (group first line, only when there is room)
     ambitus_marks: list = field(default_factory=list)  # [(x left, bottom-line row, clef, lo, hi, lo alt, hi alt)]
 
 

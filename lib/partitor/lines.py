@@ -18,7 +18,7 @@ from . import VERSION
 from .config import file_part_name
 from .mapping import _NUMERALS
 from .model import RestRun, Strip
-from .reflow import _diverge, _single, _x0, find_prefixes
+from .reflow import MERGE_EDGE_SP, REST_BAR_SP, _diverge, _single, _x0, find_prefixes, rest_bar_block
 from .strips import anchor
 from .typography import put_text, text_len
 
@@ -201,6 +201,9 @@ def line_labels(s: Strip) -> list[tuple[str, float, float, float, bool]]:
     for name, t, b in s.staff_labels:
         fs = LABEL_SP * s.sp
         out.append((name, xr, (t + b) / 2 + 0.35 * fs, fs, False))
+    for name, t, b in s.name_labels:        # full name, left of the ambitus (0.8.29)
+        fs = LABEL_SP * s.sp
+        out.append((name, xr - (AMB_W_SP + 1.0) * s.sp, (t + b) / 2 + 0.35 * fs, fs, False))
     return out
 
 
@@ -238,6 +241,22 @@ def label_column(strips: list[Strip], sp: float, amb_map: dict | None = None) ->
         # the first line shows each staff's ambitus instead of its name
         col = max(col, int((AMB_W_SP + 3.0) * sp))
     return col
+
+
+def group_name_indent(s: Strip, room: int, target: int, amb_map: dict | None) -> int:
+    """group_name_indent -> px of first-line indent that holds the full staff
+    names left of the ambitus of a group; 0 when there is no room. room: how
+    much shorter the first line is than the longest line. The ambitus stays
+    (operator request 2026-10-25); the names are added only when the line is
+    short enough by their width (and INDENT_MIN_SP) and the indent stays within
+    INDENT_MAX of the line (0.8.29)."""
+    if not s.staff_labels or not amb_map or not any(amb_map.get(n) for n, *_ in s.staff_labels):
+        return 0
+    size = LABEL_SP * s.sp
+    need = int(max(text_len(n, "regular", size) for n, *_ in s.staff_labels) + 1.5 * s.sp)
+    if room < max(need, int(INDENT_MIN_SP * s.sp)) or need > INDENT_MAX * target:
+        return 0
+    return need
 
 
 def finish_lines(strips: list[Strip], name: str, group: bool,
@@ -281,6 +300,11 @@ def finish_lines(strips: list[Strip], name: str, group: bool,
             if 0 < target - ind - length < 0.3 * sp:   # too little left to justify
                 ind = target - length
             s = dc_replace(pad_left(justify(s, target - ind), ind), name_label=name)
+        elif i == 0 and group and s.rest_src is None and \
+                (ind := group_name_indent(s, target - length, target, amb_map)):
+            # room: the full names in the indent, left of the ambitus
+            s = dc_replace(pad_left(justify(s, target - ind), ind),
+                           name_labels=[lb for lb in s.staff_labels if (amb_map or {}).get(lb[0])])
         elif s.rest_src is not None or not (last_of_mvt and length < RAGGED_LAST * target):
             s = justify(s, target)
         out.append(s)
@@ -312,7 +336,6 @@ def finish_lines(strips: list[Strip], name: str, group: bool,
 # =============================================================================
 # Multi-bar rests
 # =============================================================================
-REST_BAR_SP = 26.0      # width of a multi-bar rest (H-bar) measure
 REST_ONE_SP = 12.0      # width of a one-bar rest measure
 
 
@@ -443,9 +466,6 @@ def fill_rests(items: list, opts: dict) -> list[Strip]:
 # Bars of rests inside a line, merged (0.8.11)
 # =============================================================================
 MERGE_MIN_BARS = 2      # a run of this many rest-only bars becomes one multi-bar rest
-MERGE_EDGE_SP = 0.8     # clear of the barlines (sp)
-MERGE_SAVE_SP = 3.0     # a merge must save this much width (sp)
-MERGE_MIN_SP = 8.0      # narrowest merged measure (sp)
 
 
 def staff_lines(s: Strip) -> list[list[float]]:
@@ -639,23 +659,13 @@ def _merge_run(s: Strip, b0: int, b1: int, pre_x: int) -> Strip:
     e = int(MERGE_EDGE_SP * sp)
     xa = pre_x if b0 == 0 else s.bars_x[b0 - 1] + e
     xb = s.bars_x[b1] - e
-    orig = xb - xa
-    w = int(max(MERGE_MIN_SP * sp, min(REST_BAR_SP * sp, 0.85 * orig)))
-    if orig - w < MERGE_SAVE_SP * sp:
-        return s
     tops = [int(round(ln[0])) for ln in staff_lines(s)]
-    col = s.img[:, min(xb - 1, xa + int(sp))].copy()      # staff lines only
+    block = rest_bar_block(s.img, xa, xb, tops, sp)
+    if block is None:
+        return s
+    orig = xb - xa
+    w = block.shape[1]
     h = s.img.shape[0]
-    block = np.repeat(col[:, None], w, axis=1)
-    th = max(1, int(round(0.1 * sp)))
-    h4 = int(round(4 * sp))
-    sw = max(4, int(round(0.5 * sp)))
-    for t in tops:
-        mid = t + int(round(2 * sp))
-        a, b = int(2 * sp), w - int(2 * sp)
-        block[max(0, mid - int(0.45 * sp)):mid + int(0.45 * sp) + 1, a:b] = True
-        for xx in (a, b - sw):
-            block[t:min(h, t + h4 + th), xx:xx + sw] = True
 
     def splice(m: np.ndarray | None, fill: np.ndarray | None) -> np.ndarray | None:
         if m is None:
@@ -688,7 +698,7 @@ LINES_FORMAT = 1
 # Fields added to Strip after the format shipped, with their defaults: a file
 # written before the field loads (the lines have none of it); any other
 # difference in the fields still means "rebuild the part".
-_FIELD_DEFAULTS = {"rest_labels": list, "rest_in": int, "rest_out": int, "rest_counts": list}
+_FIELD_DEFAULTS = {"name_labels": list, "rest_labels": list, "rest_in": int, "rest_out": int, "rest_counts": list}
 _NP_OK = {"_reconstruct", "ndarray", "dtype", "scalar", "_frombuffer"}
 
 

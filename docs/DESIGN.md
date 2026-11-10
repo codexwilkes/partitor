@@ -187,6 +187,10 @@ notehead, slur or word goes whole to one owner.
      can be cut, why the others stay whole, and the widest whole line.
    - A movement starts a new line. Bars of two source lines share a line only
      when their prefixes match.
+   - A line that starts with a merged multi-bar rest is not a donor of the clef and key (0.8.29):
+     its prefix ends after the left bracket of the H-bar, so a copy would bring a stray thick
+     barline. The copy comes from the nearest line of the movement, with the same staves and the
+     same clef and key, that does not start with a rest.
    - Bar numbers and rehearsal letters move with their bars. Printed mid-line
      source numbers are removed from re-flowed lines. Lines are not
      stretched: ragged right where source bars are wide.
@@ -266,6 +270,10 @@ notehead, slur or word goes whole to one owner.
    staff-line rows from the staff, since a wide H-bar could be taken for a line. A run whose merge saves
    less than 3 sp is not made. The bar after a clef and key needs the music
    start of its line (re-flow's prefix). `rests: keep` turns it off.
+   Re-flow joins two multi-bar rests that meet where two source lines meet (0.8.29): the bars
+   of rest of each bar (`rest_counts`) add up, and one H-bar with the sum above it replaces
+   both ("2" and "6" give "8"). It joins only rest bars of two or more source lines with at
+   least one merged rest among them, and leaves a run that starts at a line with its own clef.
 
 ### 4.3 Engine robustness
 
@@ -303,8 +311,9 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
    Faint or dotted line starts: the longest solid run of a staff can start
    far right of the real start. `vision.extend_starts` moves the start of a
    staff to the page edge (the first column where the line rows of all staves
-   hold ink) when its own 5 line rows hold ink all the way there. Indents
-   (blank there) and labels (text on some rows only) keep their start.
+   hold ink) when its own 5 line rows hold ink all the way there and the
+   spaces between the lines are (nearly) blank. Indents (blank there) and
+   labels (text, with ink in the spaces too) keep their start.
 3. **Staff plausibility.** Reject false staves: staff space outside a
    plausible range (tables and engravings give absurd sizes), lines without
    noteheads or a clef, table rules. Non-music pages (title, contents,
@@ -491,7 +500,9 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
       sp), else it stands beside the part name in the heading; on a title page
       under the name. Group scores: the first line shows each staff's ambitus
       in the label column instead of its name; later lines keep the short
-      names.
+      names. When the first line is shorter than the longest line by the width
+      of the longest full name (and 4 sp), it is indented and the full names
+      stand left of the ambitus; with no such room, only the ambitus shows.
     - Wrong extremes come from clef misreads, lyrics under ledger notes,
       filled ledger lines and staff-line remnants. The operator corrects what
       remains. See `KNOWN-LIMITS.md`.

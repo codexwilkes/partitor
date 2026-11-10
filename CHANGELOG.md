@@ -7,7 +7,32 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
-## Unreleased
+## 0.8.29 — 2026-11-09
+
+### Fixed
+
+- Re-flow: two multi-bar rests that meet at the break of two source lines stayed
+  as two, "2" and "6" side by side. They are one rest now ("8"). Only rests of two
+  or more source lines are joined; a rest inside one source line was merged before.
+- Re-flow: a line cut from a source line that starts with a multi-bar rest got a
+  stray thick barline after its clef and key, with an empty stretch after it. The
+  clef and key of such a line end after the left bracket of its rest, and the copy
+  brought the bracket. The copy now comes from a line of the movement that does
+  not start with a rest.
+- A group score kept the printed instrument label of some staves on its first
+  line, and lost the label of the others (Schein, Trombones: "Alto Trombone"
+  and "Basso Trombone grosso" stayed, the two tenor labels did not). A
+  two-line label left of a staff has ink on all 5 line rows, and in the spaces
+  between them. `vision.extend_starts` took it for a faint, dotted line start
+  and moved the staff start left onto the label, so the label counted as part
+  of the staff. A staff start now moves only when the spaces between its lines
+  are (nearly) blank over the stretch.
+
+### Added
+
+- Group score, first line: the full staff names stand left of the ambitus when the
+  first line is short enough to hold them (the line is indented, as for a single
+  part). The ambitus always shows. With no room, nothing changes: only the ambitus.
 
 ### Changed
 

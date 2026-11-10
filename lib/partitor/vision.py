@@ -279,8 +279,9 @@ def extend_starts(ink: np.ndarray, staves: list[Staff], thick: int, sp: float) -
     column where the line rows of all staves together hold ink (window 1 sp,
     at least 20%; then the first column with ink on 30% of the rows). A staff more than 4 sp right of L moves its start to L
     when the stretch from L to its start holds ink on each of its 5 line
-    rows (at least 10% of the columns) and on average 20%. An indent is
-    blank there, a label is text on some rows only: both keep their start.
+    rows (at least 10% of the columns) and on average 20%, and the spaces
+    between its lines are (nearly) blank there. An indent is blank there, a
+    label is text with ink in the spaces too: both keep their start.
     Healthy pages move nothing."""
     if not staves:
         return
@@ -304,7 +305,13 @@ def extend_starts(ink: np.ndarray, staves: list[Staff], thick: int, sp: float) -
             continue
         dens = [float(b[left:st.x0].mean()) for b in bb]
         if min(dens) >= 0.10 and float(np.mean(dens)) >= 0.20:
-            st.x0 = left
+            # faint lines leave the spaces between the lines blank; a label
+            # (text 2-3 sp high) has ink there too. 0.8.29: a label of two
+            # lines kept in the staff gave the staff the start of the label
+            gaps = [float(ink[int(a + thick) + 1:int(b - thick), left:st.x0].any(axis=0).mean())
+                    for a, b in zip(st.lines, st.lines[1:])]
+            if float(np.mean(gaps)) <= 0.5 * float(np.mean(dens)):
+                st.x0 = left
 
 
 def refine_start(raw: np.ndarray, grp: list, thick: int, sp: float, x0: int) -> int:

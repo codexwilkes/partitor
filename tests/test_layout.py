@@ -519,6 +519,31 @@ class TestEngravedLook(unittest.TestCase):
         self.assertEqual(vary[0].indent, vary[1].indent)
         self.assertGreater(vary[1].indent, 0)
 
+    def test_group_first_line_names_only_when_there_is_room(self):
+        # 0.8.29: the ambitus always shows; the full names stand left of it
+        # only when the first line is short enough to hold them
+        amb = {"Alto": ("C3", 21, 37), "Basso": ("F2", 14, 30)}
+
+        def g(width, bars):
+            s = self.line([(70, 44)], bars, width=width)
+            s.bracket = True
+            s.sp = 4.0
+            s.staff_labels = [(p, 40, 80) for p in ("Alto", "Basso")]
+            return s
+        full = [g(1200, [198, 1100]), g(1200, [198, 1100])]
+        out = pt.finish_lines(full, "G", True, amb_map=amb)
+        self.assertEqual(out[0].name_labels, [])                  # no room: no names
+        self.assertEqual(len(out[0].ambitus_marks), 2)            # the ambitus stays
+        short = [g(700, [198, 600]), g(1200, [198, 1100])]
+        out = pt.finish_lines(short, "G", True, amb_map=amb)
+        self.assertEqual([n for n, *_ in out[0].name_labels], ["Alto", "Basso"])
+        self.assertEqual(len(out[0].ambitus_marks), 2)            # both are drawn
+        self.assertEqual(out[1].name_labels, [])
+        names = [lb for lb in pt.line_labels(out[0]) if lb[0] in ("Alto", "Basso")]
+        amb_left = min(m[0] for m in out[0].ambitus_marks)
+        self.assertTrue(all(x < amb_left for _, x, *_ in names), (names, amb_left))
+        self.assertGreaterEqual(min(x - pt.text_len(n, "regular", f) for n, x, _, f, _ in names), 0)
+
     def test_group_staves_close_up(self):
         with tempfile.TemporaryDirectory() as d:
             pdf = os.path.join(d, "s.pdf")
@@ -1293,3 +1318,82 @@ class TestMergeRestBars(unittest.TestCase):
         self.assertEqual((cut[0].rest_in, cut[0].rest_out), (1, 1))   # the line of bar 0 alone
         self.assertEqual((cut[1].rest_in, cut[1].rest_out), (0, 0))   # the bar with the note
 
+
+    def two_lines(self, a, b):
+        """Two source lines of one movement, each with its own prefix, as merge_rest_bars leaves them."""
+        return [self.merged(**a), self.merged(**b)], [(self.PRE, 0), (self.PRE, 1)]
+
+    def test_two_multi_bar_rests_that_meet_at_a_line_break_become_one_after_re_flow(self):
+        """Bars 109-110 end one source line and bars 111-116 start the next, both multi-bar
+        rests: re-flow put them in one line as "2" and "6". They are one rest of 8."""
+        ls, pre = self.two_lines(dict(rests=(0, 1, 2, 3), note=(0, 0)),       # note, then 3 bars of rest
+                                 dict(rests=(0, 1, 2, 3), note=(3, 0)))       # 3 bars of rest, then a note
+        self.assertEqual([s.rest_counts for s in ls], [[0, 3], [3, 0]])
+        out = pt.reflow(ls, 5000.0, pre)
+        self.assertEqual(len(out), 1)
+        self.assertEqual([(t, off) for _, t, off in out[0].rest_labels], [("6", 0)])
+        self.assertLess(out[0].img.shape[1], sum(s.img.shape[1] for s in ls) - 2 * self.PRE)
+        self.assertEqual((out[0].rest_in, out[0].rest_out), (0, 0))
+        calls = []
+        with mock_attr(pt, "_join_rests", lambda *a, **k: calls.append(1) or a[:4]):
+            old = pt.reflow(ls, 5000.0, pre)
+        self.assertTrue(calls)                                        # the step runs for the line
+        self.assertEqual([t for _, t, _ in old[0].rest_labels], ["3", "3"])   # without it: "3" and "3"
+
+    def test_the_joined_rest_is_drawn_once_with_staff_lines_around_it(self):
+        ls, pre = self.two_lines(dict(rests=(0, 1, 2, 3), note=(0, 0), staves=3),
+                                 dict(rests=(0, 1, 2, 3), note=(3, 0), staves=3))
+        out = pt.reflow(ls, 5000.0, pre)[0]
+        self.assertEqual([(t, off) for _, t, off in out.rest_labels], [("6", 0), ("6", 100), ("6", 200)])
+        x = int(out.rest_labels[0][0])
+        for t0 in (out.staff_top, out.staff_top + 100, out.staff_top + 200):
+            self.assertTrue(out.img[t0 + 20, x - 40:x + 40].all())            # the H-bar on the middle line
+            self.assertFalse(out.img[t0 + 12:t0 + 15, x - 30:x + 30].any())        # no whole rest left in the span
+
+    def test_rests_with_music_between_them_are_not_joined(self):
+        ls, pre = self.two_lines(dict(rests=(0, 1, 2, 3), note=(0, 0)), dict(rests=(0, 1, 2, 3), note=(0, 0)))
+        out = pt.reflow(ls, 5000.0, pre)
+        self.assertEqual(len(out), 1)
+        self.assertEqual([t for _, t, _ in out[0].rest_labels], ["3", "3"])   # note, 3, note, 3
+
+    def test_a_multi_bar_rest_alone_stays_as_it_is_after_re_flow(self):
+        ls, pre = self.two_lines(dict(rests=(0, 1, 2, 3), note=(0, 0)), dict(rests=(0, 1, 2, 3), note=(0, 0)))
+        cut = pt.reflow(ls, 200.0, pre)
+        self.assertEqual(sorted(t for o in cut for _, t, _ in o.rest_labels), ["3", "3"])
+
+    def test_the_prefix_of_a_line_that_starts_with_a_multi_bar_rest_is_not_copied(self):
+        """find_prefixes ends such a line's prefix after the left bracket of its H-bar. A
+        continuation line that copied it showed the bracket as a stray thick barline (bar 124).
+        It copies the clef and key of a line without a rest at its start."""
+        plain = self.merged(rests=(0, 1, 2, 3), note=(0, 0))
+        rest = self.merged(rests=(0, 1, 2))
+        self.assertEqual(rest.rest_counts, [3, 0])
+        pre = [(self.PRE, 0), (60, 1)]                                # the bracket (x 50-55) lies inside 60
+        tail = rest.img.shape[1] - (rest.bars_x[0] + 2)               # the bar after the rest
+        out = pt.reflow([plain, rest], 260.0, pre)
+        self.assertEqual(out[-1].img.shape[1], self.PRE + tail)       # clef and key of the plain line only
+        called = []
+        real = pt._starts_with_rest
+        with mock_attr(pt, "_starts_with_rest", lambda s: called.append(s) or False):
+            old = pt.reflow([plain, rest], 260.0, pre)
+        self.assertTrue(called)                                       # the test goes through the guard
+        self.assertEqual(old[-1].img.shape[1], 60 + tail)             # without it: the bracket comes along
+        self.assertTrue(real(rest) and not real(plain))
+
+    def test_a_line_with_a_rest_at_its_start_and_no_other_donor_keeps_its_own_prefix(self):
+        rest = self.merged(rests=(0, 1, 2))
+        a = self.merged(rests=(0, 1, 2))
+        pre = [(60, 0), (60, 1)]
+        out = pt.reflow([a, rest], 200.0, pre)
+        self.assertEqual(out[-1].img.shape[1], 60 + rest.img.shape[1] - (rest.bars_x[0] + 2))
+
+    def test_a_multi_bar_rest_block_is_drawn_for_a_span_and_none_for_a_narrow_one(self):
+        img = np.zeros((140, 500), bool)
+        for k in range(5):
+            img[40 + 10 * k, :] = True
+        wide = pt.rest_bar_block(img, 30, 430, [40], 10.0)
+        self.assertEqual(wide.shape, (140, 260))                      # at most REST_BAR_SP
+        self.assertTrue(wide[60, 30:230].all())                       # the H-bar on the middle line
+        mid = pt.rest_bar_block(img, 30, 230, [40], 10.0)
+        self.assertEqual(mid.shape[1], 170)                           # 0.85 of the span
+        self.assertIsNone(pt.rest_bar_block(img, 30, 100, [40], 10.0))    # saves too little

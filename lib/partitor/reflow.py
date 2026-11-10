@@ -360,6 +360,92 @@ def _compose(pieces: list[tuple[Strip, int, int, bool]]) -> tuple[np.ndarray, np
     return img, hdr, above
 
 
+# =============================================================================
+# Multi-bar rest measure drawn over a span of a line
+# =============================================================================
+REST_BAR_SP = 26.0      # width of a multi-bar rest (H-bar) measure
+MERGE_EDGE_SP = 0.8     # clear of the barlines (sp)
+MERGE_SAVE_SP = 3.0     # a merge must save this much width (sp)
+MERGE_MIN_SP = 8.0      # narrowest merged measure (sp)
+
+
+def rest_bar_block(img: np.ndarray, xa: int, xb: int, tops: list[int], sp: float) -> np.ndarray | None:
+    """rest_bar_block -> the columns of one multi-bar rest measure (an H-bar on
+    each staff, brackets at both ends) that replace img[:, xa:xb], or None when
+    the measure would save less than MERGE_SAVE_SP. The staff lines come from the
+    column of img near xa. tops: the row of the top line of each staff."""
+    orig = xb - xa
+    w = int(max(MERGE_MIN_SP * sp, min(REST_BAR_SP * sp, 0.85 * orig)))
+    if orig - w < MERGE_SAVE_SP * sp:
+        return None
+    col = img[:, min(xb - 1, xa + int(sp))].copy()      # staff lines only
+    h = img.shape[0]
+    block = np.repeat(col[:, None], w, axis=1)
+    th = max(1, int(round(0.1 * sp)))
+    h4 = int(round(4 * sp))
+    sw = max(4, int(round(0.5 * sp)))
+    for t in tops:
+        mid = t + int(round(2 * sp))
+        a, b = int(2 * sp), w - int(2 * sp)
+        block[max(0, mid - int(0.45 * sp)):mid + int(0.45 * sp) + 1, a:b] = True
+        for xx in (a, b - sw):
+            block[t:min(h, t + h4 + th), xx:xx + sw] = True
+    return block
+
+
+def _starts_with_rest(s: Strip) -> bool:
+    """_starts_with_rest -> True when the first bar of a line is a merged multi-bar
+    rest. The left bracket of its H-bar stands at the end of the line's prefix
+    (find_prefixes puts the gap after it), so the prefix is not a clean clef and
+    key: copied to another line, it brings the bracket."""
+    return bool(s.rest_labels) and bool(s.rest_counts) and s.rest_counts[0] > 1
+
+
+def _join_rests(img: np.ndarray, hdr: np.ndarray, marks: list, labels: list,
+                bars: list[tuple[int, int, int, int]], sp: float, top: int, bw: int,
+                skip_first: bool) -> tuple[np.ndarray, np.ndarray, list, list]:
+    """_join_rests -> (img, hdr, marks, labels) of a re-flowed line where each
+    run of bars that hold only rests, and that come from two or more source
+    lines, is one multi-bar rest: the two multi-bar rests that touch where two
+    source lines meet ("2" and "6") become one ("8"). Runs inside one source line
+    were merged already (merge_rest_bars). bars: per bar of the line (x0, x1,
+    bars of rest it holds (0: it has notes), source line); x0 is where the
+    bar starts, after its left barline; x1 is after its right barline. top: the
+    row of the top staff line. skip_first: the first bar has its own clef; a run
+    that starts there stays as it is. A run with no multi-bar rest among its bars
+    (the staff rows are unknown) or with no saving stays as it is."""
+    e = int(MERGE_EDGE_SP * sp)
+    runs, cur = [], []
+    for k, b in enumerate(bars):
+        if b[2] > 0:
+            cur.append(k)
+        else:
+            runs.append(cur)
+            cur = []
+    runs.append(cur)
+    for run in reversed(runs):
+        if len(run) < 2 or len({bars[k][3] for k in run}) < 2 or (skip_first and run[0] == 0):
+            continue
+        x0, x1 = bars[run[0]][0], bars[run[-1]][1]
+        rows = sorted({r for cx, _, r in labels if x0 <= cx < x1})
+        xa = x0 if run[0] == 0 else x0 - bw + e         # clear of the barline before the run
+        xb = x1 - bw - e                                # and of the barline after it
+        if not rows or xb <= xa:
+            continue
+        block = rest_bar_block(img, xa, xb, [int(round(top + r)) for r in rows], sp)
+        if block is None:
+            continue
+        w, delta = block.shape[1], block.shape[1] - (xb - xa)
+        n = sum(bars[k][2] for k in run)
+        img = np.concatenate([img[:, :xa], block, img[:, xb:]], axis=1)
+        hdr = np.concatenate([hdr[:, :xa], np.zeros((hdr.shape[0], w), bool), hdr[:, xb:]], axis=1)
+        marks = [(mx if mx < xa else mx + delta, t) for mx, t in marks]
+        labels = [(cx if cx < xa else cx + delta, *rest) for cx, *rest in labels if not xa <= cx < xb]
+        labels += [(xa + w / 2.0, str(n), r) for r in rows]
+        labels.sort()
+    return img, hdr, marks, labels
+
+
 def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip]:
     """reflow -> new lines no wider than W (px, where possible), cut only
     at barlines. A continuation line starts with a copy of the clef and key
@@ -369,10 +455,33 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
     source lines join only when their prefixes are the same."""
     pre = find_prefixes(strips) if pre is None else pre
     bw = lambda s_: max(1, int(0.2 * s_.sp))         # barline width kept left
+    donors: dict[int, int] = {}
+
+    def donor(j: int) -> int:
+        """The line whose clef and key a continuation of line j copies: the
+        donor of find_prefixes, unless that line starts with a multi-bar rest
+        (its prefix holds the left bracket of the H-bar). Then the nearest line of
+        the same movement and staves with its own prefix and no such rest."""
+        if j not in donors:
+            k = pre[j][1]
+            if _starts_with_rest(strips[k]):
+                sp_ = strips[k].sp
+                for q in sorted((q for q in range(len(strips)) if pre[q] is not None and pre[q][1] == q
+                                 and not _starts_with_rest(strips[q])), key=lambda q: abs(q - j)):
+                    lo, hi = min(q, j), max(q, j)
+                    if any(strips[m].movement for m in range(lo + 1, hi + 1)):
+                        break                            # a movement lies between: nothing nearer is the same
+                    if _same_stack(strips[q], strips[k], REFLOW_STACK_SP) \
+                       and _diverge(_group_view(strips[q]), _group_view(strips[k])) \
+                       >= (pre[q][0] - _x0(strips[q])) - 0.5 * sp_:
+                        k = q
+                        break
+            donors[j] = k
+        return donors[j]
     units: list[list] = []        # runs of bars that may share lines
     for i, s_ in enumerate(strips):
         cut = pre[i] is not None and s_.ends_at_bar and len(s_.bars_x) >= 2
-        cw = lambda j: pre[pre[j][1]][0]                # copy width of line j
+        cw = lambda j: pre[donor(j)][0]                 # copy width of line j
         if not cut:
             units.append([("whole", i)])
             continue
@@ -382,7 +491,7 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
                 and pre[i][0] > 0)
         if same:
             j = units[-1][-1][1]
-            dj, di = pre[j][1], pre[i][1]
+            dj, di = donor(j), donor(i)
             if abs((cw(j) - _x0(strips[dj])) - (cw(i) - _x0(strips[di]))) > 0.5 * s_.sp \
                or _diverge(_group_view(strips[dj]), _group_view(strips[di])) \
                < (cw(i) - _x0(strips[di])) - 0.5 * s_.sp \
@@ -408,7 +517,7 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
             return x0, max(x0, x1)       # a barline inside the prefix: a bar with no width, not a negative one
         widths = [span(i, b)[1] - span(i, b)[0] for i, b in bars]
         i0 = bars[0][0]
-        starts = _break_lines(widths, pre[pre[i0][1]][0], W)
+        starts = _break_lines(widths, pre[donor(i0)][0], W)
         for k, a in enumerate(starts):
             z = starts[k + 1] if k + 1 < len(starts) else len(bars)
             i, b = bars[a]
@@ -416,7 +525,7 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
             if b == 0:                               # real start: own clef, header
                 pieces = [(s_, 0, pre[i][0], True)] if pre[i][0] > 0 else []
             else:                                    # continuation: copied clef + key
-                k_ = pre[i][1]
+                k_ = donor(i)
                 pieces = [(_restack(strips[k_], s_), 0, pre[k_][0], False)]
             for ii, bb in bars[a:z]:
                 x0, x1 = span(ii, bb)
@@ -437,6 +546,14 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
                         if x0 <= cx < x1:
                             labels.append((x + cx - x0, *rest))
                 x += x1 - x0
+            rc = [strips[ii].rest_counts[bb] if bb < len(strips[ii].rest_counts) else 0
+                  for ii, bb in bars[a:z]]          # a rest at the start and at the end of the line
+            xs = list(itertools.accumulate((p[2] - p[1] for p in pieces), initial=0))
+            n_pre = len(pieces) - len(rc)
+            img, hdr, marks, labels = _join_rests(
+                img, hdr, marks, labels,
+                [(xs[n_pre + k], xs[n_pre + k + 1], c, bars[a + k][0]) for k, c in enumerate(rc)],
+                s_.sp, top, bw(s_), skip_first=(b == 0))
             if b < len(s_.bar_nums):
                 num = s_.bar_nums[b]
             elif s_.bar_no is not None:
@@ -445,8 +562,6 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
                 num = None
             first_of_mvt = s_.movement and b == 0
             show = None if (first_of_mvt or num is None or num < 1) else num
-            rc = [strips[ii].rest_counts[bb] if bb < len(strips[ii].rest_counts) else 0
-                  for ii, bb in bars[a:z]]          # a rest at the start and at the end of the line
             r_in = sum(itertools.takewhile(lambda v: v > 0, rc))
             r_out = sum(itertools.takewhile(lambda v: v > 0, reversed(rc)))
             line = Strip(img, s_.staff_x0, top, top + (s_.staff_bottom - s_.staff_top),

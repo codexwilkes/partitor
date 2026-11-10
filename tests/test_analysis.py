@@ -419,6 +419,20 @@ class TestDottedStart(unittest.TestCase):
         self.assertLessEqual(abs(xs[0] - self.LEFT), self.SP, xs)
         self.assertGreaterEqual(xs[1], 690, xs)
 
+    def test_label_with_ink_in_the_spaces_keeps_the_start(self):
+        # 0.8.29: a two-line label left of a staff holds ink on all 5 line
+        # rows and in the spaces between them. It is not a faint line start.
+        img = self.page([900, 900, 900, 900])
+        top = 600                                        # the second staff
+        img[top - 10:top + 4 * self.SP + 14, self.LEFT:880] = False   # solid from 900
+        for x in range(200, 800, 44):
+            img[top - 10:top + 4 * self.SP + 14, x:x + 14] = True
+        xs = self.starts(img)
+        self.assertEqual(len(xs), 4, xs)
+        self.assertGreaterEqual(xs[1], 880, xs)
+        for k in (0, 2, 3):
+            self.assertLessEqual(abs(xs[k] - self.LEFT), self.SP, xs)
+
     def test_solid_page_is_unchanged(self):
         xs = self.starts(self.page([self.LEFT] * 4))
         self.assertEqual(len(set(xs)), 1, xs)          # same start for all
