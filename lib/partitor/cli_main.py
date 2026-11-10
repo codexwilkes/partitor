@@ -19,7 +19,7 @@ from .cli_items import (
     cmd_analyse, cmd_contract, cmd_expand, cmd_list, cmd_meta, cmd_new, cmd_proof, cmd_reid,
     cmd_pages, cmd_plan, cmd_rename, cmd_repage, cmd_show, item_matches, list_page_size,
 )
-from .cli_parts import ambitus_menu, ask_part, cmd_groups, cmd_parts
+from .cli_parts import ambitus_menu, ask_part, cmd_groups, cmd_parts, short_menu
 from .config import LAYOUT_DEFAULTS, PAGE_HEADER_SP, PAPER
 from .console import Abort, BOLD, RST, _die, _warn, ask
 from .library import (
@@ -44,7 +44,7 @@ def item_menu(item: Path) -> None:
         print("  edit (saved, not built):  m title/composer  t part names  g groups  "
               "n bar numbers and marks")
         print("                            e expand  c contract  p pages  a paper  k ambitus"
-              "  s set")
+              "  h short names  s set")
         print("  v review   y analyse again   r build (r Trombones, r 2-4: only those)")
         print("  f fit (paper, staff size, page turns: f Trombones)   "
               "l pages (see and move page turns: l Trombones)")
@@ -72,6 +72,8 @@ def item_menu(item: Path) -> None:
                                                build=False))
             elif k == "k":
                 ambitus_menu(data)
+            elif k == "h":
+                short_menu(data)
             elif k == "a":
                 cur = (data.get("layout") or {}).get("paper", LAYOUT_DEFAULTS["paper"])
                 new = PAPER_NEXT.get(cur, "letter")

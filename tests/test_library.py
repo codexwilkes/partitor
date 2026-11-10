@@ -20,6 +20,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -382,6 +383,52 @@ class TestPartialBuildReal(unittest.TestCase):
                 else:
                     os.environ["PARTITOR_JOBS"] = env
 
+    def test_a_short_name_reaches_the_group_part(self):
+        """`Part:short=...` is in the labels of the group's later lines (the build
+        passes it to finish_lines); without it the rule's form stands."""
+        with tempfile.TemporaryDirectory() as tmp:
+            one = Path(tmp, "page.pdf")
+            make_score_pdf(str(one), systems=1, staves=2,
+                           labels=("Alto Trombone", "Bass Trombone"), title="")
+            doc = pymupdf.open()
+            for _ in range(3):
+                doc.insert_pdf(pymupdf.open(str(one)))
+            item = Path(tmp, "2026-10-0001-c-t")
+            item.mkdir()
+            doc.save(str(item / "2026-10-0001-source.pdf"))
+            pt.save_item(item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-26"})
+            env = os.environ.get("PARTITOR_JOBS")
+            os.environ["PARTITOR_JOBS"] = "1"
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
+                    d = pt.load_item(item)
+                    d["groups"] = {"Duo": list(d["parts"])}
+                    self.assertEqual(d["parts"], ["Alto Trombone", "Bass Trombone"])
+                    pt.save_item(item, d)
+                    self.assertEqual(build.run_build(item, ["Duo"]), 0)
+                    rule = self.text(item, "duo")
+                    pt.apply_set(d, ["Alto Trombone:short=A. Tbn."])
+                    pt.save_item(item, d)
+                    self.assertEqual(build.run_build(item, ["Duo"]), 0)
+                    own = self.text(item, "duo")
+            finally:
+                if env is None:
+                    os.environ.pop("PARTITOR_JOBS", None)
+                else:
+                    os.environ["PARTITOR_JOBS"] = env
+        self.assertIn("Alto Tro.", rule)
+        self.assertNotIn("A. Tbn.", rule)
+        self.assertIn("A. Tbn.", own)
+        self.assertNotIn("Alto Tro.", own)
+        self.assertIn("Bass Tro.", own)                      # the other staff keeps the rule
+
+    @staticmethod
+    def text(item, name):
+        f = next(p for p in sorted((item / "parts").glob(f"*-{name}-*.pdf"))
+                 if "11x17" not in p.name)
+        return " ".join(pg.get_text() for pg in pymupdf.open(str(f)))
+
     @staticmethod
     def sig(item):
         import hashlib
@@ -493,6 +540,53 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(pt.step_size(d(1, 7.0, 7.0), False)[0], ["gap=9.0"])
         with self.assertRaises(ValueError):
             pt.step_size(d(1, 7.0, 7.0, gap=7.0), False)
+
+    def test_apply_set_short_name(self):
+        data = {"parts": ["Alto", "Org R", "Continuo"], "skip": ["Org R"],
+                "groups": {"Trbs": ["Alto"]}, "layout": {}}
+        self.assertEqual(pt.apply_set(data, ["Alto:short=A. Tbn."]), ["Alto:short: auto -> A. Tbn."])
+        self.assertEqual(data["layout"]["parts"], {"Alto": {"short": "A. Tbn."}})
+        # a part not extracted on its own (a group member) can have one too
+        pt.apply_set(data, ["Org R:short=Org."])
+        self.assertEqual(data["layout"]["parts"]["Org R"], {"short": "Org."})
+        self.assertEqual(pt.apply_set(data, ["Alto:short=auto"]), ["Alto:short: A. Tbn. -> auto"])
+        self.assertNotIn("Alto", data["layout"]["parts"])          # back to the rule, nothing kept
+        for bad in (["Nobody:short=x"], ["short=x"], ["Alto:short=" + "x" * 25],
+                    ["Alto:short=a\nb"]):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                pt.apply_set(data, bad)
+        self.assertIn("short", pt.PART_SET_KEYS)
+
+    def test_short_name_follows_a_rename(self):
+        data = {"parts": ["S", "A", "Org R"], "layout": {"parts": {"A": {"short": "Alt."}}},
+                "systems": [{"map": ["S", "A", "Org R"], "clefs": ["G", "C3", "G"]}]}
+        self.assertEqual(pt.apply_part_ops(data, "2=Altus"), "")
+        self.assertEqual(data["layout"]["parts"], {"Altus": {"short": "Alt."}})
+
+    def test_short_menu_sets_and_clears(self):
+        item = self.item_with_choice()
+        data = pt.load_item(item)
+        data["groups"] = {"Low": ["Tenor", "Bass"]}
+        pt.save_item(item, data)
+        env = {"PARTITOR_LIBRARY": str(self.share)}
+        with mock.patch.dict(os.environ, env):
+            _, out = self.quiet_input(["1", "Te.", "", ""], cli_parts.short_menu, data)
+        self.assertEqual(pt.load_item(item)["layout"]["parts"], {"Tenor": {"short": "Te."}})
+        self.assertIn("Tenor: Ten.  (rule)", out)             # shown by the rule first
+        self.assertIn("Tenor: Te.  (by hand)", out)
+        data = pt.load_item(item)
+        with mock.patch.dict(os.environ, env):
+            self.quiet_input(["Tenor", "auto", ""], cli_parts.short_menu, data)
+        self.assertNotIn("parts", pt.load_item(item).get("layout") or {})
+
+    def test_item_menu_key_h_sets_a_short_name(self):
+        item = self.item_with_choice()
+        data = pt.load_item(item)
+        data["groups"] = {"Low": ["Tenor", "Bass"]}
+        pt.save_item(item, data)
+        with mock.patch.dict(os.environ, {"PARTITOR_LIBRARY": str(self.share)}):
+            self.quiet_input(["h", "2", "B.", "", "b"], pt.item_menu, item)
+        self.assertEqual(pt.load_item(item)["layout"]["parts"], {"Bass": {"short": "B."}})
 
     def test_per_part_layout(self):
         data = {"parts": ["Canto", "Continuo"], "groups": {"Tutti": ["Canto"]},

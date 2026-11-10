@@ -544,6 +544,29 @@ class TestEngravedLook(unittest.TestCase):
         self.assertTrue(all(x < amb_left for _, x, *_ in names), (names, amb_left))
         self.assertGreaterEqual(min(x - pt.text_len(n, "regular", f) for n, x, _, f, _ in names), 0)
 
+    def test_group_short_names_default_rule_and_custom(self):
+        # 0.8.30: `Part:short=...` replaces the rule for one part; the rule stays the default
+        self.assertEqual(pt.short_name("Bass Trombone Grosso"), "Bass Tro. Gro.")
+        self.assertEqual(pt.short_name("Bass Trombone Grosso", None), "Bass Tro. Gro.")
+        self.assertEqual(pt.short_name("Bass Trombone Grosso", ""), "Bass Tro. Gro.")
+        self.assertEqual(pt.short_name("Bass Trombone Grosso", "B.Tbn."), "B.Tbn.")
+
+        def g(parts):
+            s = self.line([(70, 44)], [198])
+            s.bracket = True
+            s.staff_labels = [(p, 40, 80) for p in parts]
+            return s
+        lines = [g(["Alto Trombone", "Bass Trombone"]), g(["Alto Trombone", "Bass Trombone"])]
+        plain = pt.finish_lines(lines, "G", True)
+        self.assertEqual([n for n, *_ in plain[1].staff_labels], ["Alto Tro.", "Bass Tro."])
+        own = pt.finish_lines([g(["Alto Trombone", "Bass Trombone"]),
+                               g(["Alto Trombone", "Bass Trombone"])], "G", True,
+                              short_map={"Bass Trombone": "B.Tbn."})
+        self.assertEqual([n for n, *_ in own[1].staff_labels], ["Alto Tro.", "B.Tbn."])
+        # the label column is as wide as the longest short form
+        wide = pt.label_column(lines, 10.0, None, {"Bass Trombone": "Bass Trombone Grosso!"})
+        self.assertGreater(wide, pt.label_column(lines, 10.0))
+
     def test_group_staves_close_up(self):
         with tempfile.TemporaryDirectory() as d:
             pdf = os.path.join(d, "s.pdf")

@@ -69,7 +69,8 @@ GAP_MAX = 14.0        # expand never sets a wider gap (sp)
 PART_SET_KEYS = {"pages", "gap", "min_gap", "scale", "min_staff_mm", "max_staff_mm", "group_gap",
                  "reflow", "title_page", "bar_raise", "bar_size", "ink", "turns", "breaks",
                  "paper", "margin_top", "margin_bottom", "margin_side", "gutter", "binding", "duplex",
-                 "foldouts", "foldside"}
+                 "foldouts", "foldside", "short"}
+SHORT_MAX = 24        # longest short form of a part name (`Part:short=...`)
 REPAGE_KEYS = ("turns", "breaks", "duplex", "title_page", "foldouts", "foldside")   # `repage` applies these without a rebuild
 
 
@@ -573,6 +574,23 @@ def apply_set(data: dict, pairs: list[str]) -> list[str]:
         part = None
         if ":" in k:                       # "Continuo:pages=4": one part only
             part, k = (x.strip() for x in k.rsplit(":", 1))
+            if k == "short":
+                # the short form of a group staff label (0.8.30): any part of
+                # the score, also one not extracted on its own (a group member)
+                known = [p_ for p_ in data.get("parts") or [] if p_ != "-"]
+                if part not in known:
+                    raise ValueError(f"unknown part: {part} (parts: {', '.join(known)})")
+                pl = plays.setdefault(part, {})
+                was = pl.get("short")
+                vl = v.strip()
+                if vl.lower() in ("", "auto", "none", "off"):
+                    pl.pop("short", None)           # back to the rule (short_name)
+                else:
+                    if len(vl) > SHORT_MAX or any(c in vl for c in "\n\r\t"):
+                        raise ValueError(f"short: at most {SHORT_MAX} characters on one line, or auto")
+                    pl["short"] = vl
+                done.append(f"{part}:short: {was or 'auto'} -> {pl.get('short') or 'auto'}")
+                continue
             if part not in part_names(data):
                 raise ValueError(f"unknown part: {part} (parts: {', '.join(part_names(data))})")
             if k == "ambitus":

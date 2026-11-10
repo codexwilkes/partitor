@@ -678,7 +678,8 @@ def cmd_build(a: argparse.Namespace) -> int:
             try:
                 plan_src = read_source(
                     strips, opts, dpi,
-                    label_px=label_column(strips, strips[0].sp, extra.get("ambitus_map")) if extra.get("members") else 0.0
+                    label_px=label_column(strips, strips[0].sp, extra.get("ambitus_map"),
+                                          extra.get("short_map")) if extra.get("members") else 0.0
                 ).to_dict()
             except Exception as e:            # noqa: BLE001  (plan data never stops a build)
                 _warn(f"plan data:  {name}: {e}")
@@ -697,7 +698,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                 # about 60 at 8 mm). pages=auto: at most GROUP_REFLOW_PAGES times
                 # the pages without re-flow; pages=N sets the count instead.
                 base = finish_lines(strips, name, group, extra.get("ambitus"),
-                                    extra.get("ambitus_map"))
+                                    extra.get("ambitus_map"), extra.get("short_map"))
                 n0 = choose_layout(base, dpi, opts)[2]
                 o_r = {**opts, "page_count": max(n0, math.ceil(GROUP_REFLOW_PAGES * n0))}
                 floor = fit_scale(strips, dpi, {**opts, "scale": 1e9})
@@ -705,13 +706,13 @@ def cmd_build(a: argparse.Namespace) -> int:
                       f"x {GROUP_REFLOW_PAGES}); set pages=N to change it")
             sc, g, n_est, strips = choose_reflow(strips, dpi, o_r, pre, floor)
             strips = finish_lines(strips, name, group, extra.get("ambitus"),
-                                  extra.get("ambitus_map"))
+                                  extra.get("ambitus_map"), extra.get("short_map"))
             sc = min(sc, fit_scale(strips, dpi, opts))
         else:
             # one line width, indent, labels: before the layout choice (labels
             # widen the lines)
             strips = finish_lines(strips, name, group, extra.get("ambitus"),
-                                  extra.get("ambitus_map"))
+                                  extra.get("ambitus_map"), extra.get("short_map"))
             sc, g, n_est = choose_layout(strips, dpi, opts)
         o = {**opts, "scale": sc, "gap": g}
         if sc < fit_scale(strips, dpi, opts) - 1e-6:
@@ -783,7 +784,9 @@ def cmd_build(a: argparse.Namespace) -> int:
         else:
             steps.append(("emit", gname, strips, gi,
                           {"members": " · ".join(groups[gname]),
-                           "ambitus_map": {p_: ambitus_for(amb_all, p_) for p_ in groups[gname]}}))
+                           "ambitus_map": {p_: ambitus_for(amb_all, p_) for p_ in groups[gname]},
+                           "short_map": {p_: plays[p_]["short"] for p_ in groups[gname]
+                                         if (plays.get(p_) or {}).get("short")}}))
     emits = [st_ for st_ in steps if st_[0] == "emit"]
     rjobs = job_count(getattr(a, "jobs", None), RENDER_WORKER_GB, len(emits))
     if rjobs > 1:

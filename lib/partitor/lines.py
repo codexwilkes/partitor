@@ -169,10 +169,14 @@ def _hbar_spans(s: Strip) -> list[tuple[int, int]]:
     return out
 
 
-def short_name(name: str) -> str:
+def short_name(name: str, custom: str | None = None) -> str:
     """Abbreviation for a group staff label: words of 5+ letters cut to 3
     and a full stop; numbers, roman numerals and short words kept
-    ('Basso Trombone grosso' -> 'Bas. Tro. gro.')."""
+    ('Basso Trombone grosso' -> 'Bas. Tro. gro.'). custom: the operator's
+    short form of this part (`set ID "Part:short=..."`, 0.8.30); it replaces
+    the rule."""
+    if custom:
+        return custom
     out = []
     for w in name.split():
         if len(w) >= 5 and w.isalpha() and w.lower() not in _NUMERALS:
@@ -228,14 +232,16 @@ def put_smallcaps(page: pymupdf.Page, x_right: float, base: float, text: str,
 AMB_W_SP = 8.0          # ambitus width in staff spaces (ambitus_width / sp)
 
 
-def label_column(strips: list[Strip], sp: float, amb_map: dict | None = None) -> int:
+def label_column(strips: list[Strip], sp: float, amb_map: dict | None = None,
+                 short_map: dict | None = None) -> int:
     """label_column -> width (px) of the label column finish_lines puts left of
     the lines of a group (short staff names; the ambitus of each staff on
-    the first line needs AMB_W_SP + 3 sp); 0 when no line has labels."""
+    the first line needs AMB_W_SP + 3 sp); 0 when no line has labels. short_map:
+    {part: the operator's short form}."""
     if not any(s.staff_labels for s in strips):
         return 0
     size = LABEL_SP * sp
-    shorts = {n: short_name(n) for s in strips for n, *_ in s.staff_labels}
+    shorts = {n: short_name(n, (short_map or {}).get(n)) for s in strips for n, *_ in s.staff_labels}
     col = int(max(text_len(v, "regular", size) for v in shorts.values()) + 3.0 * sp)
     if amb_map and any(amb_map.values()):
         # the first line shows each staff's ambitus instead of its name
@@ -260,7 +266,8 @@ def group_name_indent(s: Strip, room: int, target: int, amb_map: dict | None) ->
 
 
 def finish_lines(strips: list[Strip], name: str, group: bool,
-                 amb: tuple | None = None, amb_map: dict | None = None) -> list[Strip]:
+                 amb: tuple | None = None, amb_map: dict | None = None,
+                 short_map: dict | None = None) -> list[Strip]:
     """finish_lines -> the lines of one part or group at one width: the
     longest staff sets it; other lines are justified (a movement's short
     last line stays short). A first line shorter by INDENT_MIN_SP or more
@@ -313,9 +320,9 @@ def finish_lines(strips: list[Strip], name: str, group: bool,
         # stick out at the right): short names, full names on the first
         # line where they fit the column
         size = LABEL_SP * sp
-        shorts = {n: short_name(n) for s in out for n, *_ in s.staff_labels}
+        shorts = {n: short_name(n, (short_map or {}).get(n)) for s in out for n, *_ in s.staff_labels}
         col_w = max(text_len(v, "regular", size) for v in shorts.values())
-        col = label_column(out, sp, amb_map)
+        col = label_column(out, sp, amb_map, short_map)
         fin = []
         for j, s in enumerate(out):
             names, marks = [], []

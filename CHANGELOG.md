@@ -7,6 +7,19 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.30 — 2026-11-10
+
+### Added
+
+- Group score: the short form of a staff label can be set per part. `partitor set ID
+  "Alto Trombone:short=A. Tbn."` (at most 24 characters; `short=auto` brings the rule
+  back), or the item menu key `h` (the parts of the groups, numbered, with their short
+  form; a new text, or `auto`). The rule stays the default: words of 5 or more
+  letters cut to 3 and a full stop. The value is kept in `layout.parts` of the item,
+  so it moves with a rename of the part and stays when the score is analysed again.
+  The label column is as wide as the longest short form.
+
+
 ## 0.8.29 — 2026-11-09
 
 ### Fixed

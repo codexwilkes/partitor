@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Nathan Wilkes and partitor contributors
-"""The parts and groups commands and the ambitus menu."""
+"""The parts and groups commands, the ambitus menu and the short-name menu."""
 from __future__ import annotations
 
 import argparse
@@ -472,3 +472,40 @@ def ambitus_menu(data: dict) -> None:
         cmd_set(argparse.Namespace(id=data["id"], pairs=[f"{part}:ambitus={val}"], build=False))
         data = load_item(_item_or_die(data["id"]))
         amb = data.get("ambitus") or {}
+
+
+def short_menu(data: dict) -> None:
+    """Menu key h: the short form of each group staff label, numbered (the
+    custom form, else the rule's); pick one and give the new text, or auto
+    for the rule. Saved, not built (`set ID "Part:short=..."`)."""
+    from .lines import short_name          # here: lines needs numpy and cv2, light commands do not
+    members = []
+    for g_ in (data.get("groups") or {}).values():
+        members += [p_ for p_ in g_ if p_ not in members]
+    names = members or [p_ for p_ in data.get("parts") or [] if p_ != "-"]
+    if not names:
+        _warn("short:  no parts")
+        return
+
+    def show(d: dict) -> None:
+        own = {n_: (v_ or {}).get("short") for n_, v_ in
+               ((d.get("layout") or {}).get(PART_LAYOUT_KEY) or {}).items()}
+        for i, p_ in enumerate(names, 1):
+            cur = own.get(p_)
+            print(f"  {i}  {p_}: {short_name(p_, cur)}" + ("  (by hand)" if cur else "  (rule)"))
+    show(data)
+    while True:
+        v = ask("part (Enter = done)", "")
+        if not v:
+            return
+        part = names[int(v) - 1] if v.isdigit() and 1 <= int(v) <= len(names) else (
+            v if v in names else None)
+        if part is None:
+            _warn(f"short:  no part {v}")
+            continue
+        val = ask(f"{part}: short form (auto = the rule; Enter = no change)", "")
+        if not val:
+            continue
+        cmd_set(argparse.Namespace(id=data["id"], pairs=[f"{part}:short={val}"], build=False))
+        data = load_item(_item_or_die(data["id"]))
+        show(data)

@@ -421,7 +421,9 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
       `set ID "Trombones:group_gap=5"`.
     - A group line prints only the staves of its parts that the source prints
       there. When the staves change from line to line, each staff is labelled
-      with a short name (words of 5+ letters cut to 3 and a full stop) in a
+      with a short name (words of 5+ letters cut to 3 and a full stop; the
+      operator can give one part its own: `set ID "Alto Trombone:short=A. Tbn."`,
+      `:short=auto` brings the rule back, at most 24 characters) in a
       label column, right-aligned before the bracket, the same width on every
       line. When they never change, the first line has the full names. A
       system without any of the group's staves is one multi-bar rest line.
@@ -993,14 +995,17 @@ Details:
   before others moves their letters on.
 - Per-part layout: `layout.parts: {part or group: {key: value}}` over the item
   layout, for pages, gap, min_gap, scale, min_staff_mm, max_staff_mm, reflow,
-  title_page, bar_raise, bar_size, ink. `set ID "Continuo:pages=2"`
+  title_page, bar_raise, bar_size, ink, and `short` (the short form of a part's
+  group staff label, §4.3 item 11; any part of the score, also one not
+  extracted on its own). `set ID "Continuo:pages=2"`
   (`:pages=auto` clears); `expand ID [part]`, `contract ID [part]`; the menu keys
   `e`, `c`, `p` ask for a part (Enter = all). Build options on the command line
   win. A rename in `parts` moves the part's layout with it.
 - Item menu: edits `m` title/composer, `t` part names, `g` groups, `n` bar
   numbers, `e` expand, `c` contract, `p` pages, `a` paper (Letter -> A4 ->
   Ledger -> Letter), `k` ambitus (parts numbered with their range; LOW-HIGH,
-  auto, off, on; Enter keeps), `s` set; `v` review, `y` analyse again, `x`
+  auto, off, on; Enter keeps), `h` short names (the group staff labels, numbered;
+  a new text, or auto for the rule; Enter keeps), `s` set; `v` review, `y` analyse again, `x`
   repage, `r` build, `b` back. The status line shows the changes not built.
 - Stages:
   1. Analyse: `new` (or `partitor analyse ID` again) reads the score and writes
