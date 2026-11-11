@@ -170,6 +170,33 @@ class TestForkMap(unittest.TestCase):
         self.assertEqual(len(out), 3)
         self.assertEqual(cv2.getNumThreads(), expected_threads)  # pool size restored to what this build accepted
 
+    def test_the_worker_memory_is_a_range_with_the_shared_part(self):
+        """0.8.48: the peak resident size of a forked worker counts the pages it shares with the main
+        process; the message gives its own memory as a range, not the peak alone."""
+        saved = list(parallel._AT_FORK)
+        try:
+            parallel._AT_FORK.clear()
+            with mock_attr(parallel, "worker_peak_mb", lambda: 1225):
+                self.assertEqual(parallel.worker_memory(),
+                                 "the largest peaked at 1225 MB (includes memory shared with the main process)")
+                parallel._AT_FORK.extend([400 * 1024, 610 * 1024])
+                self.assertEqual(parallel.worker_memory(),
+                                 "the largest peaked at 1225 MB, of which up to 610 MB is shared with the "
+                                 "main process: its own memory 615 MB to 1225 MB")
+                parallel._AT_FORK.append(2000 * 1024)
+                self.assertIn("own memory 0 MB to 1225 MB", parallel.worker_memory())
+        finally:
+            parallel._AT_FORK[:] = saved
+
+    def test_fork_map_records_the_main_process_at_each_fork(self):
+        if parallel.rss_kb() is None:
+            self.skipTest("no /proc/self/status")
+        n0 = len(parallel._AT_FORK)
+        out, _ = self.run_map(lambda i: i, range(3), 2)
+        self.assertEqual(out, [0, 1, 2])
+        self.assertEqual(len(parallel._AT_FORK) - n0, 3)
+        self.assertGreater(parallel._AT_FORK[-1], 1024)            # KB: more than 1 MB
+
     def test_one_job_runs_here(self):
         pid = os.getpid()
         out, _ = self.run_map(lambda i: os.getpid() == pid, range(3), 1)

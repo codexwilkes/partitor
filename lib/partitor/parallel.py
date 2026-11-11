@@ -98,9 +98,36 @@ def job_count(requested, worker_gb: float, items: int) -> int:
     return max(1, min(items, cpus - 1, JOBS_MAX, by_mem))
 
 
+_AT_FORK: list[int] = []    # resident size (KB) of this process at each fork of fork_map (0.8.48)
+
+
+def rss_kb() -> int | None:
+    """rss_kb -> the resident size (KB) of this process now (VmRSS); None where /proc is missing."""
+    try:
+        for line in Path("/proc/self/status").read_text().splitlines():
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1])
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
 def worker_peak_mb() -> int:
-    """worker_peak_mb -> peak memory (MB) of the largest child that ended so far."""
+    """worker_peak_mb -> peak resident size (MB) of the largest child that ended so far. A forked
+    child counts the pages it shares with this process too (copy on write)."""
     return int(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024)
+
+
+def worker_memory() -> str:
+    """worker_memory -> the memory of the largest worker, in words (0.8.48). Its peak resident size
+    counts the pages it shares with the main process, so its own memory lies between the peak
+    less the main process at the fork, and the peak. Without /proc: the peak, marked as such."""
+    peak = worker_peak_mb()
+    if not _AT_FORK:
+        return f"the largest peaked at {peak} MB (includes memory shared with the main process)"
+    shared = max(_AT_FORK) // 1024
+    return (f"the largest peaked at {peak} MB, of which up to {shared} MB is shared with the main "
+            f"process: its own memory {max(0, peak - shared)} MB to {peak} MB")
 
 
 def _describe_exit(status: int) -> str:
@@ -167,6 +194,9 @@ def fork_map(fn, items, jobs: int):
         while ready < len(items):
             while nxt < len(items) and len(running) < jobs:
                 path = os.path.join(tmp, f"{nxt}.pkl")
+                kb = rss_kb()
+                if kb is not None:
+                    _AT_FORK.append(kb)       # what a child may share with this process
                 try:
                     pid = os.fork()
                 except OSError:

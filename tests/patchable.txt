@@ -19,3 +19,4 @@ _band_now
 _find_prefixes
 yaml_load
 _main
+worker_peak_mb

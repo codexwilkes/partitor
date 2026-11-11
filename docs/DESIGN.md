@@ -416,7 +416,13 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
 8. **Memory.** The engine processes page by page and keeps only compact
    results (strips, or a compressed cache per page, §12.4). `detect` and `build` use
    worker processes (`PARTITOR_JOBS`, `--jobs`; §4.4); the memory cap
-   (`PARTITOR_MEMORY_MAX`) covers all workers together.
+   (`PARTITOR_MEMORY_MAX`) covers all workers together. The build line `workers: N; the largest
+   peaked at P MB, of which up to S MB is shared with the main process: its own memory A MB to P MB`
+   (0.8.48, `parallel.worker_memory`): P is the peak resident size of the largest worker
+   (`ru_maxrss`), which counts the pages it shares with the main process after the fork; S is the
+   main process at the fork (`VmRSS`). Before, the line gave P alone as the worker's memory (cold
+   item 0003: 1225 MB, while the whole run peaked at 1.84 GB with 3 workers). Checked on item 0001:
+   range 127-326 MB, sampled private memory of the worker 162 MB.
 9. **Page-edge artefacts.** Book-spine shadow, dark scan borders and corner
    marks are found and discarded as a known class.
 10. **Scan conditioning (poor scans, light grey print).** The engine tolerates

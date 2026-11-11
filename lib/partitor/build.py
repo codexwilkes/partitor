@@ -44,7 +44,7 @@ from .partplan import read_source
 from .mapping import assign_maps
 from .model import PageResult, RestRun, Strip
 from .typography import missing_fonts
-from .parallel import RENDER_WORKER_GB, job_count, page_worker_gb, worker_peak_mb
+from .parallel import RENDER_WORKER_GB, job_count, page_worker_gb, worker_memory
 from .reflow import find_prefixes, reflow_report
 from .render import (
     GROUP_REFLOW_PAGES, LARGE, LAST_RENDER, choose_layout, choose_reflow, fit_scale, large_copies,
@@ -204,7 +204,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
     finally:
         results.close()
     if jobs > 1:
-        _note(f"workers: {jobs}; the largest used {worker_peak_mb()} MB "
+        _note(f"workers: {jobs}; {worker_memory()} "
               f"(estimate for the worker count: {worker_gb:.1f} GB)")
         _note(f"analysis took {time.monotonic() - t_analysis:.0f} s")
     if not sysrecs:
@@ -625,7 +625,7 @@ def cmd_build(a: argparse.Namespace) -> int:
     finally:
         outs.close()
     if jobs > 1:
-        _note(f"workers: {jobs}; the largest used {worker_peak_mb()} MB "
+        _note(f"workers: {jobs}; {worker_memory()} "
               f"(estimate for the worker count: {worker_gb:.1f} GB)")
     t_render = time.monotonic()
     _note(f"analysis took {t_render - t_analysis:.0f} s")
@@ -817,7 +817,7 @@ def cmd_build(a: argparse.Namespace) -> int:
     finally:
         results.close()
     if rjobs > 1:
-        _note(f"workers: {rjobs}; the largest so far used {worker_peak_mb()} MB "
+        _note(f"workers: {rjobs}; {worker_memory()} "
               f"(estimate for the worker count: {RENDER_WORKER_GB:.1f} GB)")
     _note(f"rendering took {time.monotonic() - t_render:.0f} s")
     return _summary(start)

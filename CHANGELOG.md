@@ -7,6 +7,13 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.48 — 2026-11-11
+
+### Fixed
+- The build line about the workers said "the largest used N MB". N counts memory the worker
+  shares with the main process, so it looked about twice too high. The line now gives the peak,
+  the part that may be shared, and the worker's own memory as a range.
+
 ## 0.8.47 — 2026-11-11
 
 ### Fixed
