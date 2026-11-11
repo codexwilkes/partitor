@@ -432,28 +432,24 @@ def _profiles_cached(s: Strip, nbins: int) -> tuple:
     return s._prof                                   # type: ignore[attr-defined]
 
 
-def pitches(strips: list[Strip], opts: dict) -> list[float]:
-    """pitches -> staff-top to staff-top distance (source px) after each
-    strip: the constant pitch (staff height + `gap` staff spaces), larger
-    only where ink of two strips would come closer than `clearance`
-    (header ink: HEADER_CLEAR_SP). Constant leading, so the eye can predict
-    where the next line is."""
+def pitch_terms(strips: list[Strip], opts: dict) -> list[tuple[float, float, float, bool, float]]:
+    """pitch_terms -> per pair of strips the terms of its pitch that do not depend on `gap`
+    (0.8.43): (staff height, staff space, the least gap of a group score in px (0: one staff),
+    a movement starts next, the pitch the ink needs). pitch_at puts them together for a gap,
+    so `partitor plan` can try the gaps the build tries."""
     nb = 400
     out = []
     for a, b in zip(strips, strips[1:]):
-        base = (a.staff_bottom - a.staff_top) + opts["gap"] * a.sp
         clear = opts["clearance"]
         n_st = len(a.staff_labels)
+        least = 0.0
         if n_st > 1:
             # a group score: systems apart by more than their staves (operator request
             # 2026-10-24: two systems almost touched). 1.5 x the space
             # between the staves of the system, at least `gap`; ink 3 sp apart
             inner = ((a.staff_bottom - a.staff_top) - n_st * 4 * a.sp) / (n_st - 1)
-            base = (a.staff_bottom - a.staff_top) + max(opts["gap"] * a.sp,
-                                                        SYSTEM_GAP_FACTOR * inner)
+            least = SYSTEM_GAP_FACTOR * inner
             clear = max(clear, SYSTEM_CLEAR_SP)
-        if b.movement:                 # a new movement: double leading
-            base += opts["gap"] * a.sp
         _, _, pb = _profiles_cached(a, nb)
         t_own, t_hdr, _ = _profiles_cached(b, nb)
         req = 0.0
@@ -463,8 +459,28 @@ def pitches(strips: list[Strip], opts: dict) -> list[float]:
             if both.any():
                 req = max(req, float(np.max((pb[both] - a.staff_top)
                                             - (t[both] - b.staff_top))) + c * a.sp)
-        out.append(max(base, req))
+        out.append((float(a.staff_bottom - a.staff_top), float(a.sp), float(least), bool(b.movement), req))
     return out
+
+
+def pitch_at(term: tuple, gap: float) -> float:
+    """pitch_at -> the pitch (source px) of one pitch_terms entry at `gap` (staff spaces): the
+    staff height + the gap (a group: at least its least gap; a new movement: the gap twice), or
+    more where the ink needs it."""
+    h, sp, least, movement, req = term
+    base = h + max(gap * sp, least)
+    if movement:                       # a new movement: double leading
+        base += gap * sp
+    return max(base, req)
+
+
+def pitches(strips: list[Strip], opts: dict) -> list[float]:
+    """pitches -> staff-top to staff-top distance (source px) after each
+    strip: the constant pitch (staff height + `gap` staff spaces), larger
+    only where ink of two strips would come closer than `clearance`
+    (header ink: HEADER_CLEAR_SP). Constant leading, so the eye can predict
+    where the next line is."""
+    return [pitch_at(t, opts["gap"]) for t in pitch_terms(strips, opts)]
 
 
 def ambitus_width(sp: float = AMB_SP) -> float:

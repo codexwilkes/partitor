@@ -50,7 +50,9 @@ a bad turn.
 ## Read the table
 
 The table is short. It shows the option as built (`*`) and the best option of
-each paper (`best`). Add `--all` to see every option. The option numbers are
+each paper (`best`). The `built:` line above the table gives the estimate for
+the layout as built. If it differs from the real page count, trust the options
+less. A part built before 0.8.43 gets the closer estimate after one rebuild. Add `--all` to see every option. The option numbers are
 the same in both views. The last line of `plan` gives a ready command for the
 best option.
 
@@ -67,7 +69,7 @@ Example (the numbers are only an example):
 
 | Column | Meaning |
 |---|---|
-| `#` | Option number. `*` marks the option as built. |
+| `#` | Option number. `*` marks the option as built: same paper, staff within 0.25 mm, the same re-flow and fold-out settings. No `*` when no option matches. |
 | `paper`, `staff` | Paper and staff height. |
 | `pages` | Pages of music (a fold-out flap counts as a page). |
 | `rest` | Page turns where the player rests 2 bars or more. Best. |

@@ -936,6 +936,21 @@ or more at the turn), `short` (a rest of one bar), `attacca`, `fold-out` (the nu
 - The estimate of the built layout is printed above the table (`built: ... the estimate for it: N
   pages`): the difference shows how far to trust the rows. Not counted: bridgeable turns (they need
   per-staff rests, §5.7) and one-bar rests; both are 0 in the table.
+- Since 0.8.43 the estimate models the build (§5.2). The plan data keeps, per line, the terms of its
+  pitch that do not depend on the gap (`pt`: staff height, staff space, the least gap of a group, a
+  movement next, the pitch the ink needs; `strips.pitch_terms`) and whether a rehearsal letter opens
+  it (`sec`). A row tries the gaps as the build does (`gap` down to `gap_min` in steps of 0.25: the
+  fewest turns at `gap_min`, then the widest gap with that many turns). LINE_FIT (98 %) applies only to
+  the lines re-flow cuts; a line that is not cut may fill the text width (beside the label column of a
+  group). The estimate of the built layout takes the scale and the gap the build chose, cuts no line
+  when the build did not re-flow, and plans with the turn costs of the build (`render.plan_costs`:
+  §5.4, or §5.7 with `foldouts: on`); the rows keep the costs of fold-out parts, which `plan N` sets.
+  On the sample library the estimate gives the built page count for 40 parts of 40. Plan data of an
+  older build has no `pt` and `sec`: its pitch is the one saved at the item gap, until a rebuild.
+- `*` marks the row of the built layout only (0.8.43, `partplan.as_built`): the same paper, a staff
+  within 0.25 mm, a row that can be made, no cut lines when the build did not re-flow, and no fold-out
+  when `foldouts` is not on. Before, paper and size alone gave the mark, also to a row that could not
+  be made.
 - `partitor plan ID PART N` sets option N for that part (saved, not built): `paper`,
   `max_staff_mm`, `reflow` (on when the lines are cut), `foldouts=on` and `pages` (the planned
   pages plus 2, at most 99). It also says how many fold-out sheets the option needs. Then `partitor rebuild ID PART` makes it; the build reports the real pages and turns, and

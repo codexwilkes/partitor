@@ -160,6 +160,98 @@ class TestEstimate(unittest.TestCase):
 
 
 @needs_deps
+class TestAsBuilt(unittest.TestCase):
+    """0.8.43 (F3): the plan models the default build: the gap the build tightens to, uncut lines up
+    to the full text width, and a `*` row only for the layout that was built."""
+
+    def test_pitch_terms_give_the_pitches_at_any_gap(self):
+        st = part(12)
+        st[5].movement = True
+        terms = pt.pitch_terms(st, OPTS)
+        for gap in (10.0, 8.5, 7.0):
+            with self.subTest(gap=gap):
+                self.assertEqual(pt.pitches(st, {**OPTS, "gap": gap}), [pt.pitch_at(t, gap) for t in terms])
+
+    def pages_at(self, src, gap, gap_min, mm=6.0):
+        return pt.estimate(src, {**OPTS, "gap": gap, "gap_min": gap_min}, "letter", mm)
+
+    def test_the_estimate_tightens_the_gap_as_the_build_does(self):
+        for n in range(20, 120):
+            src = pt.read_source(part(n), OPTS, 400)
+            wide, tight = self.pages_at(src, 10.0, 10.0), self.pages_at(src, 7.0, 7.0)
+            if pt.turns(tight.pages) < pt.turns(wide.pages):
+                break
+        else:
+            self.fail("no part where a tighter gap saves a turn")
+        o = self.pages_at(src, 10.0, 7.0)
+        self.assertEqual(pt.turns(o.pages), pt.turns(tight.pages))      # fewest turns first
+        self.assertLess(o.gap, 10.0)
+        self.assertGreaterEqual(o.gap, 7.0)
+        old = pt.Source(src.dpi, src.sp, [{k: v for k, v in ln.items() if k != "pt"} for ln in src.lines])
+        self.assertEqual(self.pages_at(old, 10.0, 7.0).pages, wide.pages)    # old plan data: the saved pitch
+
+    def test_an_uncut_line_up_to_the_text_width_fits(self):
+        st = part(10)
+        st[4] = flow_line([], [1900], width=2000, key=False)         # one bar, no prefix: never cut
+        src = pt.read_source(st, OPTS, 400)
+        whole = src.lines[4]["whole"]
+        pw, _ = pt.PAPER["letter"]
+        usable = pt.usable_width({**OPTS, "paper": "letter"}, pw)
+        mm = 0.99 * usable * 4.0 * src.sp * 25.4 / (72.0 * whole)      # the line fills 99 % of the text
+        self.assertTrue(pt.estimate(src, OPTS, "letter", mm).ok)
+        self.assertFalse(pt.estimate(src, OPTS, "letter", mm * 1.03).ok)
+
+    def test_a_build_without_re_flow_is_estimated_without_cuts(self):
+        src = pt.read_source(part(10), OPTS, 400)
+        cut = pt.estimate(src, OPTS, "letter", 8.0)
+        self.assertTrue(cut.ok and cut.reflow)
+        whole = pt.estimate(src, OPTS, "letter", 8.0, cut=False)    # the lines are wider than the text
+        self.assertFalse(whole.ok)
+        small = pt.estimate(src, OPTS, "letter", 3.0, cut=False)
+        self.assertTrue(small.ok)
+        self.assertFalse(small.reflow)
+        self.assertEqual(sum(j - i for g in small.plan.groups for i, j in g.pages), 10)
+
+    def test_the_source_marks_section_starts(self):
+        st = part(6)
+        src = pt.read_source(st, OPTS, 400)
+        self.assertEqual([ln["sec"] for ln in src.lines], [pt.section_start(x) for x in st])
+
+    def test_with_the_costs_of_the_build_the_estimate_gives_the_pages_of_the_build(self):
+        """The rows price turns as fold-out parts do; the estimate of a build without fold-outs takes
+        the costs of the build (render.plan_costs) and gives the pages its planner gives."""
+        o = {**OPTS, "turns": "any", "logo": "off", "title_page": "auto",
+             "gap_min": OPTS["gap"]}                                            # the built gap
+        sp = 10.0
+        for n in range(30, 90, 4):
+            st = part(n, rests={n // 3, n // 2 + 1})
+            src = pt.read_source(st, o, 400)
+            mm = 3.0
+            s1 = mm * 400 / (4.0 * sp * 25.4)
+            built = len(pt.layout_pages(st, 400, {**o, "scale": s1})[0])
+            est = pt.estimate(src, o, "letter", mm, cut=False, costs=pt.plan_costs(o))
+            with self.subTest(n=n):
+                self.assertEqual(est.pages, built)
+
+    def opt(self, staff=6.0, ok=True, reflow=False, folds=0, paper="letter"):
+        plan = SimpleNamespace(folds=folds, playing=0, counts=lambda: {})
+        return pt.Option(paper, staff, ok, "" if ok else "x", 3, False, plan if ok else None, reflow, 1)
+
+    def test_the_star_marks_the_built_layout_only(self):
+        built, lay = {"staff_mm": 5.9, "reflow": False}, {"paper": "letter"}
+        self.assertTrue(pt.as_built(self.opt(), built, lay))
+        self.assertFalse(pt.as_built(self.opt(paper="ledger"), built, lay))
+        self.assertFalse(pt.as_built(self.opt(staff=6.5), built, lay))
+        self.assertFalse(pt.as_built(self.opt(ok=False), built, lay))            # cannot be made
+        self.assertFalse(pt.as_built(self.opt(reflow=True), built, lay))         # cut lines, built uncut
+        self.assertTrue(pt.as_built(self.opt(reflow=True), {**built, "reflow": True}, lay))
+        self.assertFalse(pt.as_built(self.opt(folds=1), built, lay))             # foldouts off
+        self.assertTrue(pt.as_built(self.opt(folds=1), built, {**lay, "foldouts": "on"}))
+        rows = pt.plan_rows([self.opt(ok=False)], built, lay)
+        self.assertFalse(rows[1].startswith("*"))
+
+
+@needs_deps
 class TestLabelColumn(unittest.TestCase):
     """A group's label column is added after the cut and the staff shrinks to fit (0.8.7)."""
 

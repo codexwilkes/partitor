@@ -7,6 +7,19 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.43 — 2026-11-11
+
+### Fixed
+- `partitor plan`: the estimate of the layout as built (`built: ... the estimate for it`) now gives
+  the page count of the build. It now takes the gap the build chose, cuts no line when the build did
+  not re-flow, uses the exact staff size and the turn costs of the build. Before, it could say 3 pages
+  for a part built on 2. The rows also try a tighter gap, as the build does.
+- `partitor plan`: `*` marks only the option that matches the build (paper, staff size, re-flow and
+  fold-outs, and the option can be made). Before, an option that could not be made could carry it.
+- `partitor plan`: a line that is not cut may fill the whole text width; it no longer makes an option
+  unavailable at the size it was built at.
+- The closer estimate needs plan data of this version: rebuild a part once.
+
 ## 0.8.42 — 2026-11-11
 
 ### Fixed

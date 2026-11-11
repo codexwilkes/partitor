@@ -610,13 +610,13 @@ def plan_names(data: dict, built: dict, words: list[str]) -> list[str]:
 def plan_rows(opts_list: list, old: dict, lay: dict, show_all: bool = True) -> list[str]:
     """plan_rows -> the table of options of one part, as text lines. show_all False: only the
     row as built and the best row of each paper (the numbers of the rows stay)."""
-    from .partplan import best_rows
+    from .partplan import as_built, best_rows
     best = best_rows(opts_list)
     out = [f"  {'#':>2}  {'paper':<6} {'staff':>7} {'pages':>5} {'rest':>5} {'short':>5} {'attacca':>7} "
            f"{'fold-out':>8} {'bad':>4}  note"]
     shown = 0
     for o in opts_list:
-        mark = "*" if (o.paper == lay.get("paper") and abs(o.staff_mm - old.get("staff_mm", 0)) <= 0.25) else " "
+        mark = "*" if as_built(o, old, lay) else " "
         if not show_all and mark == " " and o.n not in best:
             continue
         shown += 1
@@ -679,6 +679,7 @@ def plan_table(item: Path, data: dict, built: dict, nm: str, trial: bool = False
     there is nothing to plan (the reason is printed)."""
     from .lines import lines_path, load_lines
     from .partplan import JUSTIFY_SHARE, Source, estimate, options, read_source
+    from .render import plan_costs
     lay = part_layout(data, nm)
     try:
         pl = load_lines(lines_path(item / "lines", nm))
@@ -715,7 +716,11 @@ def plan_table(item: Path, data: dict, built: dict, nm: str, trial: bool = False
                   f"not in these estimates (the saved plan data has no bar numbers: rebuild the part once)")
     _head(f"Plan: {nm}")
     c0 = old.get("content_pages", old["pages"])
-    est = estimate(src, o, o["paper"], float(old["staff_mm"]))
+    g0 = float(old.get("gap", o["gap"]))                    # the gap the build chose
+    sc0 = pl["opts"].get("scale")                           # the exact scale of the build (staff_mm is rounded)
+    mm0 = 4.0 * src.sp * 25.4 * sc0 / src.dpi if sc0 else float(old["staff_mm"])
+    est = estimate(src, {**o, "gap": g0, "gap_min": g0}, o["paper"], mm0, cut=bool(old.get("reflow")),
+                   costs=plan_costs(o))                   # the turn costs of the build (§5.4 or §5.7)
     _note(f"{'trial build' if trial else 'built'}: "
           f"{o['paper']}, staff {old['staff_mm']} mm, {c0} pages of music, "
           f"{old.get('turns', 0)} turns, {old.get('bad_turns', 0)} while playing"
