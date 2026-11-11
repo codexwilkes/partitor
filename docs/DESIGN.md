@@ -1354,3 +1354,8 @@ applies those edits to every result, read or new.
   `analysis cache: N of M page(s) found`. Nothing else in the output changes.
 - **Size.** About 0.6 MB per page; a 70-page score about 40 MB. The folder is part of the
   item: `rm -r cache/` is always safe.
+- **After the read.** A build cuts one strip per part and system from the owner image
+  (`strips.make_strip`). Since 0.8.33 it reads only the box of the part's staves: one pass per
+  page (`owner_boxes`) gives the box of every owner code, and each strip reads its box, not the
+  whole page. Before, each strip read the whole page (a 70-page score with 17 parts: 1 138 full-page
+  reads, about 200 s of a build whose pages were all in the cache). The strips are the same.

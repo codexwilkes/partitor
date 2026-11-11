@@ -6,7 +6,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from .config import AMB_SP, HEADER_CLEAR_SP, PART_LAYOUT_KEY, SYSTEM_CLEAR_SP, SYSTEM_GAP_FACTOR
+from .config import AMB_SP, HEADER_CLEAR_SP, OWN_NONE, PART_LAYOUT_KEY, SYSTEM_CLEAR_SP, SYSTEM_GAP_FACTOR
 from .model import PageResult, Strip
 from .typography import _font, text_len
 
@@ -14,6 +14,47 @@ from .typography import _font, text_len
 # spaces of the staff end. A final or repeat barline (thin + thick) is found at
 # its middle, up to 2.2 sp before the end (a 2.0 limit missed them).
 BAR_END_SP = 2.5
+
+# owner_boxes: the boxes of the last page asked for (one page at a time: a build
+# cuts every strip of a page before the next page)
+_BOXES: dict = {}
+
+
+def owner_boxes(o: np.ndarray) -> dict[int, tuple[int, int, int, int]]:
+    """owner_boxes -> {owner code: (first row, last row, first column, last column)} of the
+    ink in the owner image o (OWN_NONE left out). One pass over the page; make_strip then
+    reads only the box of its staves, not the whole page (0.8.33). The result of the last
+    page is kept (same array object: same result)."""
+    hit = _BOXES.get("page")
+    if hit is not None and hit[0] is o:
+        return hit[1]
+    ys, xs = np.nonzero(o != OWN_NONE)
+    lab = o[ys, xs]
+    order = np.argsort(lab, kind="stable")       # rows stay in order inside each code
+    lab, ys, xs = lab[order], ys[order], xs[order]
+    boxes: dict[int, tuple[int, int, int, int]] = {}
+    if lab.size:
+        starts = np.concatenate(([0], np.flatnonzero(np.diff(lab)) + 1))
+        ends = np.concatenate((starts[1:], [lab.size])) - 1
+        x_lo = np.minimum.reduceat(xs, starts)
+        x_hi = np.maximum.reduceat(xs, starts)
+        for k, (a, b) in enumerate(zip(starts, ends)):
+            boxes[int(lab[a])] = (int(ys[a]), int(ys[b]), int(x_lo[k]), int(x_hi[k]))
+    _BOXES["page"] = (o, boxes)
+    return boxes
+
+
+def _codes_in_box(o: np.ndarray, boxes: dict, codes: list[int]) -> tuple[np.ndarray, np.ndarray]:
+    """(rows, columns) of the pixels of o whose owner is one of codes, in page coordinates,
+    read inside the union of their boxes only. Empty arrays when none has ink."""
+    bb = [boxes[c] for c in codes if c in boxes]
+    if not bb:
+        e = np.zeros(0, np.intp)
+        return e, e
+    r0, r1 = min(b[0] for b in bb), max(b[1] for b in bb)
+    c0, c1 = min(b[2] for b in bb), max(b[3] for b in bb)
+    ys, xs = np.nonzero(np.isin(o[r0:r1 + 1, c0:c1 + 1], codes))
+    return ys + r0, xs + c0
 
 
 def make_strip(res: PageResult, st_idx: list[int], header_owner: int,
@@ -26,12 +67,11 @@ def make_strip(res: PageResult, st_idx: list[int], header_owner: int,
     darker: dilate the ink by 1 px."""
     o = res.owner
     sp = res.sp
-    own = np.isin(o, st_idx)
+    boxes = owner_boxes(o)
     sts = [res.staves[i] for i in st_idx]
-    ys, xs = np.nonzero(own)
+    ys, xs = _codes_in_box(o, boxes, list(st_idx))
     y0, y1 = int(ys.min()), int(ys.max())
     x0, x1 = int(xs.min()), int(xs.max())
-    hdr = o == header_owner
     # printed mid-line bar numbers: own ink of the top staff or header ink
     inbox = np.zeros(o.shape, bool)
     for bx0, by0, bx1, by1 in res.num_boxes.get(sts[0].system, []):
@@ -39,8 +79,8 @@ def make_strip(res: PageResult, st_idx: list[int], header_owner: int,
     n_own = inbox[ys, xs]
     hy = hx = None
     n_hdr = None
-    if hdr.any():
-        hy, hx = np.nonzero(hdr)
+    if header_owner in boxes:
+        hy, hx = _codes_in_box(o, boxes, [header_owner])
         n_hdr = inbox[hy, hx]
     top_staff = min((s for s in res.staves if s.system == sts[0].system),
                     key=lambda s: s.top)
@@ -48,9 +88,9 @@ def make_strip(res: PageResult, st_idx: list[int], header_owner: int,
     if hy is not None and shift > 0:
         hy = hy + shift
         hb = int(hy.max())
-        cols = slice(int(hx.min()), int(hx.max()) + 1)
-        sub = own[:, cols]
-        rows = np.flatnonzero(sub.any(axis=1))
+        # rows of own ink in the header's columns
+        cl, ch = int(hx.min()), int(hx.max())
+        rows = np.unique(ys[(xs >= cl) & (xs <= ch)])
         own_top = int(rows.min()) if rows.size else y0
         need = own_top - int(0.5 * sp)
         if hb > need:

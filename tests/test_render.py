@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -88,6 +89,59 @@ class TestRendering(unittest.TestCase):
             self.assertFalse(pt.LAST_RENDER["title_page"])
             self.assertNotEqual(pymupdf.open(out2)[0].get_image_info(), [])
             del n2
+
+    def _page_with_two_staves(self):
+        """A page 1200 x 900 px: staff 0 at rows 100-140, staff 1 at rows 700-740, a header of
+        system 0 above staff 0 and a printed bar number box on staff 0."""
+        owner = np.full((1200, 900), pt.OWN_NONE, np.int32)
+        st0 = pt.Staff(0, 0, [100.0 + 10 * k for k in range(5)], 50, 850, system=0)
+        st1 = pt.Staff(0, 1, [700.0 + 10 * k for k in range(5)], 50, 850, system=0)
+        for st in (st0, st1):
+            for ly in st.lines:
+                owner[int(ly), 50:851] = st.idx
+        owner[90:150, 300:310] = 0                       # a stem of staff 0
+        owner[60:75, 400:500] = pt.OWN_HEADER_BASE       # header text of system 0
+        res = pt.PageResult(0, owner.shape, 10.0, 1, 0.0, 0.0, [st0, st1], [[st0, st1]], owner,
+                            num_boxes={0: [(295, 95, 312, 105)]})
+        return res
+
+    def test_owner_boxes_one_pass(self):
+        res = self._page_with_two_staves()
+        boxes = pt.owner_boxes(res.owner)
+        self.assertEqual(boxes[0], (90, 149, 50, 850))
+        self.assertEqual(boxes[1], (700, 740, 50, 850))
+        self.assertEqual(boxes[pt.OWN_HEADER_BASE], (60, 74, 400, 499))
+        self.assertNotIn(pt.OWN_NONE, boxes)
+        self.assertIs(pt.owner_boxes(res.owner), boxes)            # same page: kept
+        self.assertIsNot(pt.owner_boxes(res.owner.copy()), boxes)  # another array: new pass
+
+    def test_make_strip_reads_the_box_of_its_staves_only(self):
+        """0.8.33: make_strip read the whole owner image once per part and system (198 s of
+        a warm build of a 70-page score); it now reads the box of its own staves."""
+        res = self._page_with_two_staves()
+        seen = []
+        real = np.isin
+
+        def spy(a, *args, **kw):
+            seen.append(a.shape)
+            return real(a, *args, **kw)
+        with mock.patch.object(np, "isin", spy):
+            pt.make_strip(res, [1], pt.OWN_HEADER_BASE)
+        self.assertTrue(seen)
+        self.assertTrue(all(s[0] * s[1] < res.owner.size // 10 for s in seen), seen)
+
+    def test_make_strip_keeps_every_pixel(self):
+        res = self._page_with_two_staves()
+        for idx in ([0], [1], [0, 1]):
+            s = pt.make_strip(res, idx, pt.OWN_HEADER_BASE)
+            own = int(np.isin(res.owner, idx).sum())
+            hdr = int((res.owner == pt.OWN_HEADER_BASE).sum())
+            self.assertEqual(int(s.img.sum()), own + hdr, idx)
+            self.assertEqual(int(s.hdr.sum()), hdr, idx)
+        s0 = pt.make_strip(res, [0], pt.OWN_HEADER_BASE)
+        self.assertIsNotNone(s0.num_mask)                          # the bar number box
+        # own ink of staff 0 inside the box (rows 95-105, columns 295-312, inclusive)
+        self.assertEqual(int(s0.num_mask.sum()), int((res.owner[95:106, 295:313] == 0).sum()))
 
     def test_darker_adds_ink(self):
         owner = np.full((200, 400), pt.OWN_NONE, np.int32)

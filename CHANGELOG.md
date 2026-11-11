@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.33 — 2026-11-10
+
+### Changed
+- Faster build when the pages are in the analysis cache. The build cut each strip (one part, one
+  system) by reading the whole page image; it now reads only the box of that part's staves (one pass
+  per page finds the box of every staff and header). On a 70-page score with 17 parts this was about
+  200 s of a build whose pages were all in the cache. The parts are the same.
+
 ## 0.8.32 — 2026-11-10
 
 ### Fixed
