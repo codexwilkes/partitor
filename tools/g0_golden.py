@@ -110,7 +110,7 @@ LONG_INVARIANT = ("build:long-jobs2", "build:long-default")     # same output ex
 
 SUBCOMMANDS = ["menu", "new", "list", "show", "rebuild", "repage", "proof", "bars", "parts",
                "groups", "meta", "analyse", "set", "expand", "contract", "reid", "rename",
-               "pieces", "detect", "build"]
+               "pieces", "detect", "build", "plan", "pages"]
 
 # (label, args, stdin, snapshot the item folder after this step)
 LIB_STEPS = [
@@ -135,6 +135,13 @@ LIB_STEPS = [
     ("list",       ["list"], "", False),
     ("rename",     ["rename", "1"], "\n", True),
     ("show2",      ["show", "1"], "", False),
+    # 0.8.46: the keys, the plan, the pages table, fold-outs, turns=rest, cut marks, bold rest bars
+    ("set-list",   ["set", "1"], "", False),
+    ("plan",       ["plan", "1", "T"], "", False),
+    ("pages",      ["pages", "1", "T"], "", False),
+    ("fold-rest",  ["set", "1", "T:foldouts=on", "T:turns=rest", "cutline=marks", "rest_bar=bold"], "", False),
+    ("rebuild5",   ["rebuild", "1"], "\n\n", True),
+    ("pages2",     ["pages", "1", "T"], "", False),
 ]
 
 # ---------------------------------------------------------------- normalising

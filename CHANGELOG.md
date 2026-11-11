@@ -7,6 +7,18 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.46 — 2026-11-11
+
+### Added
+- `partitor set ID` with no `key=value` lists every key `set` takes: its value for the item, the
+  default and what it accepts (`*` = set for the item), then the keys set for single parts.
+  Before, it stopped with a usage error, and no command listed the keys.
+- The golden check covers more: `set ID`, `plan`, `pages`, a part with fold-outs, `turns=rest`,
+  cut marks and bold rest bars, and the help of `plan` and `pages`.
+
+### Fixed
+- DESIGN.md: the command list names `pages`; a note said `plan` was not yet in the main help.
+
 ## 0.8.45 — 2026-11-11
 
 ### Fixed

@@ -970,8 +970,7 @@ or more at the turn), `short` (a rest of one bar), `attacca`, `fold-out` (the nu
   are made as that group's are; the table header says `trial build`. To keep a group: `partitor groups`,
   then `rebuild` it. The joint lines count as rest only where every staff rests, so joining parts removes
   turn points: compare the tables with those of the single parts.
-- Not done yet: `plan` in the main `--help` (that text is part of the G0 golden: it needs a re-record
-  with the operator's word).
+- `plan` and `pages` are in the main `--help`, and G0 guards their `--help` (0.8.46).
 
 ### 5.9 The pages table (`partitor pages`, `page_report`)
 `page_report` lays a part out as `repage` would (no drawing) and returns one row per face: printed label,
@@ -1035,12 +1034,14 @@ partitor list [words] | show <id>
 partitor expand <id> [part] | contract <id> [part]
 partitor set <id> pages=2 scale=1.2 gap=11 paper=a4 title="..."
 partitor set <id> "Continuo:pages=2"      (one part)
+partitor set <id>                         every key: value, default, what it accepts (0.8.46)
 partitor rename <id>           folder name follows title and composer
 partitor reid <id>             old YYYY-NNN item -> YYYY-MM-NNNN
 partitor rebuild <id> [part ...] [--jobs N|auto]
 partitor repage <id> [part ...]           page breaks again from the saved lines
 partitor plan <id> [part] [N]             options of a part; with N: set option N
 partitor plan <id> --group Name=A,B       try a group of parts in a temporary copy (read-only)
+partitor pages <id> <part> [--move PAGE=N]  pages and turns (§5.9)
 partitor analyse <id> [--yes] [--join pP:N] [--unjoin pP:N] | analyse --all
 partitor bars | parts | groups | meta | proof <id>
 ```

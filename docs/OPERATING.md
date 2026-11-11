@@ -16,6 +16,7 @@ sandbox (`SANDBOX.md`).
 | `partitor new [n]` | Wizard for a PDF in `inbox/`. |
 | `partitor list [words]` | All items, or those that match every word. |
 | `partitor show ID` | Review: parts, groups, settings, open choices. |
+| `partitor set ID` | List every setting: its value, the default and what it accepts. |
 | `partitor set ID key=value ...` | Change settings (saved, not built). `Part:key=value` for one part; `"Part:short=A. Tbn."` sets the short form of a group staff label (`auto` = the rule). |
 | `partitor expand ID [part]`, `contract ID [part]` | One step larger or smaller. |
 | `partitor analyse ID [--yes]`, `analyse --all` | Read the score again. |

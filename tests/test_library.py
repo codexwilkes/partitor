@@ -27,6 +27,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from support import (  # noqa: E402,F401
+    LIB,
     SRC,
     build,
     cli_items,
@@ -1250,6 +1251,28 @@ class TestItemLock(unittest.TestCase):
                 rc = pt.cmd_set(argparse.Namespace(id="2026-10-0007", pairs=["gap=12"], build=False))
         self.assertEqual(rc, 0)
         self.assertEqual(pt.load_item(self.item)["layout"]["gap"], 12.0)
+
+    def test_set_with_no_pairs_lists_every_key_and_changes_nothing(self):
+        """0.8.46 (F9): `set ID` alone listed nothing (a usage error); now every key of `set`."""
+        data = pt.load_item(self.item)
+        data["layout"] = {"gap": 12.0, "parts": {"A": {"page_count": 4, "foldouts": "on"}}}
+        pt.save_item(self.item, data)
+        before = Path(self.item, "2026-10-0007-score.yaml").read_text(encoding="utf-8")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = pt.cmd_set(argparse.Namespace(id="2026-10-0007", pairs=[], build=False))
+        self.assertEqual(rc, 0)
+        text = out.getvalue()
+        for name, (lk, _) in pt.SET_KEYS.items():
+            if lk is not None:
+                self.assertRegex(text, rf"\n[ *] {name} ", name)
+        self.assertRegex(text, r"\n\* gap +12\.0 +10\.0 +number")
+        self.assertIn("foldouts       off        off        off | on", text)
+        self.assertIn("A: pages=4, foldouts=on", text)                       # the names `set` takes
+        self.assertEqual(Path(self.item, "2026-10-0007-score.yaml").read_text(encoding="utf-8"), before)
+        r = subprocess.run([sys.executable, str(Path(LIB, "partitor-engine")), "set", "--help"],
+                           capture_output=True, text=True, env={**os.environ, "PARTITOR_ALLOW_ROOT": "1"})
+        self.assertIn("none: list every key", " ".join(r.stdout.split()))
 
     def test_every_command_that_changes_an_item_holds_its_lock(self):
         for name in ("cmd_set", "cmd_rebuild", "cmd_repage", "cmd_pages", "cmd_plan", "cmd_parts",

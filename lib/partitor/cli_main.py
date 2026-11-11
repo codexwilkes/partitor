@@ -360,9 +360,9 @@ def _main() -> int:
                     help="take a join back")
     st = sub.add_parser("set", help="change settings; saved, not built (--build: build too)")
     st.add_argument("id", help="12 or 2026-10-0012")
-    st.add_argument("pairs", nargs="+", metavar="key=value",
-                    help="title=..., gap=11, pages=3, ...; one part: \"Continuo:pages=4\" "
-                         "(keys: DESIGN.md, partitor set)")
+    st.add_argument("pairs", nargs="*", metavar="key=value",
+                    help="title=..., gap=11, pages=3, ...; one part: \"Continuo:pages=4\"; "
+                         "none: list every key with its value and default")
     st.add_argument("--build", action="store_true", help="build after the change")
     pc = sub.add_parser("pieces", help="list the pieces of a PDF: runs of music pages "
                         "(no library, no files written)")

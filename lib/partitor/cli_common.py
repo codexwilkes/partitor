@@ -8,10 +8,11 @@ import functools
 import time
 from pathlib import Path
 
-from .console import _die, _note, _ok, _summary, _warn
+from .config import LAYOUT_DEFAULTS, PART_LAYOUT_KEY
+from .console import _die, _head, _note, _ok, _summary, _warn
 from .library import (
-    ItemBusy, apply_set, find_item, folder_name, item_id, item_lock, item_status, library_root,
-    load_item, mark_pending, save_item, step_size,
+    SET_KEYS, ItemBusy, apply_set, find_item, folder_name, item_id, item_lock, item_status,
+    library_root, load_item, mark_pending, save_item, step_size,
 )
 from .proof import annotate_proof
 
@@ -79,11 +80,46 @@ def locks_item(fn):
     return run
 
 
+ACCEPTS = {"pages": "1-99 | auto", "gapsp": "1-40 (sp) | source",
+           "breaks": "per part: 45,60 | +45 | -45 | none"}   # parsers of SET_KEYS in words
+
+
+def settings_lines(data: dict) -> list[str]:
+    """settings_lines -> the layout keys of an item as text lines (0.8.46): every key `set` takes
+    (SET_KEYS, by the name `set` uses) with its value, its default and what it accepts (`*`: set
+    for the item), then the keys set for single parts."""
+    lay = {k: v for k, v in (data.get("layout") or {}).items() if k != PART_LAYOUT_KEY}
+    keys = [(name, lk, how) for name, (lk, how) in SET_KEYS.items() if lk is not None]
+    w = max(len(n) for n, _, _ in keys)
+
+    def show(v) -> str:
+        return "-" if v is None else str(v)
+    out = [f"  {'key':<{w}}  {'value':<10} {'default':<10} accepts"]
+    for name, lk, how in keys:
+        d = LAYOUT_DEFAULTS.get(lk)
+        acc = " | ".join(how) if isinstance(how, tuple) else "number" if how is float else ACCEPTS.get(how, str(how))
+        out.append(f"{'*' if lk in lay else ' '} {name:<{w}}  {show(lay.get(lk, d)):<10} {show(d):<10} {acc}")
+    back = {lk: name for name, lk, _ in keys}
+    for part, own in sorted(((data.get("layout") or {}).get(PART_LAYOUT_KEY) or {}).items()):
+        pairs = [f"{back.get(k, k)}={v}" for k, v in (own or {}).items() if k in LAYOUT_DEFAULTS]
+        if pairs:
+            out.append(f"  {part}: {', '.join(pairs)}")
+    return out
+
+
 @locks_item
 def cmd_set(a: argparse.Namespace) -> int:
     start = time.monotonic()
     item = _item_or_die(a.id)
     data = load_item(item)
+    if not a.pairs:                            # no pairs: list the keys (0.8.46)
+        _head(f"Settings: {item.name}")
+        for line in settings_lines(data):
+            print(line)
+        _note('change: partitor set ID key=value, or "Part:key=value" for one part; '
+              "also title=, subtitle=, composer=. The meaning of each key: the comment block "
+              "in score.yaml, or DESIGN.md §3")
+        return 0
     try:
         changes = apply_set(data, a.pairs)
     except ValueError as e:

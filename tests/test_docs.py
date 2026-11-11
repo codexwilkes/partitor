@@ -9,6 +9,7 @@ import ast
 import os
 import re
 import unittest
+from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
@@ -168,6 +169,22 @@ class TestEngineSources(unittest.TestCase):
     def test_a_dict_in_a_module_is_found(self):
         # the layout keys live in a module, not in the script
         self.assertTrue(literal_dict("SET_KEYS") is not None)
+
+
+class TestCommandsInDesign(unittest.TestCase):
+    def test_every_subcommand_is_named_in_design_6_2(self):
+        """0.8.46 (F9): a command of the CLI that DESIGN §6.2 does not name is a doc defect."""
+        src = Path(ROOT, "lib", "partitor", "cli_main.py").read_text(encoding="utf-8")
+        names = set(re.findall(r'add_parser\("([a-z-]+)"', src))
+        loop = re.search(r'for name in \(([^)]*)\):\s*\n\s*sp_ = sub.add_parser\(name', src)
+        self.assertIsNotNone(loop)
+        names |= set(re.findall(r'"([a-z-]+)"', loop.group(1)))
+        self.assertIn("plan", names)
+        design = Path(ROOT, "docs", "DESIGN.md").read_text(encoding="utf-8")
+        sec = design[design.index("### 6.2 Commands"):design.index("### 6.3")]
+        missing = sorted(n for n in names           # as a command: `partitor NAME`, `| NAME` or `NAME`
+                         if not re.search(rf"(partitor\s+|\|\s*|`){re.escape(n)}\b(?![=-])", sec))
+        self.assertEqual(missing, [])
 
 
 class TestDesignSections(unittest.TestCase):
