@@ -649,7 +649,13 @@ print is double-sided. Title page: title, subtitle, part name, composer, and
 the members of a group, centred in the upper third.
 
 Page turns at section boundaries. Page breaks are chosen over the whole part
-at once (dynamic programming), not first-fit. A turn follows each recto
+at once (dynamic programming), not first-fit. One planner does this for every
+part since 0.8.41: `turnplan` (§5.7), exact, with the costs below
+(`render.plan_costs`). The planner before it (`plan_pages` until 0.8.40) added
+the cost of a short last page after its search and could leave 1-2 lines on the
+last page (rule 5 of §5.2); `plan_pages` is now a short form of `plan_faces`.
+Single-sided print (`duplex: off`) has a turn after every page and no title
+page. A turn follows each recto
 (physical page 1, 3, 5; with a title page, page 1 is the title page). A turn
 may fall only before a section boundary: a movement start, a line that opens
 with a rehearsal letter (a new section after a repeat), or a multi-bar rest on
@@ -662,7 +668,7 @@ is chosen automatically; there is no `turn` key.
 
 Repage and turns while resting. A build saves the finished lines of each part
 (`lines/<part>.lines`). `partitor repage ID [part ...]` loads them and runs
-`plan_pages` and `render_part` only; nothing is analysed again. It sets
+the page planner and `render_part` only; nothing is analysed again. It sets
 `turns=rest` for the parts. With `turns=rest` a turn (after each recto) is
 allowed only where a multi-bar rest line of 2+ bars is the last line of the
 page or the first of the next (`rest_turn`). Order of choice: a rest (cost 0),
@@ -770,7 +776,7 @@ as a rest to turn in; a group line counts as rest only when every staff rests.
     block, logo centre at 76 % of the page height, 64 pt high.
   - Back page (last page of every part, one page included): centred on the text
     block 10 pt above the folio (4 pt below the last line), up to 44 pt high. It
-    needs 28 pt; `plan_pages` charges `LOGO_COST` (20) for a last page without
+    needs 28 pt; the planner charges `LOGO_COST` (20) for a last page without
     that room, so lines move forward before a page is added. If no room is
     left the logo is left out with a warning.
   - Not in the title band of page 1 (the band is crowded).
@@ -803,9 +809,9 @@ PDF (`large: on`, default):
 
 ### 5.7 Page-turn planner and fold-outs for bound parts (`turnplan`)
 
-`foldouts: on` (layout key, per part too; `set ID "Trombones:foldouts=on"`; default `off`, which keeps
-the page plan of §5.4) lets `turnplan` choose the page breaks, the spreads and the fold-outs of a
-bound part. It applies to double-sided print only (`duplex` not `off`). `plan_turns` takes the height
+`foldouts: on` (layout key, per part too; `set ID "Trombones:foldouts=on"`; default `off`: the page plan of
+§5.4, made by `turnplan` too since 0.8.41, without fold-outs) lets `turnplan` choose the page
+breaks, the spreads and the fold-outs of a bound part. It applies to double-sided print only (`duplex` not `off`). `plan_turns` takes the height
 of a run of lines, the page height and, for each page break, a `Boundary` (bars of rest next to it, a
 movement start, bars one staff rests), and returns a `Plan`: groups of pages, the class of every turn,
 the cost. The pure planner is in `turnplan`; `render` feeds it (`plan_faces`, `layout_plan`).
@@ -837,7 +843,7 @@ the cost. The pure planner is in `turnplan`; `render` feeds it (`plan_faces`, `l
   (printed on one side: one page per group, a turn after each page, no fold-outs), `last_cost(i)`
   (an extra cost of the last page when it starts at line i: the room for the logo) and a turn
   class `section` (`Boundary.section`: a rehearsal letter; `Costs.section`, used only when it is
-  below `Costs.bad`). The build does not use them yet. The search keeps the cheapest candidate as it
+  below `Costs.bad`). The build uses them since 0.8.41 (every part, §5.4). The search keeps the cheapest candidate as it
   goes and makes the groups of the winner only (one per state; before, one per candidate): the same
   plans (3 000 random cases against 0.8.39, 0 differences), about 2.6 times faster. Checked against
   a brute force: 1 600 cases for spreads and fold-outs (2026-11-10), 800 for the single-sided mode.
@@ -1304,7 +1310,7 @@ This map comes from function names and headings. Check it when a module exists.
   (patched by tests; no other file has a copy and reads `analysis.analyse_one`),
   `ownership.analyse_page` (patched by tests; `analysis` reads `ownership.analyse_page`),
   `stagecache.ANALYSIS_CACHE_FORMAT` (patched by tests),
-  `render.SYSTEM_GAP_LAST` (patched by tests; `plan_pages` reads it in `render`, the script
+  `render.SYSTEM_GAP_LAST` (patched by tests; `page_lines` reads it in `render`, the script
   has no copy), `build.run_build` and `build.cmd_build` (patched by tests; their readers use
   `build.run_build` and `build.cmd_build`, also the command table of `main`, and
   no other file has a copy), `cli_items.cmd_rebuild` (patched by tests; menu `r` and the

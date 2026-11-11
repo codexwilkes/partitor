@@ -18,7 +18,7 @@ from .console import _warn
 from .lines import line_labels, put_smallcaps
 from .model import Strip
 from .reflow import find_prefixes, reflow, reflow_caps
-from .turnplan import Boundary, plan_turns
+from .turnplan import Boundary, Costs, plan_turns
 from .strips import (
     REH_PAD, ambitus_width, anchor, bar_mark, bar_x, pitches, reh_boxes, rest_boxes,
 )
@@ -424,106 +424,11 @@ def page_lines(strips: list[Strip], pit: list[float], k: float, i: int, j: int,
 
 def plan_pages(strips: list[Strip], dpi: int, opts: dict, title_page: bool
                ) -> tuple[list[list[tuple[Strip, float]]], int]:
-    """plan_pages -> (pages of (strip, y), bad turns): page breaks chosen over the
-    whole part at once (dynamic programming, not first-fit), so a turn
-    falls at a section boundary where possible (DESIGN.md §5.4): a turn
-    follows each recto (physical page 1, 3, 5, ...; page 1 is a title page
-    when title_page) when printed double-sided. A section that fits on two
-    pages then starts on a verso and needs no turn. Costs: TURN_BAD per
-    turn not at good_turn, PAGE_COST per page, SHORT_LAST, FILL_COST."""
-    n = len(strips)
-    _, ph = PAPER[opts["paper"]]
-    k = 72.0 / dpi * (opts.get("scale") or 1.0)
-    pit = pitches(strips, opts)
-    _, _, mt, mb = page_box(opts, 0, False)
-    band = RUN_HEAD if (title_page or opts.get("_no_band")) else TITLE_BAND
-    avail1 = ph - mt - mb - band
-    availn = ph - mt - mb - RUN_HEAD
-    cum = [0.0]
-    for v in pit:
-        cum.append(cum[-1] + v)
-    duplex = opts.get("duplex", "auto") != "off"
-    rest_rule = opts.get("turns", "any") == "rest"
-    logo_on = logo_wanted(opts)
-    logo_need = logo_room(ph, page_box(opts, 0, False)[3])
-
-    def turn_cost(t: int) -> float:          # cost of a turn before line t
-        if not rest_rule:
-            return 0.0 if good_turn(strips, t) else TURN_BAD
-        if rest_turn(strips, t):
-            return 0.0
-        return TURN_MOVE if strips[t].movement else TURN_HARD
-    fill_cost = REPAGE_FILL if rest_rule else FILL_COST
-    forced = sorted(f for f in set(opts.get("_breaks") or []) if 0 < f < n)
-
-    def height(i: int, j: int) -> float:        # lines i..j-1 on one page (pt)
-        last = strips[j - 1]
-        return (strips[i].staff_top + (cum[j - 1] - cum[i]) - last.staff_top
-                + last.img.shape[0]) * k
-
-    first_phys = 2 if title_page else 1
-    INF = float("inf")
-    # best[c][j]: cost of lines 0..j-1 on content pages 0..c-1
-    # at most 2 pages more than first-fit (more never saves a turn)
-    maxp = min(n, len(_pack(strips, dpi, {**opts, "_no_band": title_page or opts.get("_no_band")},
-                            None)) + (4 if rest_rule else 2) + len(forced))
-    best = [dict() for _ in range(maxp + 1)]
-    back: list[dict] = [dict() for _ in range(maxp + 1)]
-    best[0][0] = 0.0
-    total_best, end_c = INF, None
-    for c in range(maxp):
-        avail = avail1 if c == 0 else availn
-        for i, cost in list(best[c].items()):
-            fj = next((f for f in forced if f > i), None)   # a manual break ends a page here
-            for j in range(i + 1, n + 1):
-                h = height(i, j)
-                if h > avail and j > i + 1:
-                    break
-                cc = cost + PAGE_COST
-                if j == n and logo_on and avail - h < logo_need:
-                    cc += LOGO_COST          # no room for the logo under the last line
-                if j < n:
-                    cc += fill_cost * max(0.0, 1.0 - h / avail) ** 2
-                    phys = first_phys + c
-                    if phys % 2 == 1 or not duplex:
-                        cc += turn_cost(j)
-                if cc < best[c + 1].get(j, INF):
-                    best[c + 1][j] = cc
-                    back[c + 1][j] = i
-                if fj is not None and j >= fj:
-                    break
-        if n in best[c + 1]:
-            last_i = back[c + 1][n]
-            tot = best[c + 1][n]
-            if c > 0 and n - last_i < min(MIN_LAST_LINES, n // (c + 1)):
-                tot += SHORT_LAST
-            if tot < total_best:
-                total_best, end_c = tot, c + 1
-        if not best[c + 1]:
-            break
-    # pages from the back pointers, then y of each line as in _pack
-    cuts, j, c = [], n, end_c
-    while c > 0:
-        i = back[c][j]
-        cuts.append((i, j))
-        j, c = i, c - 1
-    pages = []
-    cuts = list(reversed(cuts))
-    for c, (i, j) in enumerate(cuts):
-        # last page of a group score with room to spare: systems further
-        # apart, up to SYSTEM_GAP_LAST (operator request 2026-10-24: "the whole page
-        # is available")
-        free = None
-        if c == len(cuts) - 1:
-            free = (avail1 if c == 0 else availn) - height(i, j)
-        pages.append(page_lines(strips, pit, k, i, j, free))
-    bad, j = 0, 0
-    for c, pg in enumerate(pages[:-1]):
-        j += len(pg)
-        if ((first_phys + c) % 2 == 1 or not duplex) and turn_cost(j) >= (
-                TURN_HARD if rest_rule else TURN_BAD):
-            bad += 1
-    return pages, bad
+    """plan_pages -> (pages of (strip, y), bad turns): the content pages of plan_faces and the
+    count of bad_turns. Since 0.8.41 one planner (turnplan, exact) lays out every part
+    (DESIGN.md §5.4, §5.7); this is its short form for a part without fold-outs."""
+    pages, plan = plan_faces(strips, dpi, opts, title_page)
+    return pages, bad_turns(plan, opts)
 
 
 TRIM_PT = 36.0         # 1/2 in cut off the free edge of a fold-out flap
@@ -539,6 +444,26 @@ def folds_wanted(opts: dict) -> bool:
     """The planner of turnplan (spreads, fold-outs) runs for double-sided parts
     with `foldouts: on`; single-sided print has a turn after every page."""
     return opts.get("foldouts", "off") == "on" and opts.get("duplex", "auto") != "off"
+
+
+def section_start(s: Strip) -> bool:
+    """section_start -> True when the line opens with a rehearsal letter (a new section, after a
+    repeat): with `turns: any` a turn may fall there (good_turn)."""
+    return any(mx <= s.staff_x0 + 3 * s.sp for mx, _ in s.marks)
+
+
+def plan_costs(opts: dict) -> Costs:
+    """plan_costs -> the turnplan Costs of a part (0.8.41). Fold-outs (`foldouts: on`): the costs
+    of turnplan (§5.7). Otherwise the rules of §5.4: `turns: any` (default): a turn at a rest, a
+    movement start or a section start costs nothing, any other TURN_BAD, unfilled pages FILL_COST;
+    `turns: rest`: a rest of two bars or more is free, a movement start TURN_MOVE, any other turn
+    TURN_HARD, unfilled pages REPAGE_FILL."""
+    if folds_wanted(opts):
+        return Costs()
+    if opts.get("turns", "any") == "rest":
+        return Costs(rest_one=TURN_HARD, attacca=TURN_MOVE, section=TURN_HARD, bridge=TURN_HARD,
+                     bad=TURN_HARD, fill=REPAGE_FILL)
+    return Costs(rest_one=0.0, attacca=0.0, section=0.0, bridge=TURN_BAD, bad=TURN_BAD, fill=FILL_COST)
 
 
 def plan_faces(strips: list[Strip], dpi: int, opts: dict, title_page: bool):
@@ -563,12 +488,20 @@ def plan_faces(strips: list[Strip], dpi: int, opts: dict, title_page: bool):
         return (strips[i].staff_top + (cum[j - 1] - cum[i]) - last.staff_top
                 + last.img.shape[0]) * k
 
+    folds = folds_wanted(opts)
+    single = opts.get("duplex", "auto") == "off"
     bounds = [Boundary()] + [
-        Boundary(rest_bars=edge_rest(strips, j), movement=bool(strips[j].movement))
+        Boundary(rest_bars=edge_rest(strips, j), movement=bool(strips[j].movement),
+                 section=not folds and section_start(strips[j]))
         for j in range(1, n)]
-    plan = plan_turns(n, height, availn, bounds, avail_first=avail1, title_page=title_page,
-                      allow_fold=opts["paper"] in LARGE, forced=tuple(opts.get("_breaks") or []),
-                      fold_sides=fold_sides(opts))
+    last_cost = None
+    if logo_wanted(opts):
+        need = logo_room(ph, mb)
+        last_cost = lambda i: LOGO_COST if (avail1 if i == 0 else availn) - height(i, n) < need else 0.0  # noqa: E731
+    plan = plan_turns(n, height, availn, bounds, avail_first=avail1, title_page=title_page and not single,
+                      allow_fold=folds and opts["paper"] in LARGE, forced=tuple(opts.get("_breaks") or []),
+                      fold_sides=fold_sides(opts), costs=plan_costs(opts), last_cost=last_cost,
+                      single=single)
     flat = [pg for g in plan.groups for pg in g.pages]
     pages = []
     for c, (i, j) in enumerate(flat):
@@ -625,29 +558,32 @@ def layout_plan(strips: list[Strip], dpi: int, opts: dict):
     title page (title_page auto, 3+ pages); the cheaper plan wins, a tie keeps
     the title page (the music then starts on a spread)."""
     pages, plan = plan_faces(strips, dpi, opts, False)
-    if opts.get("title_page", "auto") == "auto" and len(pages) >= 3:
+    if opts.get("title_page", "auto") == "auto" and opts.get("duplex", "auto") != "off" and len(pages) >= 3:
         tp, tplan = plan_faces(strips, dpi, opts, True)
-        if len(tp) >= 3 and tplan.cost <= plan.cost:
+        if folds_wanted(opts):
+            better = tplan.cost <= plan.cost
+        else:                    # §5.4: fewer bad turns, then fewer pages; a tie keeps the title page
+            better = (bad_turns(tplan, opts), len(tp)) <= (bad_turns(plan, opts), len(pages))
+        if len(tp) >= 3 and better:
             return tp, True, tplan
     return pages, False, plan
+
+
+def bad_turns(plan, opts: dict) -> int:
+    """bad_turns -> the turns of a plan that are not at a good place: cost TURN_BAD or more
+    (`turns: any`), TURN_HARD or more (`turns: rest`); the count §5.4 ranks title pages by."""
+    worst = TURN_HARD if opts.get("turns", "any") == "rest" else TURN_BAD
+    return sum(1 for g in plan.groups if g.turn.cls != "end" and g.turn.cost >= worst)
 
 
 def layout_pages(strips: list[Strip], dpi: int, opts: dict
                  ) -> tuple[list[list[tuple[Strip, float]]], bool]:
     """layout_pages -> (content pages, title page?). DESIGN.md §5.4: page
-    breaks by plan_pages, with and without a title page (title_page auto,
+    breaks by plan_faces (turnplan), with and without a title page (title_page auto,
     double-sided, 3+ content pages); fewer bad turns, then fewer pages
     win; a tie keeps the title page (the music starts on a spread)."""
-    if folds_wanted(opts):
-        pages, title_page, _ = layout_plan(strips, dpi, opts)
-        return pages, title_page
-    pages, bad = plan_pages(strips, dpi, opts, False)
-    if opts.get("title_page", "auto") == "auto" and opts.get("duplex", "auto") != "off" \
-       and len(pages) >= 3:
-        tp, tbad = plan_pages(strips, dpi, opts, True)
-        if len(tp) >= 3 and (tbad, len(tp)) <= (bad, len(pages)):
-            return tp, True
-    return pages, False
+    pages, title_page, _ = layout_plan(strips, dpi, opts)
+    return pages, title_page
 
 
 AMB_HEAD = 0.8         # ambitus notehead size, share of a normal head (cue size)
@@ -712,7 +648,7 @@ LOGO_LAST_H = 44.0      # pt, on the back page (centred above the folio)
 LOGO_LAST_MIN_H = 28.0  # pt, smaller than this the wordmark is not legible: logo left out
 LOGO_GAP = 4.0          # pt, between the last line and the logo
 LOGO_FOLIO_GAP = 10.0   # pt, between the logo and the folio
-LOGO_COST = 20.0        # plan_pages: the last page has no room for the logo (less than PAGE_COST)
+LOGO_COST = 20.0        # plan_faces: the last page has no room for the logo (less than PAGE_COST)
 FOLIO_SIZE = 9.5        # pt
 _LOGO_WARNED: list[bool] = []
 
@@ -952,7 +888,7 @@ def draw_face(page: pymupdf.Page, pg: list, strips: list[Strip], name: str, meta
         page.insert_image(rect, pixmap=pix)
     if f.last and logo_wanted(opts):
         # back page: logo centred above the folio, in the room left under
-        # the last line (plan_pages leaves room where it can)
+        # the last line (the planner leaves room where it can)
         s_, y_ = pg[-1]
         free = folio_top(ph, mb) - LOGO_FOLIO_GAP - (top + y_ + s_.img.shape[0] * k)
         lh = min(LOGO_LAST_H, free - LOGO_GAP)

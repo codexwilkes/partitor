@@ -370,6 +370,18 @@ class TestBatchExtras(unittest.TestCase):
         self.assertEqual(n, 2)
         self.assertFalse(pt.LAST_RENDER["title_page"])
 
+    def test_planner_keeps_three_lines_on_the_last_page_with_the_same_page_count(self):
+        """0.8.41: one planner (turnplan) for every part. The old plan_pages added SHORT_LAST after
+        its search and gave [17, 1] for 18 lines and [17, 18, 1] for 36 (§5.2 rule 5 broken)."""
+        for dup in ("auto", "off"):
+            opts = {**pt.LAYOUT_DEFAULTS, "scale": 2.0, "gap": 6.0, "logo": "off", "duplex": dup}
+            for n, npages in ((18, 2), (19, 2), (36, 3), (37, 3)):
+                with self.subTest(duplex=dup, n=n):
+                    pages, _ = pt.plan_pages(self.strips(n), 400, opts, False)
+                    self.assertEqual(len(pages), npages)
+                    self.assertGreaterEqual(len(pages[-1]), pt.MIN_LAST_LINES)
+                    self.assertEqual(sum(len(p) for p in pages), n)
+
     def _logo_boxes(self, page):
         """Bounding boxes of the logo images on a page (found by aspect ratio)."""
         path = pt.logo_path()

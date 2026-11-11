@@ -7,6 +7,18 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.41 — 2026-11-11
+
+### Changed
+- One page planner for every part: the planner of fold-out parts (`turnplan`), which is exact, now
+  also lays out parts without fold-outs. The rules and costs of page turns are the same. Most parts
+  keep their pages.
+
+### Fixed
+- The last page of a part could hold only 1 or 2 lines, against the rule "at least 3 lines". Lines
+  now move from the pages before it; the page count does not change (example: 9, 9, 9, 1 lines
+  becomes 8, 8, 9, 3).
+
 ## 0.8.40 — 2026-11-11
 
 ### Changed
