@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Nathan Wilkes and partitor contributors
-"""Fonts and text measure; the cut and fold guides of printed sheets."""
+"""Fonts and text measure; the cut and fold guides of printed sheets; the assembly text of fold-outs."""
 from __future__ import annotations
 
 import os
@@ -134,3 +134,83 @@ def flap_guides(page: pymupdf.Page, cut_x: float, tape_x: float, ph: float, mt: 
     mid = (cut_x + tape_x) / 2
     put_text(page, (mid - text_len(note, "italic", 7) / 2, max(mt - 10, 10)), note, "italic", 7)
     put_text(page, (mid - text_len(hint, "italic", 7) / 2, ph - 16), hint, "italic", 7)
+
+
+def page_ranges(pages: list[int], total: int) -> str:
+    """page_ranges -> '1-4, 7-9' for the pages 1..total without `pages`."""
+    skip = set(pages)
+    out, a = [], None
+    for n in range(1, total + 2):
+        keep = n <= total and n not in skip
+        if keep and a is None:
+            a = n
+        elif not keep and a is not None:
+            out.append(str(a) if n - 1 == a else f"{a}-{n - 1}")
+            a = None
+    return ", ".join(out)
+
+
+def assemble_text(name: str, part_file: str, sheet_file: str, flap_file: str, small: str, big: str,
+                  places: dict, total: int, cutline: str = "dotted", large: tuple | None = None) -> str:
+    """assemble_text -> the text of <part>-assemble.txt: the two ways to make the
+    fold-outs, what to print for each, and where each one goes. cutline: the layout
+    key of that name (how the cut is shown). small, big: the part paper and the sheet paper,
+    as the text names them ("Letter paper (8.5 x 11 in)", "ledger paper (17 x 11 in)").
+    large: (large part file, large flap file, large paper as named, the trim at that size in
+    inches, True when a blank strip at the foot is cut off) when the large-print copy is made
+    (0.8.36): a third way, cut and tape at the large size (no paper holds two large faces side
+    by side, so no sheet). Moved from render in 0.8.36."""
+    cut = {"dotted": "cut at the dotted line marked 'cut'. This takes 1/2 in off the flap.",
+           "marks": "cut between the crop marks marked 'cut'. This takes 1/2 in off the flap.",
+           "off": "trim 1/2 in off the free edge of the flap. No cut line is printed."}[cutline]
+    n = len(places)
+    plural = "s" if n != 1 else ""
+    every = sorted(x for p in places.values() for x in p["pdf"])
+    rng = page_ranges(every, total)
+    out = [f"{name}: print and assemble", "",
+           f"This part has {n} fold-out{plural}. A fold-out gives the player three pages with no page turn.",
+           "Make each fold-out in one of two ways. Both ways give the same pages.", "",
+           "A. With a ledger printer (cut and fold)", "",
+           "1. Print the part file", f"   {part_file}",
+           f"   on {small}, double-sided. Flip on the long edge.",
+           f"   Print only these pages: {rng}. The other pages come from the sheets.",
+           "2. Print the sheet file", f"   {sheet_file}",
+           f"   on {big}, double-sided. Flip on the short edge.",
+           "   Each sheet is two PDF pages: the front, then the back.",
+           f"3. On each sheet, {cut}",
+           "4. Fold each sheet at the dotted line in the middle. The flap folds forward over its page.",
+           "5. Put each sheet in its place in the printed stack:", ""]
+    for gi in sorted(places):
+        p = places[gi]
+        out.append(f"   Sheet {p['sheet']} of {n}: {p['where']} (pages {' and '.join(p['labels'])}).")
+    out += ["", "B. With a Letter printer only (cut and tape)", "",
+            "1. Print the part file", f"   {part_file}",
+            f"   on {small}, double-sided, all pages. Flip on the long edge.",
+            "2. Print the flap file", f"   {flap_file}",
+            f"   on {small}, one side only. Each page is one flap.",
+            f"3. On each flap page, {cut}",
+            "4. Put the flap next to its page, edge to edge, the printed sides up. Tape the joint on",
+            "   the back with narrow tape. Fold the flap forward over its page.",
+            "5. Join each flap to its page:", ""]
+    for gi in sorted(places):
+        p = places[gi]
+        out.append(f"   Flap {p['sheet']} of {n}: tape its {'left' if p['edge'] == 'right' else 'right'} "
+                   f"edge to the {p['edge']} edge of page {p['bound_label']} (page {p['bound_pdf']} "
+                   "of the part file).")
+    if large:
+        lpart, lflap, sheet, trim, foot = large
+        across = ([] if not foot else
+                  ["   " + {"dotted": "Cut off the blank strip at the foot at the dotted line across the sheet.",
+                           "marks": "Cut off the blank strip at the foot between the marks at the side edges.",
+                           "off": "Cut off the blank strip at the foot, 14.24 in from the top (no line is printed)."
+                           }[cutline]])
+        out += ["", f"C. Large copy on {sheet} (cut and tape)", "",
+                "1. Print the large part file", f"   {lpart}",
+                f"   on {sheet}, double-sided, all pages. Flip on the long edge.", *across,
+                "2. Print the large flap file", f"   {lflap}",
+                f"   on {sheet}, one side only. Each page is one flap.", *across,
+                f"3. On each flap page, {cut.replace('1/2 in', f'{trim:.2f} in')}",
+                "4. Tape each flap to its page as in B, step 5 (the same page numbers)."]
+    out += ["", "Then punch or bind the stack.", "",
+            "A fold-out needs a rest at both ends: unfold the flap at the start, fold it in before the turn."]
+    return "\n".join(out) + "\n"

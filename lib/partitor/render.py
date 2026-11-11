@@ -23,7 +23,7 @@ from .strips import (
 )
 from .typography import (
     CROP_MARK, CUT_DASHES, FILL_COST, MIN_LAST_LINES, PAGE_COST, REPAGE_FILL, REST_TURN_MIN,
-    SHORT_LAST, TURN_BAD, TURN_HARD, TURN_MOVE, cut_words, flap_guides, put_text, sheet_guides,
+    SHORT_LAST, TURN_BAD, TURN_HARD, TURN_MOVE, assemble_text, cut_words, flap_guides, put_text, sheet_guides,
     text_len,
 )
 
@@ -237,6 +237,26 @@ LARGE = {"letter": ((792.0, 1224.0), "11x17"),      # Letter -> 11x17 (ledger)
          "a4": ((841.89, 1190.55), "A3")}           # A4 -> A3 (exact sqrt 2)
 
 
+def large_path(src: Path, paper: str) -> Path:
+    """large_path -> the file of the large-print copy of src: <stem>-11x17.pdf (Letter),
+    <stem>-A3.pdf (A4)."""
+    return src.with_name(f"{src.stem}-{LARGE[paper][1]}.pdf")
+
+
+def large_copies(fn: Path, opts: dict) -> dict:
+    """large_copies -> the large-print files of the part just rendered (LAST_RENDER), for its
+    `built` record: {"large": file} and, when the part has fold-outs, {"large_flaps": file}: the
+    flap file of the tape route at the large size, one flap per sheet (0.8.36; the large copy of
+    the part file has no flaps). {} when `large` is off or the paper has no larger sheet."""
+    if opts.get("large") != "on" or opts["paper"] not in LARGE:
+        return {}
+    cl = opts.get("cutline", "dotted")
+    out = {"large": large_copy(fn, opts["paper"], cl).name}
+    if LAST_RENDER.get("flaps"):
+        out["large_flaps"] = large_copy(fn.with_name(LAST_RENDER["flaps"]), opts["paper"], cl).name
+    return out
+
+
 def large_copy(src: Path, paper: str, cutline: str = "dotted") -> Path:
     """large_copy -> path of the large-print copy of a part: each page
     scaled to the full width of the larger sheet (Letter -> 11x17, x1.294;
@@ -244,10 +264,10 @@ def large_copy(src: Path, paper: str, cutline: str = "dotted") -> Path:
     shorter than the sheet (11x17: 14.24 in of 17 in), cutline shows the cut:
     dotted = a dotted line across the sheet (scissors, knife); marks = short
     marks at both side edges (paper cutter); off = nothing."""
-    (sw, sh), tag = LARGE[paper]
+    (sw, sh), _ = LARGE[paper]
     pw, ph = PAPER[paper]
     f = sw / pw
-    out = src.with_name(f"{src.stem}-{tag}.pdf")
+    out = large_path(src, paper)
     doc = pymupdf.open(src)
     big = pymupdf.open()
     for pno in range(len(doc)):
@@ -1118,13 +1138,36 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
                          f"page {pl['bound_label']}.", cutline=cl)
         flaps.save(flaps_pdf, garbage=3, deflate=True)
         assemble = out.with_name(out.stem + ASSEMBLE_TAIL)
-        assemble.write_text(assemble_text(name, out.name, foldout.name, flaps_pdf.name, pw, ph, places,
-                                          len(doc), cl), encoding="utf-8")
+        assemble.write_text(assemble_text(name, out.name, foldout.name, flaps_pdf.name,
+                                          *paper_words(opts["paper"], pw, ph), places, len(doc), cl,
+                                          large_words(out, flaps_pdf, opts)), encoding="utf-8")
     LAST_RENDER.update(content=nfaces, title_page=title_page, foldouts=plan.folds,
                        foldout=foldout.name if foldout else None,
                        flaps=flaps_pdf.name if foldout else None,
                        assemble=assemble.name if foldout else None)
     return len(doc)
+
+
+def paper_words(paper: str, pw: float, ph: float) -> tuple[str, str]:
+    """paper_words -> (part paper, sheet paper) as the assembly text names them."""
+    if paper == "letter":
+        return "Letter paper (8.5 x 11 in)", "ledger paper (17 x 11 in)"
+    if paper == "a4":
+        return "A4 paper", "A3 paper (420 x 297 mm)"
+    return "the part paper", f"paper {2 * pw / 72:.1f} x {ph / 72:.1f} in"
+
+
+def large_words(out: Path, flaps: Path, opts: dict) -> tuple | None:
+    """large_words -> the `large` argument of assemble_text (0.8.36), None when no large copy
+    is made: the two large files, the large paper as named, the 1/2 in trim at the large size,
+    and whether a blank strip at the foot is cut off (Letter on 11x17; A4 fills A3)."""
+    paper = opts["paper"]
+    if opts.get("large") != "on" or paper not in LARGE:
+        return None
+    sheet = {"letter": "11 x 17 in paper", "a4": "A3 paper"}.get(paper, "the large paper")
+    trim = 0.5 * LARGE[paper][0][0] / PAPER[paper][0]
+    return (large_path(out, paper).name, large_path(flaps, paper).name, sheet, trim,
+            LARGE[paper][0][1] - PAPER[paper][1] * LARGE[paper][0][0] / PAPER[paper][0] > 1.0)
 
 
 FOLDOUT_TAIL = "-foldout-sheets.pdf"      # <part>.pdf -> <part>-foldout-sheets.pdf
@@ -1163,74 +1206,6 @@ def sheet_places(faces: list[dict], plan, title_page: bool) -> dict:
     return out
 
 
-def page_ranges(pages: list[int], total: int) -> str:
-    """page_ranges -> '1-4, 7-9' for the pages 1..total without `pages`."""
-    skip = set(pages)
-    out, a = [], None
-    for n in range(1, total + 2):
-        keep = n <= total and n not in skip
-        if keep and a is None:
-            a = n
-        elif not keep and a is not None:
-            out.append(str(a) if n - 1 == a else f"{a}-{n - 1}")
-            a = None
-    return ", ".join(out)
-
-
-def assemble_text(name: str, part_file: str, sheet_file: str, flap_file: str, pw: float, ph: float,
-                  places: dict, total: int, cutline: str = "dotted") -> str:
-    """assemble_text -> the text of <part>-assemble.txt: the two ways to make the
-    fold-outs, what to print for each, and where each one goes. cutline: the layout
-    key of that name (how the cut is shown)."""
-    cut = {"dotted": "cut at the dotted line marked 'cut'. This takes 1/2 in off the flap.",
-           "marks": "cut between the crop marks marked 'cut'. This takes 1/2 in off the flap.",
-           "off": "trim 1/2 in off the free edge of the flap. No cut line is printed."}[cutline]
-    if (pw, ph) == PAPER["letter"]:
-        big = "ledger paper (17 x 11 in)"
-    elif (pw, ph) == PAPER["a4"]:
-        big = "A3 paper (420 x 297 mm)"
-    else:
-        big = f"paper {2 * pw / 72:.1f} x {ph / 72:.1f} in"
-    small = {PAPER["letter"]: "Letter paper (8.5 x 11 in)", PAPER["a4"]: "A4 paper"}.get((pw, ph), "the part paper")
-    n = len(places)
-    plural = "s" if n != 1 else ""
-    every = sorted(x for p in places.values() for x in p["pdf"])
-    rng = page_ranges(every, total)
-    out = [f"{name}: print and assemble", "",
-           f"This part has {n} fold-out{plural}. A fold-out gives the player three pages with no page turn.",
-           "Make each fold-out in one of two ways. Both ways give the same pages.", "",
-           "A. With a ledger printer (cut and fold)", "",
-           "1. Print the part file", f"   {part_file}",
-           f"   on {small}, double-sided. Flip on the long edge.",
-           f"   Print only these pages: {rng}. The other pages come from the sheets.",
-           "2. Print the sheet file", f"   {sheet_file}",
-           f"   on {big}, double-sided. Flip on the short edge.",
-           "   Each sheet is two PDF pages: the front, then the back.",
-           f"3. On each sheet, {cut}",
-           "4. Fold each sheet at the dotted line in the middle. The flap folds forward over its page.",
-           "5. Put each sheet in its place in the printed stack:", ""]
-    for gi in sorted(places):
-        p = places[gi]
-        out.append(f"   Sheet {p['sheet']} of {n}: {p['where']} (pages {' and '.join(p['labels'])}).")
-    out += ["", "B. With a Letter printer only (cut and tape)", "",
-            "1. Print the part file", f"   {part_file}",
-            f"   on {small}, double-sided, all pages. Flip on the long edge.",
-            "2. Print the flap file", f"   {flap_file}",
-            f"   on {small}, one side only. Each page is one flap.",
-            f"3. On each flap page, {cut}",
-            "4. Put the flap next to its page, edge to edge, the printed sides up. Tape the joint on",
-            "   the back with narrow tape. Fold the flap forward over its page.",
-            "5. Join each flap to its page:", ""]
-    for gi in sorted(places):
-        p = places[gi]
-        out.append(f"   Flap {p['sheet']} of {n}: tape its {'left' if p['edge'] == 'right' else 'right'} "
-                   f"edge to the {p['edge']} edge of page {p['bound_label']} (page {p['bound_pdf']} "
-                   "of the part file).")
-    out += ["", "Then punch or bind the stack.", "",
-            "A fold-out needs a rest at both ends: unfold the flap at the start, fold it in before the turn."]
-    return "\n".join(out) + "\n"
-
-
 def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
                 opts: dict, out: Path) -> int:
     """render_part -> physical page count. Writes out (PDF). meta: title,
@@ -1263,5 +1238,5 @@ def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
                        head_right=bool(duplex and phys % 2 == 0),
                        folio=f"{ci + 1}/{n}", last=(ci == n - 1)))
     doc.save(out, garbage=3, deflate=True)
-    LAST_RENDER.update(content=n, title_page=title_page, foldouts=0, foldout=None, assemble=None)
+    LAST_RENDER.update(content=n, title_page=title_page, foldouts=0, foldout=None, flaps=None, assemble=None)
     return n + (1 if title_page else 0)

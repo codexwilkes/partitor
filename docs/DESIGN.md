@@ -790,6 +790,12 @@ PDF (`large: on`, default):
   short crop marks at the side edges, for a paper cutter; `off` = no line.
 - A4 -> A3: exact (x1.414), the whole sheet, no cut line.
 - File names: `<part>-11x17.pdf`, `<part>-A3.pdf`, next to the part.
+- A part with fold-outs (§5.7): the large copy is made from the part file, which has no flaps.
+  The flaps get their own large file, `<part>-foldout-flaps-11x17.pdf` (`-A3`): the flap file of
+  the tape route at the large size, one flap per sheet, printed on one side and taped to its page
+  of the large copy (0.8.36; before, the music of the flaps was missing at the large size). There
+  is no large fold-out sheet: no normal paper holds two 11x17 faces side by side. The record in
+  `built` has `large_flaps`; `-assemble.txt` gives this third way (C).
 - Paper `ledger` has no large-print copy (the sheet is 11x17 already); the build
   says so once: `large copy: skipped (paper ledger is already 11x17)`.
 
@@ -828,8 +834,10 @@ the cost. The pure planner is in `turnplan`; `render` feeds it (`plan_faces`, `l
 - Pages and fold-outs are chosen for the whole part at once (dynamic programming), with the page
   costs of §5.4 (`PAGE_COST`, `REPAGE_FILL`, `SHORT_LAST`). Manual breaks (`breaks`) end a page.
 
-Print of a part with fold-outs (`render_plan`). Four files per part (0.8.12). A fold-out is made in
-one of two ways, by the printer the person has; both give the same pages:
+Print of a part with fold-outs (`render_plan`). Four files per part (0.8.12), and with the
+large-print copy two more (`-11x17.pdf` and `-foldout-flaps-11x17.pdf`, §5.6). A fold-out is made in
+one of two ways, by the printer the person has (a third at the large size, §5.6); both give the
+same pages:
 
 - `NN-part.pdf`: every leaf on the part's paper (Letter), except the flaps. It is complete: print
   it all for the tape route. A blank page is added when the count would be odd, so the leaves
@@ -869,7 +877,8 @@ one of two ways, by the printer the person has; both give the same pages:
     `7b/18`), and the next verso is 8; left fold-out, the flap is `6a` and the verso `6b`, and the previous
     recto is 5. Each sheet is one leaf: it replaces two consecutive pages of the part file.
 - The record of the part in `score.yaml` (`built`) has `foldout` (the sheet file), `foldouts` (the count),
-  `flaps` (the flap file) and `assemble` (the text file).
+  `flaps` (the flap file), `assemble` (the text file) and, with the large-print copy, `large_flaps`
+  (the large flap file, §5.6).
   `repage` applies `foldouts` without a rebuild.
 - Fold-outs need a sheet of two pages side by side: Letter (ledger sheet) and A4 (A3 sheet). On
   ledger paper `foldouts: on` plans the turns with `turnplan` but makes no fold-out.
@@ -1206,7 +1215,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 0 | `console` | Output primitives, colours, counters, prompts, `Abort` |
 | 0 | `config` | Tunables, `TUNE`, layout and score keys, defaults, paper sizes (`PAPER`), name helpers |
 | 0 | `model` | Data classes `Staff`, `PageResult`, `Strip`, `RestRun` |
-| 0 | `typography` | Fonts and text measure |
+| 0 | `typography` | Fonts and text measure; cut and fold guides; fold-out assembly text |
 | 0 | `mapping` | Staff label to part map, accent folding (`fold_accents`) |
 | 0 | `bars` | Bar numbers, bar marks, barline edits |
 | 1 | `vision` | Page render, tracking, dewarp, staff and system detect, OCR |
@@ -1248,7 +1257,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | §4.4 parallel | `parallel` |
 | §12.4 stage cache | `stagecache`, `analysis` |
 | §5.1 to 5.4, 5.6 layout | `render` |
-| §5.7 page-turn planner | `turnplan` |
+| §5.7 page-turn planner | `turnplan`; print of fold-outs: `render`, assembly text `typography` |
 | §5.8 part planning | `partplan` |
 | §5.5 typography | `typography`, `lines` |
 | §6 CLI | `cli_*` |

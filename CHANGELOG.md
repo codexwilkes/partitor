@@ -7,6 +7,17 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.36 — 2026-11-10
+
+### Fixed
+- The large-print copy (`-11x17.pdf`, `-A3.pdf`) of a part with fold-outs had no flaps: it is made
+  from the part file, and the flaps are in their own files, so the music of every flap was missing
+  at the large size. The flaps now get a large file too, `-foldout-flaps-11x17.pdf` (`-A3.pdf`):
+  one flap per sheet, printed on one side, cut, and taped to its page of the large copy. There is
+  no large fold-out sheet (no normal paper holds two 11x17 pages side by side).
+  `-assemble.txt` gives this as a third way (C), and the `built` record has `large_flaps`.
+  A partial rebuild and `reid` keep the new file as they keep the large copy.
+
 ## 0.8.35 — 2026-11-10
 
 ### Changed

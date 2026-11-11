@@ -490,7 +490,7 @@ def partial_blocker(item: Path, data: dict, names: list[str], tail: str) -> str 
         want = part_file_name(num, nm, tail)
         if r.get("file") != want:
             return f"the file name of {nm} would change ({r.get('file')} -> {want})"
-        for k in ("file", "large"):
+        for k in ("file", "large", "large_flaps"):
             if r.get(k) and not (pdir / r[k]).is_file():
                 return f"{r[k]} is not in parts/"
     return None
@@ -505,7 +505,7 @@ def keep_other_parts(item: Path, data: dict, stage: Path, names: list[str]) -> l
     for r in (data.get("built") or {}).get("parts") or []:
         if r["part"] in names or r["part"] not in cur:
             continue
-        for k in ("file", "large"):
+        for k in ("file", "large", "large_flaps"):
             if r.get(k):
                 shutil.copy2(item / "parts" / r[k], stage / r[k])
         keep.append(dict(r))

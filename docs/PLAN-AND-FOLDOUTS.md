@@ -108,16 +108,18 @@ table is shown. The item does not change. To keep a group, define it with
 
 ## Print and assemble
 
-A part with fold-outs has four files in `parts/`:
+A part with fold-outs has four files in `parts/` (six with the large-print copy):
 
 - the part file: every page on Letter, except the flaps;
 - a file that ends in `-foldout-sheets.pdf`: one ledger sheet (17 × 11 in) for
   each fold-out. A sheet is two PDF pages: front, then back;
 - a file that ends in `-foldout-flaps.pdf`: one Letter page for each flap;
 - a file that ends in `-assemble.txt`: the steps below, with the pages and
-  places of your part.
+  places of your part;
+- with the large-print copy: the large part file (`-11x17.pdf`) and a file that
+  ends in `-foldout-flaps-11x17.pdf`: the flaps at the large size (way C below).
 
-Make each fold-out one of two ways. The pages are the same. Use the way your
+Make each fold-out one of two ways (a third, C, at the large size). The pages are the same. Use the way your
 printer allows. Different people can print different parts in different ways.
 
 **A. Ledger printer (cut and fold).**
@@ -142,6 +144,19 @@ printer allows. Different people can print different parts in different ways.
    flap ("Tape the left edge of this page to the right edge of page 2a/30")
    and in `-assemble.txt`. Tape the joint on the back with narrow tape. Fold the
    flap forward over its page.
+
+**C. Large copy (11 × 17 in, or A3 for A4 parts; cut and tape).** Only when the
+large-print copy is on (`large: on`, the default).
+
+1. Large part file (`-11x17.pdf`): 11 × 17 in, double-sided, all pages. Cut off
+   the blank strip at the foot at the line across the sheet.
+2. Large flap file (`-foldout-flaps-11x17.pdf`): 11 × 17 in, one side only, one
+   flap per sheet. Cut off the blank strip at the foot in the same way.
+3. Cut each flap along its "cut" line (about 0.65 in off the free edge at this size).
+4. Tape each flap to its page as in B. The page numbers are the same.
+
+There is no large fold-out sheet: no normal paper holds two 11 × 17 pages side
+by side.
 
 Then punch or bind the stack.
 

@@ -758,6 +758,47 @@ class TestFoldoutRender(unittest.TestCase):
                 else:
                     self.assertGreaterEqual(min(b.x0 for b in boxes), cut + pt.mm2pt(5.0) - 0.5)
 
+    def test_large_copy_of_a_fold_out_part_has_its_flaps(self):
+        """0.8.36: the large copy was made from the part file only, so the music of every flap
+        was missing at the large size. The flaps now have their own large file."""
+        with tempfile.TemporaryDirectory() as d:
+            out, _, info = self.render(d, self.music(120, rests={38, 95}))
+            self.assertGreater(info["foldouts"], 0)
+            got = pt.large_copies(out, {**self.OPTS, "large": "on"})
+            self.assertEqual(got, {"large": "p-11x17.pdf", "large_flaps": "p-foldout-flaps-11x17.pdf"})
+            flaps = pymupdf.open(Path(d, got["large_flaps"]))
+            self.assertEqual(len(flaps), info["foldouts"])
+            self.assertEqual([(round(p.rect.width), round(p.rect.height)) for p in flaps],
+                             [(792, 1224)] * info["foldouts"])
+            self.assertEqual(len(pymupdf.open(Path(d, got["large"]))), len(pymupdf.open(out)))
+            self.assertEqual(pt.large_copies(out, {**self.OPTS, "large": "off"}), {})
+
+    def test_large_copy_without_fold_outs_has_no_flap_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            out, _, info = self.render(d, self.music(12), foldouts="off")
+            self.assertFalse(info.get("flaps"))
+            self.assertEqual(pt.large_copies(out, {**self.OPTS, "large": "on"}), {"large": "p-11x17.pdf"})
+
+    def test_assemble_text_has_the_large_way_when_the_large_copy_is_made(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.render(d, self.music(120, rests={38, 95}), large="on")
+            txt = Path(d, "p-assemble.txt").read_text(encoding="utf-8")
+            self.assertIn("C. Large copy on 11 x 17 in paper (cut and tape)", txt)
+            self.assertIn("p-11x17.pdf", txt)
+            self.assertIn("p-foldout-flaps-11x17.pdf", txt)
+            self.assertIn("This takes 0.65 in off the flap.", txt)
+            self.assertIn("Cut off the blank strip at the foot at the dotted line across the sheet.", txt)
+        with tempfile.TemporaryDirectory() as d:
+            self.render(d, self.music(120, rests={38, 95}), large="off")
+            self.assertNotIn("C. Large copy", Path(d, "p-assemble.txt").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as d:
+            self.render(d, self.music(120, rests={38, 95}), large="on", paper="a4")
+            txt = Path(d, "p-assemble.txt").read_text(encoding="utf-8")
+            self.assertIn("C. Large copy on A3 paper (cut and tape)", txt)
+            self.assertIn("p-foldout-flaps-A3.pdf", txt)
+            self.assertIn("This takes 0.71 in off the flap.", txt)
+            self.assertNotIn("blank strip", txt)                 # A4 fills A3: nothing to cut off
+
     def test_page_ranges_skip_the_sheet_pages(self):
         self.assertEqual(pt.page_ranges([5, 6], 10), "1-4, 7-10")
         self.assertEqual(pt.page_ranges([1, 2], 4), "3-4")

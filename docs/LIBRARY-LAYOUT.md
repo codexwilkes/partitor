@@ -25,6 +25,8 @@ and needs a minor version at least (a major version after 1.0.0).
     `...--<id>-foldout-sheets.pdf` (the ledger sheets),
     `...--<id>-foldout-flaps.pdf` (the Letter flaps to tape) and
     `...--<id>-assemble.txt` (print and assembly steps). They do not match `*--<id>.pdf`.
+    With the large-print copy it also has `...--<id>-foldout-flaps-11x17.pdf` (or `-A3`): the
+    flaps at the large size, to tape to the large copy (0.8.36).
 - To find a piece: match the folder by the prefix `<id>-`. To find its part
   files: match `*--<id>.pdf` (normal copy) and `*--<id>-11x17.pdf` /
   `*--<id>-A3.pdf` (large copy).

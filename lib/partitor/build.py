@@ -47,7 +47,7 @@ from .typography import missing_fonts
 from .parallel import RENDER_WORKER_GB, job_count, page_worker_gb, worker_peak_mb
 from .reflow import find_prefixes, reflow_report
 from .render import (
-    GROUP_REFLOW_PAGES, LARGE, LAST_RENDER, choose_layout, choose_reflow, fit_scale, large_copy,
+    GROUP_REFLOW_PAGES, LARGE, LAST_RENDER, choose_layout, choose_reflow, fit_scale, large_copies,
     prefix_notes, render_part, sheet_text, turns,
 )
 from .strips import group_strip, make_strip, own_group_gap, set_bar_geometry
@@ -738,8 +738,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                   + "  (no rest to turn in; set breaks or accept)")
         if lines_dir is not None:
             save_lines(lines_path(lines_dir, name), name, dpi, {**meta, **extra}, o, strips, plan_src)
-        big = (large_copy(fn, opts["paper"], opts.get("cutline", "dotted"))
-               if opts.get("large") == "on" and opts["paper"] in LARGE else None)
+        big = large_copies(fn, opts)
         rec = {"part": name, "pages": n, "reflow": opts.get("reflow") == "on",
                "width_mm": round(h_width, 2),
                "content_pages": LAST_RENDER.get("content", n),
@@ -747,7 +746,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                "staff_mm": round(h_mm, 2),
                "staff_max_mm": round(h_max, 2), "gap": round(g, 2),
                "turns": len(tl), "bad_turns": nbad,
-               "file": fn.name, **({"large": big.name} if big else {}),
+               "file": fn.name, **big,
                **({"foldout": LAST_RENDER["foldout"], "foldouts": LAST_RENDER["foldouts"],
                    "flaps": LAST_RENDER["flaps"], "assemble": LAST_RENDER["assemble"]} if LAST_RENDER.get("foldout") else {}),
                **({"group": True} if extra.get("members") else {})}

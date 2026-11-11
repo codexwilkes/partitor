@@ -550,7 +550,7 @@ def reid_item(lib: Path, item: Path) -> Path:
     if str(data.get("source", "")).startswith(f"{old}-") or data.get("source") == "source.pdf":
         data["source"] = f"{new}-source.pdf"
     for p_ in (data.get("built") or {}).get("parts") or []:
-        for k in ("file", "large"):
+        for k in ("file", "large", "large_flaps"):
             if k in p_:
                 p_[k] = str(p_[k]).replace(old, new)
     save_item(dst, data)
@@ -978,7 +978,7 @@ def cmd_repage(a: argparse.Namespace) -> int:
     parts (kept by later builds); breaks, duplex and title_page are taken
     from the layout. Writes through parts.new/ like a build."""
     from .lines import count_bad_turns, lines_path, load_lines, turn_text
-    from .render import LARGE, LAST_RENDER, large_copy, render_part, sheet_text, turns
+    from .render import LAST_RENDER, large_copies, render_part, sheet_text, turns
     start = time.monotonic()
     item = _item_or_die(a.id)
     recover_parts(item)
@@ -1029,12 +1029,12 @@ def cmd_repage(a: argparse.Namespace) -> int:
             _die(f"repage: {nm}: {e}", "parts/ is unchanged")
         tl = list(LAST_RENDER.get("turns") or [])
         nbad = count_bad_turns(tl, o)
-        big = (large_copy(fn, o["paper"], o.get("cutline", "dotted"))
-               if o.get("large") == "on" and o["paper"] in LARGE else None)
-        rec = {k: v for k, v in old.items() if k not in ("large", "foldout", "foldouts", "flaps", "assemble")}
+        big = large_copies(fn, o)
+        rec = {k: v for k, v in old.items()
+               if k not in ("large", "large_flaps", "foldout", "foldouts", "flaps", "assemble")}
         rec.update(pages=n, content_pages=LAST_RENDER.get("content", n),
                    title_page=bool(LAST_RENDER.get("title_page")), turns=len(tl),
-                   bad_turns=nbad, **({"large": big.name} if big else {}),
+                   bad_turns=nbad, **big,
                    **({"foldout": LAST_RENDER["foldout"], "foldouts": LAST_RENDER["foldouts"],
                        "flaps": LAST_RENDER["flaps"], "assemble": LAST_RENDER["assemble"]} if LAST_RENDER.get("foldout") else {}))
         recs[nm] = rec
