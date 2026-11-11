@@ -310,6 +310,22 @@ def line_spans(strips: list[Strip]) -> list[tuple[int, int | None] | None]:
     return spans
 
 
+def prefix_notes(strips: list[Strip], pre) -> list[str]:
+    """prefix_notes -> text lines for the build (0.8.32): the lines that took the clef and key of a
+    neighbour by the structure match (pre.borrowed) and the music lines that stay whole for lack of
+    one (they hold the staff re-flow can reach), each with its bar numbers."""
+    spans = line_spans(strips)
+
+    def where(i: int) -> str:
+        sp = spans[i]
+        return f"line {i + 1}" if not sp or sp[1] is None else f"bar {sp[0]}" if sp[0] == sp[1] else f"bars {sp[0]}-{sp[1]}"
+    out = [f"prefix borrowed: {where(i)} take the clef and key of {where(k)} "
+           "(the scan differs, the key signature agrees)" for i, k in sorted(getattr(pre, "borrowed", {}).items())]
+    return out + [f"no clef and key to copy: {where(i)} stay one piece (re-flow cannot make the staff larger than this line allows)"
+                  for i, s_ in enumerate(strips)
+                  if pre[i] is None and s_.rest_src is None and s_.ends_at_bar and len(s_.bars_x) >= 2]
+
+
 def break_lines(strips: list[Strip], bars: list[int]) -> tuple[list[int], list[str]]:
     """break_lines -> (j list, warnings): a page break before line j for each
     bar N in `bars` ("break after bar N"). Lines are fixed, so N must be the

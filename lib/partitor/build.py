@@ -48,7 +48,7 @@ from .parallel import RENDER_WORKER_GB, job_count, page_worker_gb, worker_peak_m
 from .reflow import find_prefixes, reflow_report
 from .render import (
     GROUP_REFLOW_PAGES, LARGE, LAST_RENDER, choose_layout, choose_reflow, fit_scale, large_copy,
-    render_part, sheet_text, turns,
+    prefix_notes, render_part, sheet_text, turns,
 )
 from .strips import group_strip, make_strip, own_group_gap, set_bar_geometry
 
@@ -693,6 +693,8 @@ def cmd_build(a: argparse.Namespace) -> int:
         if opts.get("reflow") == "on":
             pre = find_prefixes(strips)
             _note(f"{name}: {reflow_report(strips, pre)}")
+            for txt_ in prefix_notes(strips, pre):
+                _note(f"{name}: {txt_}")
             o_r, floor = opts, None
             if group and not opts.get("page_count"):
                 # a group is several staves per line: its pages grow with the

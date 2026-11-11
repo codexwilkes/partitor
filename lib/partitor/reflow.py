@@ -19,6 +19,10 @@ REFLOW_MAX_PREFIX_SP = 12.0     # clef + key signature: never wider than this
 REFLOW_SAME_SP = 1.2            # lines equal this far past the gap (sp) look like one structure (a longer key)
 REFLOW_CLEAR_SP = 2.5           # but a blank this wide after the gap ends the key signature
 REFLOW_STACK_SP = 0.3           # a line borrows a prefix from a line whose staves lie this close (sp); the copy is moved to fit
+REFLOW_AGREE_CLEF_SP = 2.4      # structure match (0.8.32): the clef is not compared (a scan blots it); the key signature after it is
+REFLOW_AGREE_TAIL_SP = 0.8      # ... up to this far past the donor's prefix end
+REFLOW_AGREE_MAX_SP2 = 0.8      # mismatch on any one staff, sp^2: equal keys on blotchy scans <= 0.65, an accidental missing or added >= 0.84
+REFLOW_AGREE_INK = 0.4          # and the smaller ink of the two lines over the larger: equal keys >= 0.64, an accidental missing <= 0.04
 
 
 def _x0(s: Strip) -> int:
@@ -63,16 +67,17 @@ def _band(s: Strip) -> np.ndarray:
     return out
 
 
-def _diverge(a: Strip, b: Strip) -> float:
-    """Distance (px, from the staff start) where the music of two lines of
-    the same part stops being identical: clef and key signature are the
-    same on every line, the first note is not."""
+def _aligned_bands(a: Strip, b: Strip, cap_px: float):
+    """_aligned_bands -> (A, B, k) or None: the own ink (_band) of two lines over the
+    first L px from the staff start (L at most cap_px), B moved onto A by the clef
+    (scans: clefs move a few px); k is the dilation kernel (about 0.3 sp). None:
+    nothing to compare."""
     A, B = _band(a), _band(b)
     h = min(A.shape[0], B.shape[0])
     ax, bx = _x0(a), _x0(b)
-    L = int(min(A.shape[1] - ax, B.shape[1] - bx, REFLOW_MAX_PREFIX_SP * 1.6 * a.sp))
+    L = int(min(A.shape[1] - ax, B.shape[1] - bx, cap_px))
     if L <= 0 or h <= 0:
-        return 0.0
+        return None
     sp = a.sp
     m = int(round(0.4 * sp))                 # scans: clefs move a few px
     A = A[:h, ax:ax + L]
@@ -82,10 +87,9 @@ def _diverge(a: Strip, b: Strip) -> float:
     c0 = m - (bx - max(0, bx - m))
     Bf[v:v + h, c0:c0 + seg.shape[1]] = seg
     if A.size == 0 or not Bf.any():
-        return 0.0
+        return None
     t_ = max(5, int(round(0.3 * sp)) | 1)    # +-3 px at 400 dpi; a pitch step is 0.5 sp
     k = np.ones((t_, t_), np.uint8)
-    dA = cv2.dilate(A.astype(np.uint8), k) > 0
     w0 = min(L, int(3 * sp))                 # the clef decides the shift
     best, shift = None, (v, m)
     for dy in range(2 * v + 1):
@@ -94,7 +98,20 @@ def _diverge(a: Strip, b: Strip) -> float:
             e = int((A[:, :w0] ^ Bc[:, :w0]).sum())
             if best is None or e < best:
                 best, shift = e, (dy, dx)
-    B = Bf[shift[0]:shift[0] + h, shift[1]:shift[1] + L]
+    return A, Bf[shift[0]:shift[0] + h, shift[1]:shift[1] + L], k
+
+
+def _diverge(a: Strip, b: Strip) -> float:
+    """Distance (px, from the staff start) where the music of two lines of
+    the same part stops being identical: clef and key signature are the
+    same on every line, the first note is not."""
+    got = _aligned_bands(a, b, REFLOW_MAX_PREFIX_SP * 1.6 * a.sp)
+    if got is None:
+        return 0.0
+    A, B, k = got
+    sp = a.sp
+    L = A.shape[1]
+    dA = cv2.dilate(A.astype(np.uint8), k) > 0
     dB = cv2.dilate(B.astype(np.uint8), k) > 0
     mis = ((A & ~dB) | (B & ~dA)).sum(axis=0).astype(float)
     win = max(2, int(round(sp)))
@@ -211,7 +228,58 @@ def _group_view(s: Strip) -> Strip:
     return st
 
 
-def find_prefixes(strips: list[Strip]) -> list[tuple[int, int] | None]:
+def _staff_view(s: Strip, m: int) -> Strip:
+    """_staff_view -> a one-staff Strip of staff m of a group line (the ink around
+    that staff, 2 sp above and below); the line itself when it has one staff."""
+    if len(s.staff_labels) < 2:
+        return s
+    pad = int(round(2 * s.sp))
+    _, t, b = s.staff_labels[m]
+    h = int(b - t) + 2 * pad
+    a0 = int(t) - pad
+    r0, r1 = max(0, a0), min(s.img.shape[0], a0 + h)
+
+    def cut(a):
+        out = np.zeros((h, s.img.shape[1]), bool)
+        out[r0 - a0:r1 - a0] = a[r0:r1]
+        return out
+    return dc_replace(s, img=cut(s.img), hdr=cut(s.hdr), num_mask=None, staff_top=pad,
+                      staff_bottom=pad + int(b - t), staff_labels=[], bracket=False)
+
+
+def _prefix_agrees(a: Strip, b: Strip, plen: float) -> bool:
+    """_prefix_agrees -> True when the key signature of line a is that of line b, staff
+    by staff, although the pixels of the clef are not (a faded or dotted scan blots the
+    clef, so the exact test of _diverge stops after a few px). The ink between
+    REFLOW_AGREE_CLEF_SP and the donor's prefix end plen (plus a tail) is compared,
+    within the tolerance of _aligned_bands (about 0.3 sp). On every staff the mismatch
+    must stay under REFLOW_AGREE_MAX_SP2 (sp^2) and the two lines must hold about the
+    same amount of ink (REFLOW_AGREE_INK): an accidental missing or added fails both. The
+    same staves are needed on both lines. Fitted on two faded scans (tests, DESIGN.md §4.2)."""
+    if len(a.staff_labels) != len(b.staff_labels):
+        return False
+    sp = a.sp
+    x0 = int(REFLOW_AGREE_CLEF_SP * sp)
+    for m in range(max(1, len(a.staff_labels))):
+        got = _aligned_bands(_staff_view(a, m), _staff_view(b, m), plen + REFLOW_AGREE_TAIL_SP * sp)
+        if got is None or got[0].shape[1] <= x0:
+            return False
+        A, B, k = got
+        dA, dB = cv2.dilate(A.astype(np.uint8), k) > 0, cv2.dilate(B.astype(np.uint8), k) > 0
+        mis = ((A & ~dB) | (B & ~dA))[:, x0:].sum() / (sp * sp)
+        ia, ib = int(A[:, x0:].sum()), int(B[:, x0:].sum())
+        if mis > REFLOW_AGREE_MAX_SP2 or min(ia, ib) < REFLOW_AGREE_INK * max(ia, ib):
+            return False
+    return True
+
+
+class _Prefixes(list):
+    """The result of find_prefixes. borrowed: {line: donor line} for the lines that
+    took the prefix of a donor by the structure match (_prefix_agrees)."""
+    borrowed: dict
+
+
+def find_prefixes(strips: list[Strip]) -> _Prefixes:
     """find_prefixes -> per strip (start, donor) or None.
     start: x (img) where the music of the line's first bar starts; donor:
     the strip whose columns 0..its start are the clef + key signature copied
@@ -308,7 +376,23 @@ def find_prefixes(strips: list[Strip]) -> list[tuple[int, int] | None]:
                and _diverge(strips[i], strips[k]) >= owns[k] - 0.5 * s_.sp:
                 out[i] = (0, k)
                 break
-    return out
+    # Structure match (0.8.32): a line whose clef is blotted (faded or dotted scan) has no
+    # prefix gap and does not match any line pixel for pixel. It takes the prefix of the
+    # nearest lines of its own segment (same staves, no rest line between) when its key
+    # signature agrees with every one of the two nearest, staff by staff. A key change,
+    # or a donor that disagrees, leaves the line whole (the build and `plan` say so).
+    segof = {i: n for n, seg in enumerate(segs) for i in seg}
+    res = _Prefixes(out)
+    res.borrowed = {}
+    for i, s_ in enumerate(orig):
+        if out[i] is not None or s_.rest_src is not None or not _single(strips[i]):
+            continue
+        donors = [k for k in sorted(owns, key=lambda k: abs(k - i))
+                  if segof[k] == segof[i] and _same_stack(s_, orig[k], REFLOW_STACK_SP)][:2]
+        if donors and all(_prefix_agrees(s_, orig[k], owns[k]) for k in donors):
+            res[i] = (0, donors[0])
+            res.borrowed[i] = donors[0]
+    return res
 
 
 def _break_lines(widths: list[float], pre: float, W: float) -> list[int]:

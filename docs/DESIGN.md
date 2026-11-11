@@ -179,13 +179,31 @@ notehead, slur or word goes whole to one owner.
      of the same movement with the same staves, also across a multi-bar rest
      line (0.8.2: a rest line has no staff labels and used to split the
      movement, so a line between two rest lines had no prefix).
+     Structure match (0.8.32): a line whose clef is damaged (a faded or dotted
+     scan) shares no gap with the others and matches no line pixel for pixel
+     (`_diverge` stops after a few px), so it had no prefix and stayed whole.
+     It now takes the prefix of the nearest line of its own segment (same
+     movement, same staves, no rest line between) when its key signature
+     agrees with each of the two nearest such lines (`_prefix_agrees`): per
+     staff, the ink from 2.4 sp past the staff start to the donor's prefix end
+     plus 0.8 sp is compared within about 0.3 sp, and the mismatch must stay
+     under 0.8 sp^2 with about the same amount of ink (at least 0.4 of the
+     larger). The clef is not compared. A key change (an accidental more or
+     less, on one staff of a group too) fails both tests and the line stays
+     whole. The limits were fitted on two faded scans (equal keys: mismatch at
+     most 0.65 sp^2, ink ratio at least 0.64; an accidental missing: at least
+     0.84 sp^2, ink ratio at most 0.04). Not covered: a flat that becomes a
+     sharp on the same line, and a key change on a score whose lines differ
+     in more than the key. The build lists every borrowed line.
    - Lines that cannot be cut safely stay whole: no prefix, not ending at a
      barline, one-line movements, multi-bar rests. A line ends at a barline
      when the last barline found lies within 2.5 sp of the staff end (0.8.2;
      a final or repeat barline is found at its middle, up to 2.2 sp before the
      end, and the old limit of 2.0 sp left every section end whole). A whole line limits the
      size of the part (constant staff size). The build says how many lines
-     can be cut, why the others stay whole, and the widest whole line.
+     can be cut, why the others stay whole, and the widest whole line; it
+     names, with their bar numbers, the lines that borrowed a prefix and the
+     lines that stay whole for lack of one (0.8.32).
    - A movement starts a new line. Bars of two source lines share a line only
      when their prefixes match.
    - A line that starts with a merged multi-bar rest is not a donor of the clef and key (0.8.29):
@@ -869,7 +887,7 @@ or more at the turn), `short` (a rest of one bar), `attacca`, `fold-out` (the nu
 - Each row cuts the lines at barlines as re-flow does (`reflow._break_lines`) for the text width of
   the paper (margins, `binding` and `gutter` as set for the part: set them first), at the staff
   height of the row, and hands the lines to `turnplan` with and without a title page. A line that
-  cannot be cut narrow enough makes the row unavailable and the note says which line and how wide.
+  cannot be cut narrow enough makes the row unavailable and the note says which line, how wide and (from 0.8.32) its bars.
   Fold-outs are planned for Letter and A4 only (§5.7).
 - A group has a label column (staff names, the ambitus on the first line) that `finish_lines` adds
   after the lines are cut; the staff then shrinks to fit. The row staff is the size that is printed.

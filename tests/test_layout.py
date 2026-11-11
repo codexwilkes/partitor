@@ -164,6 +164,20 @@ class TestReflow(unittest.TestCase):
         ls = self.lines() + [flow_line([(70, 60)], [100, 198])]   # no key signature
         self.assertIsNone(pt.find_prefixes(ls)[3])
 
+    def test_damaged_clef_of_a_part_takes_the_prefix_when_the_key_agrees(self):
+        """0.8.32: one-staff lines too. A faded clef stops the exact test after a few px; the
+        key signature still agrees with the two nearest lines, so the line is cut."""
+        lone = flow_line([(72, 52), (125, 44)], [110, 160, 198], key=True)
+        lone.img[28:94, 13:16] = False                       # the middle stroke of the clef is gone
+        ls = self.lines() + [lone]
+        self.assertLess(pt._diverge(lone, ls[0]), 3 * lone.sp)
+        pre = pt.find_prefixes(ls)
+        self.assertEqual(pre.borrowed, {3: 2})
+        self.assertEqual(pt.whole_reason(lone, pre[3]), "")
+        nokey = flow_line([(72, 52), (125, 44)], [110, 160, 198], key=False)
+        nokey.img[28:94, 13:16] = False
+        self.assertIsNone(pt.find_prefixes(self.lines() + [nokey])[3])      # a missing key is a key change
+
     def test_one_line_movement_is_not_cut(self):
         self.assertEqual(pt.find_prefixes([flow_line([(70, 44)], [100, 198], first=True)]),
                          [None])
@@ -741,6 +755,79 @@ class TestGroupReflow(unittest.TestCase):
         self.assertGreater(len(out), len(ls))                       # the lone line is cut too
         ls[3].movement = True                                       # another movement: no donor
         self.assertIsNone(pt.find_prefixes(ls)[3])
+
+    def damaged(self, key_fix=None):
+        """Three lines with a clean prefix and a fourth in the same segment whose clef is damaged
+        (a stroke of the clef is faded away, as a faded or dotted scan makes it): the exact test of
+        `_diverge` stops after a few px, so no prefix gap is found. key_fix(img, tops) changes
+        the key signature of the fourth line."""
+        ls = self.lines()
+        lone = group_line([(72, 12), (125, 4)], [110, 160, 198])
+        for t in (40, 170, 300):
+            lone.img[t - 12:t + 54, 12:16] = False                   # a broken clef: its middle stroke is gone
+        if key_fix:
+            key_fix(lone.img, (40, 170, 300))
+        return ls + [lone]
+
+    def test_damaged_clef_takes_the_prefix_of_its_neighbours_when_the_key_agrees(self):
+        """Real item (a trombone group on a faded scan): two lines had a clef the exact test could
+        not match, stayed whole, and their width held the staff of the whole part at 5 mm."""
+        ls = self.damaged()
+        g = [pt._group_view(x) for x in ls]
+        self.assertLess(pt._diverge(g[3], g[0]), 3 * ls[0].sp)       # the exact test fails at once
+        pre = pt.find_prefixes(ls)
+        self.assertIsNotNone(pre[3])
+        self.assertEqual(pre.borrowed, {3: 2})                       # from the nearest line
+        self.assertEqual(pre[3][0], 0)                               # it keeps its own clef in the first bar
+        self.assertEqual(pt.whole_reason(ls[3], pre[3]), "")
+        out = pt.reflow(ls, 140.0, pre)
+        self.assertGreater(len(out), len(ls) + 2)                    # the line is cut too
+
+    def test_a_key_change_on_one_staff_is_not_borrowed(self):
+        """One staff of three has another key signature (a key change, here an accidental more):
+        the mismatch of that staff alone refuses the line."""
+        def key_change_on_b(img, tops):
+            img[tops[1] - 4:tops[1] + 44, 56:63] = True
+        ls = self.damaged(key_change_on_b)
+        pre = pt.find_prefixes(ls)
+        self.assertIsNone(pre[3])
+        self.assertEqual(pre.borrowed, {})
+
+    def test_an_added_accidental_is_not_borrowed(self):
+        def one_more(img, tops):
+            img[tops[2] - 4:tops[2] + 44, 56:63] = True
+        self.assertIsNone(pt.find_prefixes(self.damaged(one_more))[3])
+
+    def test_prefix_agrees_compares_the_key_staff_by_staff_and_not_the_clef(self):
+        ls = self.damaged()
+        lone, donor = ls[3], ls[2]
+        self.assertTrue(pt._prefix_agrees(lone, donor, 55))          # the clef differs, the key does not
+        other = group_line([(72, 12), (125, 4)], [110, 160, 198])
+        other.img[36:84, 56:63] = True                               # another key on the first staff
+        self.assertFalse(pt._prefix_agrees(lone, other, 55))
+        self.assertFalse(pt._prefix_agrees(other, donor, 55))        # and the other way round
+        two = group_line([(72, 12)], [110, 198], parts=("A", "B"), tops=(40, 170))
+        self.assertFalse(pt._prefix_agrees(lone, two, 55))           # not the same staves
+
+    def test_a_damaged_line_in_another_segment_gets_no_donor(self):
+        from types import SimpleNamespace
+        ls = self.damaged()
+        rest = group_line([], [198])
+        rest.staff_labels = []
+        rest.rest_src = (None, None, SimpleNamespace(bars=6))
+        ls.insert(3, rest)                                           # a rest line splits the segment
+        self.assertIsNone(pt.find_prefixes(ls)[4])
+
+    def test_prefix_notes_say_which_bars_were_borrowed_and_which_stay_whole(self):
+        ls = self.damaged()
+        notes = pt.prefix_notes(ls, pt.find_prefixes(ls))
+        self.assertEqual(len(notes), 1)
+        self.assertIn("prefix borrowed: bars 1-3 take the clef and key of bars 1-3", notes[0])
+        gone = self.damaged(lambda img, tops: img.__setitem__(
+            (slice(tops[0] - 4, tops[0] + 44), slice(56, 63)), True))
+        notes = pt.prefix_notes(gone, pt.find_prefixes(gone))
+        self.assertEqual(len(notes), 1)
+        self.assertIn("no clef and key to copy: bars 1-3 stay one piece", notes[0])
 
     def odd_lone(self, tops):
         """Two lines, a multi-bar rest line, and a lone line whose staves lie a few px off the

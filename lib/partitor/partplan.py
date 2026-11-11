@@ -166,8 +166,10 @@ def estimate(src: Source, opts: dict, paper: str, staff_mm: float) -> Option:
     pieces, wide = _pieces(src, LINE_FIT * usable / k0)
     if wide is not None:
         i, w = wide
+        sp_ = src.lines[i].get("span")
+        bars = (f" (bar {sp_[0]})" if sp_[0] == sp_[1] else f" (bars {sp_[0]}-{sp_[1]})") if sp_ else ""
         return Option(paper, staff_mm, False,
-                      f"line {i + 1} cannot be cut: {w * k0 / 72.0 * 25.4:.0f} mm of music")
+                      f"line {i + 1} cannot be cut: {w * k0 / 72.0 * 25.4:.0f} mm of music{bars}")
     n = len(pieces)
     L = [src.lines[p[0]] for p in pieces]
     cum = [0.0]

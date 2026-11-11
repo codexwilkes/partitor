@@ -129,6 +129,9 @@ class TestEstimate(unittest.TestCase):
         big = pt.estimate(s, OPTS, "letter", 8.0)
         self.assertFalse(big.ok)
         self.assertIn("line 5 cannot be cut", big.note)
+        self.assertTrue(big.note.endswith(" mm of music (bar 1)"), big.note)       # the bars of the line (0.8.32)
+        st[4] = flow_line([], [1900], width=2000, key=False, nums=[37])
+        self.assertIn("(bar 37)", pt.estimate(pt.read_source(st, OPTS, 400), OPTS, "letter", 8.0).note)
 
     def test_fold_outs_only_where_a_sheet_of_two_pages_exists(self):
         s = pt.read_source(part(36, {16, 33}), OPTS, 400)

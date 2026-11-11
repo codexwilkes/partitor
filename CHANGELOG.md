@@ -7,6 +7,25 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.32 — 2026-11-10
+
+### Fixed
+- Re-flow and `plan`: a line whose clef is damaged on a faded or dotted scan stayed whole and held
+  the staff of the whole part small. Its clef and key signature did not match any other line pixel
+  for pixel, so no prefix was found. On the trombone group that showed it, two lines (bars 37-40
+  and 58-60) allowed Letter only at 5.0 mm; now every size from 8.0 mm down is possible.
+  Such a line now takes the clef and key of its neighbours when its key signature agrees with the
+  two nearest lines of its own segment (same staves, no rest line between), staff by staff. The
+  clef itself is not compared. A key change, an accidental more or less on any staff, or other
+  staves, still leaves the line whole.
+
+### Changed
+- The build says which lines took a prefix ("prefix borrowed: bars 37-40 take the clef and key of
+  bars 41-44") and which stay whole for lack of one ("no clef and key to copy: bars ... stay one
+  piece"), each with its bar numbers.
+- `partitor plan`: a row that is not possible names the bars of the line that cannot be cut
+  ("line 6 cannot be cut: 300 mm of music (bars 37-40)").
+
 ## 0.8.31 — 2026-11-10
 
 ### Changed

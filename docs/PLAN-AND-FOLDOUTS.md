@@ -223,6 +223,9 @@ every bar as engraved.
 - A right fold-out cannot be followed by a left one. A left fold-out cannot
   follow a title page.
 - A line that cannot be cut narrow enough makes an option unavailable. The
-  note says which line.
+  note says which line, how wide, and its bars (for example "line 6 cannot be
+  cut: 300 mm of music (bars 37-40)"). Look at those bars in the proof: a line
+  with no clef and key to copy, or one very wide bar, limits the staff size on
+  that paper.
 - Per-staff rests are not used yet: a turn where one staff rests is counted
   as bad.
