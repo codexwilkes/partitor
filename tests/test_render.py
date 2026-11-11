@@ -1835,6 +1835,38 @@ class TestTurnWhere(unittest.TestCase):
 
 
 @needs_deps
+class TestFoldSize(unittest.TestCase):
+    """0.8.44 (F7): with `foldouts: on` the size and gap are ranked by the turns of the plan, then its
+    fold-outs (layout_turns), not by turns(pages): a fold-out shows three faces with no turn."""
+
+    OPTS = {**pt.LAYOUT_DEFAULTS, "paper": "letter", "foldouts": "on", "logo": "off", "min_staff_mm": 4.0}
+
+    def chosen(self, opts, n=29):
+        st = TestRepage().music(n)                          # no rest anywhere
+        sc, g, faces = pt.choose_layout(st, 400, opts)
+        _, _, plan = pt.layout_plan(st, 400, {**opts, "scale": sc, "gap": g})
+        return sc, faces, sum(1 for x in plan.groups if x.turn.cls != "end"), plan.folds
+
+    def test_a_fold_out_that_saves_the_turn_wins(self):
+        sc, faces, nturns, folds = self.chosen(self.OPTS)
+        self.assertEqual((faces, nturns, folds), (3, 0, 1))   # 0.8.43: 4 faces, 1 turn while playing
+
+    def test_layout_turns_counts_the_plan_with_fold_outs_and_the_pages_without(self):
+        st = TestRepage().music(29)
+        o = {**self.OPTS, "scale": 2.29, "gap": 7.0}
+        self.assertEqual(pt.layout_turns(st, 400, o), (3, (0, 1)))
+        n = len(pt.layout_pages(st, 400, {**o, "foldouts": "off"})[0])
+        self.assertEqual(pt.layout_turns(st, 400, {**o, "foldouts": "off"}), (n, (pt.turns(n), 0)))
+
+    def test_without_fold_outs_the_choice_does_not_change(self):
+        o = {**self.OPTS, "foldouts": "off"}
+        st = TestRepage().music(29)
+        sc, g, n = pt.choose_layout(st, 400, o)
+        self.assertEqual(pt.turns(n), min(pt.turns(len(pt.layout_pages(st, 400, {**o, "scale": s_, "gap": 7.0})[0]))
+                                          for s_ in (sc, sc * 0.9, sc * 0.8)))
+
+
+@needs_deps
 class TestPagesReport(unittest.TestCase):
     """The pages table and `pages --move` (0.8.19)."""
 

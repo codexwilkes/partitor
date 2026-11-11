@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.44 — 2026-11-11
+
+### Changed
+- `foldouts: on`: the staff size and the gap are chosen by the real page turns of the plan, then the
+  fewest fold-outs. Before, a fold-out counted as pages, so the size ignored it. Now a part may get a
+  smaller staff with a fold-out in place of a turn while playing, or a wider gap where the turns stay
+  the same. Parts without fold-outs do not change.
+
 ## 0.8.43 — 2026-11-11
 
 ### Fixed

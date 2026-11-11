@@ -603,6 +603,12 @@ pages is better than larger and 3 pages.**
 5. The last page holds at least 3 lines: lines move from the pages before it,
    the page count stays. A single line alone on a page looks like an error.
 
+Fold-out parts (`foldouts: on`, §5.7; 0.8.44): steps 1-3 count the real turns of the plan
+(`render.layout_turns`), not `turns(pages)`: a fold-out shows three faces with no turn between
+them. A tie in turns goes to fewer fold-outs (a fold-out is work, like a page), then to the larger
+staff, then to the wider gap. So `foldouts: on` alone can give a smaller staff with a fold-out in
+place of a turn while playing. Before, a fold-out counted as pages, and the size ignored it.
+
 Operator overrides: `pages=N` forces the target, `scale=F` sets the staff size
 against the source, `expand` / `contract` move one step (size first, then gap).
 Each command reports when the page count changes.

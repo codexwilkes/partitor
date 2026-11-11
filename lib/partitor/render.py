@@ -128,6 +128,19 @@ def turns(npages: int) -> int:
     return max(0, (npages - 1) // 2)
 
 
+def layout_turns(strips: list[Strip], dpi: int, opts: dict) -> tuple[int, tuple[int, int]]:
+    """layout_turns -> (content pages, (page turns, fold-outs)) of a layout: what the choice of
+    size and gap ranks, fewest first. A part with fold-outs (`foldouts: on`, double-sided)
+    counts the turns of its plan (a fold-out shows three faces with no turn between them) and
+    then its fold-outs: a fold-out is work, so a tighter gap comes first (0.8.44). Other parts:
+    (turns(pages), 0), as before."""
+    if folds_wanted(opts):
+        pages, _, plan = layout_plan(strips, dpi, opts)
+        return len(pages), (sum(1 for g in plan.groups if g.turn.cls != "end"), plan.folds)
+    n = len(layout_pages(strips, dpi, opts)[0])
+    return n, (turns(n), 0)
+
+
 def choose_layout(strips: list[Strip], dpi: int, opts: dict
                   ) -> tuple[float, float, int]:
     """choose_layout -> (scale, gap, pages). DESIGN.md §5.2:
@@ -145,11 +158,20 @@ def choose_layout(strips: list[Strip], dpi: int, opts: dict
     while mm(scales[-1] - 0.02) >= opts["min_staff_mm"] and scales[-1] - 0.02 > 0.3:
         scales.append(scales[-1] - 0.02)
     gaps = list(np.arange(opts["gap"], opts["gap_min"] - 1e-9, -0.25)) or [opts["gap"]]
+    seen: dict = {}
+
+    def laid(sc: float, g: float) -> tuple[int, tuple[int, int]]:
+        # content pages (a title page adds none: the first turn is before
+        # the music, DESIGN.md §5.4) and page turns (layout_turns)
+        if (sc, g) not in seen:
+            seen[(sc, g)] = layout_turns(strips, dpi, {**opts, "scale": sc, "gap": float(g)})
+        return seen[(sc, g)]
 
     def npages(sc: float, g: float) -> int:
-        # content pages (a title page adds none: the first turn is before
-        # the music, DESIGN.md §5.4)
-        return len(layout_pages(strips, dpi, {**opts, "scale": sc, "gap": float(g)})[0])
+        return laid(sc, g)[0]
+
+    def nturns(sc: float, g: float) -> tuple[int, int]:
+        return laid(sc, g)[1]
 
     target = opts.get("page_count")
     if target:
@@ -164,13 +186,13 @@ def choose_layout(strips: list[Strip], dpi: int, opts: dict
         # ledger (0.3.0-dev.36; operator request 2026-10-27): the staff is as large as
         # the page width and max_staff_mm allow; pages and turns follow
         sc = scales[0]
-        best = turns(npages(sc, gaps[-1]))
+        best = nturns(sc, gaps[-1])
     else:
-        best = min(turns(npages(sc, gaps[-1])) for sc in scales)
-        sc = next(sc for sc in scales if turns(npages(sc, gaps[-1])) == best)
+        best = min(nturns(sc, gaps[-1]) for sc in scales)
+        sc = next(sc for sc in scales if nturns(sc, gaps[-1]) == best)
     for g in gaps:
         n = npages(sc, g)
-        if turns(n) == best:
+        if nturns(sc, g) == best:
             return sc, float(g), n
     return sc, float(gaps[-1]), npages(sc, gaps[-1])
 
@@ -222,9 +244,12 @@ def choose_reflow(strips: list[Strip], dpi: int, opts: dict, pre: list | None = 
     # the widest uncut piece allows); the page count follows. Among gaps,
     # the widest with the fewest page turns at that size.
     sc = scales[0]
-    best = min(turns(npages(sc, g)) for g in gaps)
+
+    def nturns(g: float) -> tuple[int, int]:      # page turns, fold-outs (layout_turns, 0.8.44)
+        return layout_turns(lines(sc), dpi, {**opts, "scale": sc, "gap": float(g)})[1]
+    best = min(nturns(g) for g in gaps)
     for g in gaps:
-        if turns(npages(sc, g)) == best:
+        if nturns(g) == best:
             return sc, float(g), npages(sc, g), lines(sc)
     return sc, float(gaps[-1]), npages(sc, gaps[-1]), lines(sc)
 
