@@ -151,7 +151,7 @@ def cmd_new(a: argparse.Namespace) -> int:
               f"or: partitor groups {iid}; partitor rebuild {iid}")
         return _summary(start)
     rc = build.run_build(item, jobs=jobs)
-    _reset_counts()
+    _reset_counts(keep_warnings=True)               # the build's warnings stay in the last verdict
     _head(f"Result: {item.name}")
     if rc:
         _fail(f"build:  failed (see above); item kept. Retry: partitor rebuild {iid}")

@@ -350,6 +350,57 @@ class TestReflow(unittest.TestCase):
 
 
 @needs_deps
+class TestVerdict(unittest.TestCase):
+    """0.8.45 (F10): the last verdict of a command keeps the warnings of its build step; Ctrl-C
+    prints one line and exits 130."""
+
+    def test_reset_can_keep_the_warnings(self):
+        from partitor import console
+        pt._reset_counts()
+        with contextlib.redirect_stdout(io.StringIO()):
+            pt._ok("x")
+            pt._warn("w: one")
+        pt._reset_counts(keep_warnings=True)
+        self.assertEqual((console._counts["pass"], console._counts["warn"]), (0, 1))
+        self.assertEqual(list(console._WARNINGS), ["w: one"])
+        pt._reset_counts()
+        self.assertEqual((console._counts["warn"], list(console._WARNINGS)), (0, []))
+
+    def test_a_rebuild_with_a_warning_does_not_end_with_all_ok(self):
+        with tempfile.TemporaryDirectory() as d:
+            item = Path(d, "2026-10-0001-x-y")
+            item.mkdir()
+            pt.save_item(item, {"id": "2026-10-0001", "parts": ["A"], "title": "Y", "composer": "X",
+                                **TestReflow().built()})
+
+            def fake_build(it, only=None, jobs=None):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    pt._warn("turn-while-playing:  A  page 1")
+                return 0
+            pt._reset_counts()
+            with mock_attr(build, "run_build", fake_build), \
+                 contextlib.redirect_stdout(io.StringIO()) as out:
+                build._rebuild_report(item, None)
+                rc = pt._summary(0.0)
+        self.assertEqual(rc, 0)
+        self.assertIn("OK with 1 warning(s)", out.getvalue())
+        self.assertNotIn("ALL OK", out.getvalue())
+        pt._reset_counts()
+
+    def test_ctrl_c_prints_one_line_and_exits_130(self):
+        from partitor import cli_main
+
+        def stop():
+            raise KeyboardInterrupt
+        with mock_attr(cli_main, "_main", stop), contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(cli_main.main(), 130)
+        text = err.getvalue().strip()
+        self.assertEqual(len(text.splitlines()), 1)
+        self.assertIn("stopped (Ctrl-C)", text)
+        self.assertNotIn("Traceback", text)
+
+
+@needs_deps
 class TestRestsAndTitles(unittest.TestCase):
     """Multi-bar rests for systems without a part's staff; no false title."""
 

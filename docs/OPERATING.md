@@ -96,4 +96,8 @@ the real numbers.
 | Wrong parts or bar numbers | `KNOWN-LIMITS.md`; correct in the item menu; check the proof PDF. |
 
 An interrupted build leaves the previous `parts/` set in place; a build that
-stopped during the swap is recovered at the next run.
+stopped during the swap is recovered at the next run. Ctrl-C prints one line,
+`stopped (Ctrl-C)`, and the exit code is 130.
+
+The last line of a command is its verdict. After a build with warnings it says
+`OK with N warning(s)` and lists them again; read them before you print.

@@ -157,6 +157,7 @@
 #   0 — success
 #   1 — failure (analysis, safety gate, unresolved '?' in layout, I/O)
 #   2 — usage error
+#   130 — stopped by Ctrl-C (one line, no traceback; parts/ as it was)
 # =============================================================================
 
 import os

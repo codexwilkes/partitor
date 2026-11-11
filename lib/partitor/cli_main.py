@@ -21,7 +21,7 @@ from .cli_items import (
 )
 from .cli_parts import ambitus_menu, ask_part, cmd_groups, cmd_parts, short_menu
 from .config import LAYOUT_DEFAULTS, PAGE_HEADER_SP, PAPER
-from .console import Abort, BOLD, RST, _die, _warn, ask
+from .console import Abort, BOLD, RST, YLW, _die, _warn, ask
 from .library import (
     PAPER_NEXT, _id_parts, find_item, id_order, inbox_pdfs, item_dirs, item_id, item_line,
     item_mtime, item_status, library_root, load_item, work_mark,
@@ -269,7 +269,21 @@ def plan_args(argv: list[str]) -> argparse.Namespace:
     return pn.parse_args(argv)
 
 
+STOPPED_EXIT = 130          # Ctrl-C: the shell code of SIGINT (128 + 2)
+
+
 def main() -> int:
+    """main -> exit code of the command. Ctrl-C prints one line, not a traceback (0.8.45): a
+    build that stops leaves parts/ as it was (it builds into parts.new/)."""
+    try:
+        return _main()
+    except KeyboardInterrupt:
+        print(f"\n{BOLD}{YLW}stopped (Ctrl-C).{RST} A build that stops leaves parts/ as it was; "
+              "run the command again.", file=sys.stderr)
+        return STOPPED_EXIT
+
+
+def _main() -> int:
     if "--sandbox-check" in sys.argv[1:2]:
         return sandbox_check(library="--library" in sys.argv[2:3])
     if os.geteuid() == 0 and os.environ.get("PARTITOR_ALLOW_ROOT") != "1" \

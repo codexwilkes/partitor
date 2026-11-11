@@ -18,3 +18,4 @@ ANALYSIS_CACHE_FORMAT
 _band_now
 _find_prefixes
 yaml_load
+_main

@@ -931,7 +931,7 @@ def build_report(item: Path) -> None:
 def _rebuild_report(item: Path, before: dict | None, only: list[str] | None = None,
                     jobs: str | None = None) -> int:
     rc = run_build(item, only, jobs)
-    _reset_counts()
+    _reset_counts(keep_warnings=True)               # the build's warnings stay in the last verdict
     data = load_item(item)
     if rc:
         _fail("build:  failed (see above)")

@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.45 — 2026-11-11
+
+### Fixed
+- After a build with warnings, the last verdict of `rebuild` and `new` said `ALL OK`. It now keeps
+  the warnings of the build: `OK with N warning(s)`, with the list.
+- Ctrl-C printed a Python traceback. It now prints one line, `stopped (Ctrl-C)`, and exits with
+  code 130. `parts/` and the settings stay as they were.
+
 ## 0.8.44 — 2026-11-11
 
 ### Changed

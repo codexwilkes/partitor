@@ -1008,7 +1008,13 @@ Sections 5.1 to 5.8 keep their numbers.
 - Every change is a CLI action that writes `score.yaml`, and reports the result
   (pages, staff size, review items). Edits are saved; only a build makes PDFs
   (§6.2 stages).
-- Output uses a fixed set of glyphs, counters and a summary block.
+- Output uses a fixed set of glyphs, counters and a summary block. A command that runs a build
+  step (`rebuild`, `new`) prints the build's summary, then its own; since 0.8.45 the last one keeps
+  the build's warnings (`console._reset_counts(keep_warnings=True)`), so it ends with `OK with N
+  warning(s)`, not `ALL OK`, after a warning.
+- Ctrl-C (0.8.45): one line, `stopped (Ctrl-C)`, exit code 130, no traceback (`cli_main.main`). A
+  build writes into `parts.new/` and `lines.new/`, so `parts/` and `score.yaml` stay as they were;
+  the next build removes the partial folders.
 - One command at a time on one item (0.8.38). A command that reads or changes an item (`rebuild`,
   `repage`, `set`, `pages`, `plan`, `parts`, `groups`, `bars`, `meta`, `analyse`, `proof`,
   `rename`, `reid`, `expand`, `contract`; also each item of `analyse --all`) holds an exclusive

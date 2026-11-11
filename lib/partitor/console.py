@@ -69,12 +69,16 @@ def _die(msg: str, hint: str = "") -> None:
     sys.exit(1)
 
 
-def _reset_counts() -> None:
-    """Zero the counters (the library CLI runs several steps in one process)."""
+def _reset_counts(keep_warnings: bool = False) -> None:
+    """Zero the counters (the library CLI runs several steps in one process). keep_warnings: the
+    warnings of the step stay (count and text), so the summary of the command after a build step
+    says them again and does not end with ALL OK (0.8.45)."""
     for k in _counts:
-        _counts[k] = 0
+        if not (keep_warnings and k == "warn"):
+            _counts[k] = 0
     _FAILURES.clear()
-    _WARNINGS.clear()
+    if not keep_warnings:
+        _WARNINGS.clear()
 
 
 def _summary(start: float) -> int:
