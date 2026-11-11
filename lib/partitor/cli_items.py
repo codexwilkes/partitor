@@ -26,7 +26,7 @@ from .console import (
     ask, yes,
 )
 from .library import (
-    PARTS_NEW, PARTS_PREV, REPAGE_KEYS, _id_parts, apply_set, build_names, folder_name,
+    PART_FILE_KEYS, PARTS_NEW, PARTS_PREV, REPAGE_KEYS, _id_parts, apply_set, build_names, folder_name,
     id_order, inbox_pdfs, item_dirs, item_file, item_id, item_line, item_status,
     keep_other_parts, library_logo, library_root, load_item, mark_pending, merge_item_keys,
     next_id, parse_parts, part_layout, recover_parts, restore_previous_parts, save_item,
@@ -550,7 +550,7 @@ def reid_item(lib: Path, item: Path) -> Path:
     if str(data.get("source", "")).startswith(f"{old}-") or data.get("source") == "source.pdf":
         data["source"] = f"{new}-source.pdf"
     for p_ in (data.get("built") or {}).get("parts") or []:
-        for k in ("file", "large", "large_flaps"):
+        for k in PART_FILE_KEYS:
             if k in p_:
                 p_[k] = str(p_[k]).replace(old, new)
     save_item(dst, data)

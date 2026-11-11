@@ -346,6 +346,9 @@ def item_line(item: Path, data: dict) -> str:
 
 
 PARTS_NEW, PARTS_PREV = "parts.new", "parts.prev"
+# the keys of a `built` record that name a file in parts/ (0.8.37: the fold-out files were
+# missing here, so a partial rebuild or a repage of another part dropped them)
+PART_FILE_KEYS = ("file", "large", "large_flaps", "foldout", "flaps", "assemble")
 
 
 def recover_parts(item: Path) -> None:
@@ -490,7 +493,7 @@ def partial_blocker(item: Path, data: dict, names: list[str], tail: str) -> str 
         want = part_file_name(num, nm, tail)
         if r.get("file") != want:
             return f"the file name of {nm} would change ({r.get('file')} -> {want})"
-        for k in ("file", "large", "large_flaps"):
+        for k in PART_FILE_KEYS:
             if r.get(k) and not (pdir / r[k]).is_file():
                 return f"{r[k]} is not in parts/"
     return None
@@ -505,7 +508,7 @@ def keep_other_parts(item: Path, data: dict, stage: Path, names: list[str]) -> l
     for r in (data.get("built") or {}).get("parts") or []:
         if r["part"] in names or r["part"] not in cur:
             continue
-        for k in ("file", "large", "large_flaps"):
+        for k in PART_FILE_KEYS:
             if r.get(k):
                 shutil.copy2(item / "parts" / r[k], stage / r[k])
         keep.append(dict(r))

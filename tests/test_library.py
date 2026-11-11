@@ -222,6 +222,7 @@ class TestPartialBuild(unittest.TestCase):
         self.real = build.cmd_build
         self.gen = 0
         self.asked = []
+        self.folds: set = set()                                # parts that get fold-out files
         build.cmd_build = self.fake
         self.build()                                           # the first, full build
 
@@ -243,9 +244,17 @@ class TestPartialBuild(unittest.TestCase):
             fn = pt.part_file_name(num, nm, ns.tail)
             (d / fn).write_bytes(f"g{self.gen}".encode())            # the generation is the content
             (d / fn.replace(".pdf", "-11x17.pdf")).write_bytes(f"g{self.gen}".encode())
-            build.LAST_BUILD.append({"part": nm, "pages": 2, "content_pages": 2, "staff_mm": 6.0,
-                                  "staff_max_mm": 6.0, "width_mm": 6.0, "gap": 10.0,
-                                  "file": fn, "large": fn.replace(".pdf", "-11x17.pdf")})
+            rec = {"part": nm, "pages": 2, "content_pages": 2, "staff_mm": 6.0,
+                   "staff_max_mm": 6.0, "width_mm": 6.0, "gap": 10.0,
+                   "file": fn, "large": fn.replace(".pdf", "-11x17.pdf")}
+            if nm in self.folds:
+                stem = fn[:-4]
+                more = {"foldout": f"{stem}-foldout-sheets.pdf", "flaps": f"{stem}-foldout-flaps.pdf",
+                        "assemble": f"{stem}-assemble.txt", "large_flaps": f"{stem}-foldout-flaps-11x17.pdf"}
+                for f in more.values():
+                    (d / f).write_bytes(f"g{self.gen}".encode())
+                rec.update(foldouts=1, **more)
+            build.LAST_BUILD.append(rec)
         return 0
 
     def build(self, only=None):
@@ -262,6 +271,37 @@ class TestPartialBuild(unittest.TestCase):
         """{part file: generation that wrote it}, large copies left out."""
         return {f.split("--")[0]: (self.item / sub / f).read_text()
                 for f in self.files(sub) if "11x17" not in f}
+
+    def test_a_partial_build_keeps_the_fold_out_files_of_the_other_parts(self):
+        """0.8.37: keep_other_parts copied `file` and `large` only; the fold-out sheet, flap and
+        assembly files of the other parts were lost, while their records still named them."""
+        self.folds = {"C"}
+        self.build()                                           # full: C gets its fold-out files
+        c_files = [f for f in self.files() if f.startswith("03-c-")]
+        self.assertEqual(len(c_files), 6, c_files)
+        self.build(["A"])
+        self.assertEqual(self.asked[-1], ["A"])                # a partial build, not a full one
+        self.assertEqual([f for f in self.files() if f.startswith("03-c-")], c_files)
+        rec = {r["part"]: r for r in pt.load_item(self.item)["built"]["parts"]}["C"]
+        for k in pt.PART_FILE_KEYS:
+            self.assertTrue((self.item / "parts" / rec[k]).is_file(), k)
+
+    def test_a_missing_fold_out_file_makes_the_build_whole(self):
+        self.folds = {"C"}
+        self.build()
+        next(f for f in (self.item / "parts").iterdir() if f.name.endswith("-assemble.txt")).unlink()
+        self.build(["A"])
+        self.assertIsNone(self.asked[-1])                      # a set that cannot keep C: built whole
+
+    def test_part_file_keys_name_every_file_of_a_record(self):
+        """Every file a build or repage records (render_plan, large_copies) is a PART_FILE_KEY."""
+        import re
+        src = "".join(Path(SRC).parent.joinpath("partitor", m + ".py").read_text(encoding="utf-8")
+                      for m in ("build", "render", "cli_items"))
+        named = set(re.findall(r'"(\w+)": (?:LAST_RENDER\["\w+"\]|fn\.name|large_copy\()', src))
+        named |= {"large", "large_flaps"}
+        self.assertTrue({"file", "foldout", "flaps", "assemble"} <= named, named)
+        self.assertTrue(named - {"foldouts"} <= set(pt.PART_FILE_KEYS), named - set(pt.PART_FILE_KEYS))
 
     def test_only_the_asked_parts_are_new_and_the_others_stay(self):
         self.build()                                           # full again: generation 2 everywhere

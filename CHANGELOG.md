@@ -7,6 +7,15 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.37 — 2026-11-10
+
+### Fixed
+- A rebuild or `repage` of some parts lost the fold-out files of the other parts: their
+  `-foldout-sheets.pdf`, `-foldout-flaps.pdf`, `-foldout-flaps-11x17.pdf` and `-assemble.txt` were
+  not copied into the new set, while `score.yaml` still named them (they stayed in `parts.prev/`
+  until the next build). Every file of a part record is now kept, and a set that misses one of
+  them is built whole. `reid` renames these files in the record too.
+
 ## 0.8.36 — 2026-11-10
 
 ### Fixed

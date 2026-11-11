@@ -47,7 +47,10 @@ A build writes `parts.new/`, then swaps it for `parts/` with two renames (the
 old set goes to `parts.prev/`). So `parts/` is always a complete set, but the
 folder is a new directory after each build. A sync script must not keep the
 directory open, and must read the folder again after a build. A partial rebuild
-(`rebuild ID Trombones`) keeps the other part files in the new set.
+(`rebuild ID Trombones`) and a `repage` of some parts keep every file of the other parts in the
+new set: the part, its large copy and, for a part with fold-outs, the sheet, flap and assembly files
+and the large flap file (0.8.37; before, the fold-out files of the other parts were lost). If one
+of those files is missing from `parts/`, the rebuild builds every part.
 
 ## Internal (do not depend on it)
 
