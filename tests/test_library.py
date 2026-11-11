@@ -9,6 +9,7 @@ is skipped. Run with the venv interpreter:
 
 Shared helpers: tests/support.py.
 """
+import argparse
 import builtins
 import contextlib
 import io
@@ -1142,6 +1143,87 @@ class TestLibrary(unittest.TestCase):
 
 
 @needs_deps
+class TestItemLock(unittest.TestCase):
+    """item_lock and locks_item (0.8.38): one command at a time on one item."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / "inbox").mkdir()
+        self.item = self.root / "library" / "2026-10-0007-x"
+        self.item.mkdir(parents=True)
+        pt.save_item(self.item, {"id": "2026-10-0007", "slug": "x", "parts": ["A"], "layout": {}})
+        self.env = mock.patch.dict(os.environ, {"PARTITOR_LIBRARY": str(self.root)})
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+        self.tmp.cleanup()
+
+    def holder(self):
+        """A second process that holds the lock of the item until it is stopped."""
+        code = ("import fcntl, os, sys, time; fd = os.open(sys.argv[1], os.O_RDONLY); "
+                "fcntl.flock(fd, fcntl.LOCK_EX); print('held', flush=True); time.sleep(60)")
+        p = subprocess.Popen([sys.executable, "-c", code, str(self.item)], stdout=subprocess.PIPE, text=True)
+        self.addCleanup(self.stop, p)
+        self.assertEqual(p.stdout.readline().strip(), "held")
+        return p
+
+    @staticmethod
+    def stop(p):
+        p.kill()
+        p.wait()
+        p.stdout.close()
+
+    def test_a_second_process_cannot_take_the_lock(self):
+        self.holder()
+        with self.assertRaises(pt.ItemBusy) as cm:
+            with pt.item_lock(self.item):
+                self.fail("got the lock")
+        self.assertEqual(str(cm.exception), "2026-10-0007")
+
+    def test_the_same_process_may_lock_again_and_the_lock_ends_with_the_outer_one(self):
+        lib = sys.modules["partitor.library"]
+        with pt.item_lock(self.item):
+            with pt.item_lock(self.item):
+                self.assertEqual(len(lib._LOCKS), 1)
+            self.assertEqual(len(lib._LOCKS), 1)
+        self.assertEqual(lib._LOCKS, {})
+        code = ("import fcntl, os, sys; fd = os.open(sys.argv[1], os.O_RDONLY); "
+                "fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB); print('free')")
+        r = subprocess.run([sys.executable, "-c", code, str(self.item)], capture_output=True, text=True)
+        self.assertEqual(r.stdout.strip(), "free", r.stderr)
+
+    def test_set_on_an_item_in_use_stops_and_changes_nothing(self):
+        """A `set` during a rebuild was saved, then marked built by the rebuild (0.8.38)."""
+        self.holder()
+        before = Path(self.item, "2026-10-0007-score.yaml").read_text(encoding="utf-8")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            with self.assertRaises(SystemExit):
+                pt.cmd_set(argparse.Namespace(id="2026-10-0007", pairs=["gap=12"], build=False))
+        self.assertIn("item 2026-10-0007 is in use", out.getvalue())
+        self.assertEqual(Path(self.item, "2026-10-0007-score.yaml").read_text(encoding="utf-8"), before)
+
+    def test_without_locks_on_the_file_system_the_command_goes_on(self):
+        lib = sys.modules["partitor.library"]
+
+        def no_locks(fd, op):
+            raise OSError(95, "Operation not supported")
+        with mock.patch.object(lib.fcntl, "flock", no_locks):
+            with contextlib.redirect_stdout(io.StringIO()):
+                rc = pt.cmd_set(argparse.Namespace(id="2026-10-0007", pairs=["gap=12"], build=False))
+        self.assertEqual(rc, 0)
+        self.assertEqual(pt.load_item(self.item)["layout"]["gap"], 12.0)
+
+    def test_every_command_that_changes_an_item_holds_its_lock(self):
+        for name in ("cmd_set", "cmd_rebuild", "cmd_repage", "cmd_pages", "cmd_plan", "cmd_parts",
+                     "cmd_groups", "cmd_bars", "cmd_meta", "cmd_analyse", "cmd_proof", "cmd_rename",
+                     "cmd_reid", "cmd_expand", "cmd_contract"):
+            self.assertTrue(hasattr(getattr(pt, name), "__wrapped__"), name)
+        self.assertFalse(hasattr(pt.cmd_show, "__wrapped__"))
+
+
 class TestYamlLoad(unittest.TestCase):
     """config.yaml_load (0.8.35): the C loader of libyaml, the same data as yaml.safe_load."""
 

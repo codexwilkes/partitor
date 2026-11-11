@@ -11,7 +11,7 @@ from .bars import (
     _boundaries, _flat_bars, _movements, bar_mismatches, effective_systems, format_bar_edit,
     mismatch_text, parse_bar_edit, renumber, toggle_mark,
 )
-from .cli_common import _item_or_die, bar_summary, saved
+from .cli_common import _item_or_die, bar_summary, locks_item, saved
 from .console import Abort, RST, YLW, _head, _note, _ok, _warn, ask, yes
 from .library import item_file, load_item, mark_pending, save_item
 from .proof import _proof_pages, annotate_proof
@@ -161,6 +161,7 @@ def bars_listing(sy: dict, ef: dict, rules: dict, ln: int) -> list[str]:
     return out
 
 
+@locks_item
 def cmd_bars(a: argparse.Namespace) -> int:
     """bars <id>: set pickups, split bars, barlines, line-start numbers and
     rehearsal letters by hand; saved, not built. v draws proof.pdf with the

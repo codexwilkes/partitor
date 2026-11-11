@@ -3,6 +3,8 @@
 """Item folder, ids, load and save, set keys, parts folder swap."""
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import os
 import re
 import shutil
@@ -346,6 +348,54 @@ def item_line(item: Path, data: dict) -> str:
 
 
 PARTS_NEW, PARTS_PREV = "parts.new", "parts.prev"
+class ItemBusy(Exception):
+    """Another process holds the lock of the item (item_lock)."""
+
+
+# item folders whose lock this process holds: (st_dev, st_ino) -> [fd, depth]
+_LOCKS: dict = {}
+
+
+@contextlib.contextmanager
+def item_lock(item: Path):
+    """item_lock: hold the lock of an item while a command reads or changes it (0.8.38).
+    An exclusive flock on the item folder itself (no lock file: the folder holds only the
+    item's files). Raises ItemBusy when another process holds it; a second item_lock of the
+    same item in this process only counts (a command that calls another). The forked
+    workers of a build share the lock of their parent. A file system without locks (some
+    SMB mounts) gives no lock and no error: the command goes on as before."""
+    try:
+        st = os.stat(item)
+    except OSError:
+        yield
+        return
+    key = (st.st_dev, st.st_ino)
+    held = _LOCKS.get(key)
+    if held is not None:
+        held[1] += 1
+        try:
+            yield
+        finally:
+            held[1] -= 1
+        return
+    fd = os.open(item, os.O_RDONLY)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        raise ItemBusy(item_id(item)) from None
+    except OSError:                    # no locks on this file system
+        os.close(fd)
+        yield
+        return
+    _LOCKS[key] = [fd, 1]
+    try:
+        yield
+    finally:
+        del _LOCKS[key]
+        os.close(fd)                   # closing the last descriptor drops the lock
+
+
 # the keys of a `built` record that name a file in parts/ (0.8.37: the fold-out files were
 # missing here, so a partial rebuild or a repage of another part dropped them)
 PART_FILE_KEYS = ("file", "large", "large_flaps", "foldout", "flaps", "assemble")

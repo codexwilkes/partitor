@@ -959,6 +959,16 @@ Sections 5.1 to 5.8 keep their numbers.
   (pages, staff size, review items). Edits are saved; only a build makes PDFs
   (§6.2 stages).
 - Output uses a fixed set of glyphs, counters and a summary block.
+- One command at a time on one item (0.8.38). A command that reads or changes an item (`rebuild`,
+  `repage`, `set`, `pages`, `plan`, `parts`, `groups`, `bars`, `meta`, `analyse`, `proof`,
+  `rename`, `reid`, `expand`, `contract`; also each item of `analyse --all`) holds an exclusive
+  `flock` on the item folder while it runs (`library.item_lock`, `cli_common.locks_item`). A
+  second such command on the same item stops at once with `item ID is in use: another partitor
+  command is working on it` and changes nothing; `show` and `list` take no lock. Before, a `set`
+  during a rebuild was saved, and the rebuild then marked it built (`pending` cleared) although
+  the parts used the old value. The lock is on the folder itself (no lock file). A command that
+  calls another (`pages --move` runs `repage`) keeps the one lock. A file system without locks
+  (some SMB mounts) gives no lock and no error.
 
 ### 6.2 Commands
 

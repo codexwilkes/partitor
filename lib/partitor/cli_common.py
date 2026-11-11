@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import time
 from pathlib import Path
 
 from .console import _die, _note, _ok, _summary, _warn
 from .library import (
-    apply_set, find_item, folder_name, item_id, item_status, library_root, load_item,
-    mark_pending, save_item, step_size,
+    ItemBusy, apply_set, find_item, folder_name, item_id, item_lock, item_status, library_root,
+    load_item, mark_pending, save_item, step_size,
 )
 from .proof import annotate_proof
 
@@ -58,6 +59,27 @@ def _item_or_die(ref: str) -> Path:
     raise AssertionError
 
 
+def locks_item(fn):
+    """locks_item: the command holds the lock of its item (`a.id`) while it runs (0.8.38), so a
+    second command on the same item stops at once, before it reads or writes anything (a `set`
+    during a rebuild was saved, then shown as built). No id (`analyse --all`): no lock here."""
+    @functools.wraps(fn)
+    def run(a: argparse.Namespace) -> int:
+        ref = getattr(a, "id", None)
+        if not ref:
+            return fn(a)
+        item = _item_or_die(ref)
+        try:
+            with item_lock(item):
+                return fn(a)
+        except ItemBusy as e:
+            _die(f"item {e} is in use: another partitor command is working on it",
+                 "Wait until it ends, then run this command again")
+            raise AssertionError from e
+    return run
+
+
+@locks_item
 def cmd_set(a: argparse.Namespace) -> int:
     start = time.monotonic()
     item = _item_or_die(a.id)

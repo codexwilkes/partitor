@@ -15,7 +15,7 @@ import yaml
 from . import VERSION
 from .clef import ambitus_report, part_clefs
 from .cli_bars import confirm_bar_rules
-from .cli_common import _cmd_step, _item_or_die, _lib_or_die, bar_summary, saved
+from .cli_common import _cmd_step, _item_or_die, _lib_or_die, bar_summary, locks_item, saved
 from . import cli_parts
 from .cli_parts import choose_maps, confirm_ambitus, rename_parts, set_join
 from .config import (
@@ -26,8 +26,8 @@ from .console import (
     ask, yes,
 )
 from .library import (
-    PART_FILE_KEYS, PARTS_NEW, PARTS_PREV, REPAGE_KEYS, _id_parts, apply_set, build_names, folder_name,
-    id_order, inbox_pdfs, item_dirs, item_file, item_id, item_line, item_status,
+    PART_FILE_KEYS, PARTS_NEW, PARTS_PREV, REPAGE_KEYS, ItemBusy, _id_parts, apply_set, build_names,
+    folder_name, id_order, inbox_pdfs, item_dirs, item_file, item_id, item_line, item_lock, item_status,
     keep_other_parts, library_logo, library_root, load_item, mark_pending, merge_item_keys,
     next_id, parse_parts, part_layout, recover_parts, restore_previous_parts, save_item,
     selection_help, set_name, set_value, suggest_meta, swap_parts,
@@ -35,6 +35,7 @@ from .library import (
 from .proof import annotate_proof, proof_from_preview
 
 
+@locks_item
 def cmd_proof(a: argparse.Namespace) -> int:
     """proof <id>: draw proof.pdf again from the saved score.yaml (part
     names, ambitus, bar numbers, barline ticks, rehearsal letters)."""
@@ -313,6 +314,7 @@ def rename_item(lib: Path, item: Path) -> Path:
     return dst
 
 
+@locks_item
 def cmd_rename(a: argparse.Namespace) -> int:
     """rename <id>: the folder name follows the composer and title."""
     start = time.monotonic()
@@ -348,6 +350,7 @@ def offer_rename(item: Path) -> Path:
     return dst
 
 
+@locks_item
 def cmd_meta(a: argparse.Namespace) -> int:
     """meta <id>: title, subtitle, composer, short composer; saved, not
     built. A changed title or composer offers the matching folder name."""
@@ -387,6 +390,7 @@ def analyse_item(item: Path, interactive: bool = True) -> int:
     return 0
 
 
+@locks_item
 def cmd_analyse(a: argparse.Namespace) -> int:
     """analyse <id> | --all: analyse the source again (new proof, part
     allocation, clefs, ambitus); names, groups, skip list, ambitus set by
@@ -401,7 +405,10 @@ def cmd_analyse(a: argparse.Namespace) -> int:
         bad = 0
         for item in items:
             try:
-                bad += analyse_item(item, interactive=False)
+                with item_lock(item):       # 0.8.38: not while another command works on it
+                    bad += analyse_item(item, interactive=False)
+            except ItemBusy:
+                _warn(f"analyse:  {item.name}: in use by another partitor command; not analysed")
             except Exception as e:          # one bad item does not stop the rest
                 _fail(f"analyse:  {item.name}: {e}")
                 bad += 1
@@ -557,6 +564,7 @@ def reid_item(lib: Path, item: Path) -> Path:
     return dst
 
 
+@locks_item
 def cmd_reid(a: argparse.Namespace) -> int:
     """reid <id>: an old YYYY-NNN item gets a YYYY-MM-NNNN id."""
     start = time.monotonic()
@@ -571,10 +579,12 @@ def cmd_reid(a: argparse.Namespace) -> int:
     return _summary(start)
 
 
+@locks_item
 def cmd_expand(a: argparse.Namespace) -> int:
     return _cmd_step(a, True)
 
 
+@locks_item
 def cmd_contract(a: argparse.Namespace) -> int:
     return _cmd_step(a, False)
 
@@ -770,6 +780,7 @@ def pages_table(nm: str, rows: list[dict]) -> int:
     return bad
 
 
+@locks_item
 def cmd_pages(a: argparse.Namespace) -> int:
     """pages <id> <part> [--move PAGE=N ...] [--clear]: the pages of a built part, one line each: bars,
     systems, room left at the foot (in systems) and the turn after it. --move 26=1 moves the last
@@ -889,6 +900,7 @@ def cmd_pages(a: argparse.Namespace) -> int:
     return _summary(start)
 
 
+@locks_item
 def cmd_plan(a: argparse.Namespace) -> int:
     """plan <id> [part ...] [N] [--group Name=Alto,Tenor ...]: the options of a part (paper,
     staff size) with their page turns, estimated from the saved lines (read-only). `plan <id>
@@ -972,6 +984,7 @@ def cmd_plan(a: argparse.Namespace) -> int:
     return saved(item, a, start)
 
 
+@locks_item
 def cmd_repage(a: argparse.Namespace) -> int:
     """repage <id> [part ...]: new page breaks for built parts from the lines
     saved by the last build (no analysis, no build). Sets turns=rest for the
@@ -1082,6 +1095,7 @@ def cmd_repage(a: argparse.Namespace) -> int:
     return _summary(start)
 
 
+@locks_item
 def cmd_rebuild(a: argparse.Namespace) -> int:
     """rebuild <id>: detect again when score.yaml has no systems (failed
     new), ask open choices, then build."""

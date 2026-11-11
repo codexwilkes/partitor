@@ -7,6 +7,16 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.38 — 2026-11-11
+
+### Fixed
+- Two commands on one item at the same time: a `set` while a rebuild ran was saved, and the rebuild
+  then marked it built, although the parts used the old value (`show` said `built`). Two rebuilds
+  of one item could also remove each other's new set. A command that reads or changes an item now
+  holds a lock on it while it runs; a second one stops at once with "item ID is in use: another
+  partitor command is working on it" and changes nothing. `show` and `list` are not blocked. On a
+  file system without locks (some SMB mounts) the commands work as before.
+
 ## 0.8.37 — 2026-11-10
 
 ### Fixed

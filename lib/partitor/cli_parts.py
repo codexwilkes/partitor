@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 from .clef import ambitus_report, part_clefs
-from .cli_common import _item_or_die, cmd_set, saved
+from .cli_common import _item_or_die, cmd_set, locks_item, saved
 from .config import PART_LAYOUT_KEY, SKIP_KEY
 from .console import Abort, DIM, RST, YLW, _die, _fail, _head, _ok, _reset_counts, _warn, ask
 from .library import item_file, load_item, mark_pending, merge_item_keys, part_names, save_item
@@ -337,6 +337,7 @@ def rename_parts(item: Path) -> list[str] | None:
     return None
 
 
+@locks_item
 def cmd_parts(a: argparse.Namespace) -> int:
     """parts <id>: rename parts one at a time; saved, not built."""
     start = time.monotonic()
@@ -389,6 +390,7 @@ def apply_group_op(data: dict, line: str) -> str:
     return ""
 
 
+@locks_item
 def cmd_groups(a: argparse.Namespace) -> int:
     """groups <id>: group scores (DESIGN.md §4.3 item 11): a group prints
     the staves of its parts together, joined by a bracket (for example the

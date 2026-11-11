@@ -87,6 +87,7 @@ the real numbers.
 | `run as root` | Use `sudo partitor`. |
 | `library folder not reachable` | Local: run `partitor-install`; check `inbox/` and `library/` exist. SMB: `STORAGE-SMB.md`, check the NAS and `systemctl status <unit>.automount`. |
 | `venv not found`, `engine not found` | Run `sudo /opt/partitor/bin/partitor-install`. |
+| `item ID is in use: another partitor command is working on it` | Another command (a rebuild, a menu session) works on that item. Wait until it ends, then run the command again. Nothing was changed. |
 | `path outside /var/lib/partitor/work` | Copy the PDF into the work folder first. |
 | A run stops after an hour | Raise `PARTITOR_RUNTIME_MAX`. |
 | Killed during a detect or a build (out of memory) | Lower `PARTITOR_JOBS` or raise `PARTITOR_MEMORY_MAX`. |
