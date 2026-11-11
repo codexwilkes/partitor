@@ -382,6 +382,20 @@ class TestBatchExtras(unittest.TestCase):
                     self.assertGreaterEqual(len(pages[-1]), pt.MIN_LAST_LINES)
                     self.assertEqual(sum(len(p) for p in pages), n)
 
+    def test_a_two_page_part_has_a_turn_only_when_printed_double_sided(self):
+        """0.8.42 (§5.1): 1-2 pages print single-sided and lie side by side; `duplex: on` keeps the turn."""
+        opts = {**pt.LAYOUT_DEFAULTS, "scale": 2.0, "gap": 6.0, "logo": "off"}
+        for dup, want in (("auto", 0), ("off", 0), ("on", 1)):
+            with self.subTest(duplex=dup):
+                o = {**opts, "duplex": dup}
+                pages, bad = pt.plan_pages(self.strips(24), 400, o, False)
+                self.assertEqual(len(pages), 2)
+                self.assertEqual(bad, want)
+                self.assertEqual(len(pt.turn_list(self.strips(24), pages, False, o)), want)
+                with tempfile.TemporaryDirectory() as d:
+                    pt.render_part("X", self.strips(24), {"title": "T"}, 400, o, Path(d, "p.pdf"))
+                self.assertEqual(len(pt.LAST_RENDER["turns"]), want)
+
     def _logo_boxes(self, page):
         """Bounding boxes of the logo images on a page (found by aspect ratio)."""
         path = pt.logo_path()
@@ -1877,9 +1891,12 @@ class TestPagesReport(unittest.TestCase):
         self.assertEqual(w({"resting": False, "ok": True, "movement": True}), "movement")
 
     def test_a_part_with_no_rest_has_a_turn_while_playing_in_the_report(self):
-        rows = pt.page_report(self.music(30), 400, self.OPTS)          # no rests anywhere
+        rows = pt.page_report(self.music(50), 400, self.OPTS)          # no rests anywhere, 3 pages
         words = [cli_items._turn_word(r["turn"]) for r in rows if r["turn"] is not None]
         self.assertIn("PLAYING", words)
+        two = pt.page_report(self.music(30), 400, self.OPTS)           # 2 pages lie side by side (0.8.42)
+        self.assertEqual(len(two), 2)
+        self.assertEqual([r["turn"] for r in two], [None, None])
 
     def test_the_pages_command_shows_the_table_and_moves_a_system(self):
         with tempfile.TemporaryDirectory() as tmp:

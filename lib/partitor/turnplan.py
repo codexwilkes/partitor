@@ -139,7 +139,7 @@ def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
                title_page: bool = True, allow_fold: bool = True,
                forced: tuple = (), costs: Costs | None = None,
                fold_sides: tuple = ("right",), last_cost: Callable[[int], float] | None = None,
-               single: bool = False) -> Plan:
+               single: bool = False, flat: bool = False) -> Plan:
     """plan_turns -> Plan for n lines.
     used(i, j): height of lines i..j-1 on one page; avail: height of a page
     (avail_first: of the first content page); bounds[j]: Boundary before line
@@ -151,7 +151,9 @@ def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
     are chosen for the whole part at once (dynamic programming).
     last_cost(i): an extra cost of the last page when it holds lines i..n-1 (the
     caller's logo room, 0.8.40). single: printed on one side, so a turn follows
-    every page and there are no spreads or fold-outs (0.8.40)."""
+    every page and there are no spreads or fold-outs (0.8.40). flat: a part of 1 or 2 pages
+    (no title page) lies side by side on the stand with no turn (0.8.42): the best such plan
+    is one group without a turn, and it wins over the other plans at equal or lower cost."""
     costs = costs or Costs()
     avail_first = avail if avail_first is None else avail_first
     forced = tuple(sorted(f for f in set(forced) if 0 < f < n))
@@ -279,11 +281,26 @@ def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
             return INF, ()
         return top, (Group(((i, pick),), False, turn(pick)),) + best_single(pick)[1]
 
+    def best_flat():
+        """The cheapest plan of 1 or 2 pages read without a turn (None if 2 pages do not hold it)."""
+        top, pick = INF, None
+        for a in page_ends(0):
+            if a == n:
+                c, pg = page_cost(0, n), ((0, n),)
+            elif n in page_ends(a):
+                c, pg = page_cost(0, a) + page_cost(a, n), ((0, a), (a, n))
+            else:
+                continue
+            if c < top:
+                top, pick = c, pg
+        return None if pick is None else Plan((Group(pick, False, turn(n)),), top)
+
     if n <= 0:
         return Plan((), 0.0)
+    two = best_flat() if flat and not title_page else None
     if single:
         cost, groups = best_single(0)
-        return Plan(groups, cost)
+        return two if two is not None and two.cost <= cost else Plan(groups, cost)
     if title_page:
         cost, groups = best(0, True)
         return Plan(groups, cost)
@@ -297,6 +314,8 @@ def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
             c = page_cost(0, a) + t.cost + best(a, foldable(t), False)[0]
         if c < top:
             top, pick = c, a
+    if two is not None and two.cost <= top:
+        return two
     if pick == n:
         return Plan((Group(((0, n),), False, turn(n)),), top)
     t = turn(pick)

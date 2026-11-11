@@ -258,5 +258,40 @@ class TestPlannerAdditions(unittest.TestCase):
         self.assertLess(len(made), 3 * 60)          # one per state at most (old: one per candidate)
 
 
+class TestFlat(unittest.TestCase):
+    """0.8.42: a part of 1 or 2 pages printed single-sided lies side by side: no turn (flat)."""
+
+    def test_two_pages_without_a_rest_have_no_turn(self):
+        p = run(8, title_page=False, flat=True)
+        self.assertEqual([g.pages for g in p.groups], [((0, 4), (4, 8))])
+        self.assertEqual(p.counts(), {})
+        self.assertEqual(p.folds, 0)
+        self.assertEqual(p.cost, 2 * tp.Costs().page)
+        old = run(8, title_page=False)                          # duplex on: a turn after page 1
+        self.assertEqual(old.counts(), {"bad": 1})
+
+    def test_the_break_is_free_of_the_rests(self):
+        # a rest after line 2 drew the break there (page fill paid for it); flat fills page 1
+        self.assertEqual(run(7, {2: B(rest_bars=3)}, title_page=False).groups[0].pages, ((0, 2),))
+        self.assertEqual(run(7, {2: B(rest_bars=3)}, title_page=False, flat=True).groups[0].pages,
+                         ((0, 4), (4, 7)))
+
+    def test_flat_wins_over_three_pages_and_a_fold_out(self):
+        p = run(8, title_page=False, flat=True, allow_fold=True)
+        self.assertEqual((p.pages, p.folds, p.counts()), (2, 0, {}))
+        self.assertEqual(run(8, title_page=False, flat=True, single=True).groups[0].pages,
+                         ((0, 4), (4, 8)))
+
+    def test_one_page_and_long_parts_do_not_change(self):
+        self.assertEqual(run(3, title_page=False, flat=True), run(3, title_page=False))
+        for n in (9, 13, 20):
+            with self.subTest(n=n):
+                self.assertEqual(run(n, title_page=False, flat=True), run(n, title_page=False))
+                self.assertEqual(run(n, flat=True), run(n))          # a title page: never flat
+
+    def test_two_forced_breaks_rule_flat_out(self):
+        self.assertGreaterEqual(run(8, title_page=False, flat=True, forced=(2, 5)).pages, 3)
+
+
 if __name__ == "__main__":
     unittest.main()

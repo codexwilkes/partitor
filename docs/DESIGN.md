@@ -641,7 +641,11 @@ whichever is smaller.
 | `2` (default) | p1 title page only; p2 + p3 = content 1 + 2 (spread); p4 + p5 = content 3 + 4 | Free turn before the music starts; turn after content 2 |
 | `1` | p1 = content 1 with title band; p2 + p3 = content 2 + 3 | Turn after content 1 |
 
-1-2 content pages: single-sided, title band on content page 1, no title page.
+1-2 content pages: single-sided, title band on content page 1, no title page,
+no page turn: the two pages lie side by side (since 0.8.42 the planner, the turn
+list and `plan` agree with §5.1; before, they counted a turn after page 1 and
+could add a page to put it at a rest). With `duplex: on` the two pages are one
+sheet, front and back, and the turn after page 1 stays.
 Layout `2` is `title_page: auto` (default; `off` keeps the title band). A part
 gets the title page when its music fills 3+ pages with the title band and
 still 3+ pages without it (content pages then carry only the running head) and
@@ -843,7 +847,10 @@ the cost. The pure planner is in `turnplan`; `render` feeds it (`plan_faces`, `l
   (printed on one side: one page per group, a turn after each page, no fold-outs), `last_cost(i)`
   (an extra cost of the last page when it starts at line i: the room for the logo) and a turn
   class `section` (`Boundary.section`: a rehearsal letter; `Costs.section`, used only when it is
-  below `Costs.bad`). The build uses them since 0.8.41 (every part, §5.4). The search keeps the cheapest candidate as it
+  below `Costs.bad`). The build uses them since 0.8.41 (every part, §5.4). 0.8.42: `flat` (every
+  `duplex` but `on`, `render.flat_ok`): the best plan of 1 or 2 pages as one group with no turn wins
+  when it costs the same or less than the other plans (a third page always costs more), also over a
+  fold-out. `partitor plan` uses it too. The search keeps the cheapest candidate as it
   goes and makes the groups of the winner only (one per state; before, one per candidate): the same
   plans (3 000 random cases against 0.8.39, 0 differences), about 2.6 times faster. Checked against
   a brute force: 1 600 cases for spreads and fold-outs (2026-11-10), 800 for the single-sided mode.

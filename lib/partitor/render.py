@@ -117,6 +117,12 @@ def _pack(strips: list[Strip], dpi: int, opts: dict, cap: int | None
     return pages
 
 
+def flat_ok(opts: dict) -> bool:
+    """flat_ok -> True when a part of 1 or 2 pages is printed single-sided and read side by side,
+    with no page turn (DESIGN.md §5.1; every `duplex` but `on`, 0.8.42)."""
+    return opts.get("duplex", "auto") != "on"
+
+
 def turns(npages: int) -> int:
     """Page turns of a part printed as facing pages (1-2: 0, 3-4: 1)."""
     return max(0, (npages - 1) // 2)
@@ -501,7 +507,7 @@ def plan_faces(strips: list[Strip], dpi: int, opts: dict, title_page: bool):
     plan = plan_turns(n, height, availn, bounds, avail_first=avail1, title_page=title_page and not single,
                       allow_fold=folds and opts["paper"] in LARGE, forced=tuple(opts.get("_breaks") or []),
                       fold_sides=fold_sides(opts), costs=plan_costs(opts), last_cost=last_cost,
-                      single=single)
+                      single=single, flat=flat_ok(opts))
     flat = [pg for g in plan.groups for pg in g.pages]
     pages = []
     for c, (i, j) in enumerate(flat):
@@ -762,7 +768,10 @@ def turn_list(strips: list[Strip], pages: list, title_page: bool, opts: dict,
     bar (last bar before the turn, None if unknown), next_bar, rest (bars of
     the multi-bar rest beside the turn; 0 if none), ok (the player rests or
     a movement or rehearsal letter starts: good_turn), resting (rest_turn),
-    manual (a page break set by `breaks`)."""
+    manual (a page break set by `breaks`). A part of 1 or 2 pages has no turn unless
+    `duplex: on` (flat_ok, 0.8.42)."""
+    if len(pages) <= 2 and flat_ok(opts):
+        return []
     duplex = opts.get("duplex", "auto") != "off"
     first_phys = 2 if title_page else 1
     out, j = [], 0

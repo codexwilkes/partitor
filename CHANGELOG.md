@@ -7,6 +7,15 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.42 — 2026-11-11
+
+### Fixed
+- A part of 1 or 2 pages has no page turn: the pages print single-sided and lie side by side. The
+  planner, the turn report (`pages`, the build) and `plan` counted a turn after page 1. So such
+  parts got false "turn while playing" warnings, a page break placed to suit that turn, sometimes
+  a third page, and `plan` could propose a fold-out. With `duplex: on` (one sheet, front and back)
+  the turn stays.
+
 ## 0.8.41 — 2026-11-11
 
 ### Changed
