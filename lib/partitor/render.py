@@ -226,7 +226,7 @@ def choose_reflow(strips: list[Strip], dpi: int, opts: dict, pre: list | None = 
     def lines(sc: float) -> list[Strip]:
         if sc not in cache:
             k = 72.0 / dpi * sc
-            cache[sc] = reflow(strips, 0.98 * usable / k, pre)
+            cache[sc] = reflow(strips, 0.98 * usable / k, pre, opts.get("breaks"))   # a line ends at a break
         return cache[sc]
 
     def npages(sc: float, g: float) -> int:

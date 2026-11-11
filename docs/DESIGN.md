@@ -687,7 +687,11 @@ a movement start with no rest (150, listed as "check attacca"), anything else
 part has no better place; the build and `repage` then warn `turn-while-playing`
 with the PDF page and the last bar. The weight against under-filled pages is
 40 (squared unfilled share). A manual break (`Part:breaks=45,60`, "break
-after bar N") ends a page at that bar; the line must end at the bar. The
+after bar N") ends a page at that bar; the line must end at the bar. With
+`reflow: on` re-flow ends a line after each break bar (0.8.47, `reflow.forced_starts`: the bars
+between two breaks are balanced on their own), so the break always finds a line end; before, the
+bar could fall inside a line and the build warned `bar is inside a line`. `plan` cuts its estimate
+lines the same way. Without re-flow the lines are those of the source, and the warning stays. The
 planner shifts the earlier pages so that the break falls on a verso when it
 can. The report lists each turn: PDF page, last bar, rest length. Only keys
 that do not change the lines apply (`turns`, `breaks`, `duplex`, `title_page`);

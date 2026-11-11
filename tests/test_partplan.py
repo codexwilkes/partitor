@@ -534,13 +534,22 @@ class TestManualBreaksInPlan(unittest.TestCase):
 
     def test_a_break_that_ends_no_line_is_reported_lost(self):
         src = pt.read_source(self.numbered(24), self.O, 400)
-        got = pt.estimate(src, {**self.O, "breaks": [5, 999]}, "letter", 8.0)    # bar 5 is inside a line
-        self.assertEqual(got.lost, (5, 999))
+        got = pt.estimate(src, {**self.O, "breaks": [5, 999]}, "letter", 8.0)
+        self.assertEqual(got.lost, (999,))      # 0.8.47: bar 5 is inside a line that is cut: a piece ends there
         self.assertEqual(pt.estimate(src, self.O, "letter", 8.0).lost, ())
+        whole = pt.estimate(src, {**self.O, "breaks": [5]}, "letter", 3.0, cut=False)
+        self.assertEqual(whole.lost, (5,))       # a line that is not cut keeps the bar inside
+
+    def test_a_break_ends_a_cut_piece(self):
+        """0.8.47: the estimate cuts a line at a break bar, as re-flow does."""
+        src = pt.read_source(self.numbered(3), self.O, 400)
+        pieces, _ = pt._pieces(src, 1e9, breaks=[12])
+        self.assertEqual([p[4] for p in pieces if p[0] == 1], [12, 16])
+        self.assertEqual([p[4] for p in pt._pieces(src, 1e9)[0] if p[0] == 1], [16])
 
     def test_the_table_says_when_a_break_is_lost(self):
         src = pt.read_source(self.numbered(24), self.O, 400)
-        o = pt.estimate(src, {**self.O, "breaks": [5]}, "letter", 8.0)
+        o = pt.estimate(src, {**self.O, "breaks": [999]}, "letter", 8.0)
         rows = cli_items.plan_rows([dataclasses.replace(o, n=1)], {"staff_mm": 8.0}, {"paper": "letter"})
         self.assertTrue(any("1 break(s) end no line" in r for r in rows), rows)
 

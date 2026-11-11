@@ -109,7 +109,8 @@ LAYOUT_HELP = """\
 #     note: it may be attacca). any = also at a movement start or a letter.
 #   breaks: per part, bar numbers after which a page ends (none; `set ID
 #     "Trombones:breaks=45,60"`, `+45` add, `-45` drop, `none`). A line must
-#     end at the bar; lines are never cut.
+#     end at the bar: re-flow ends a line there; without re-flow lines are
+#     not cut.
 #   group_gap: space between the staves of a group score line, or of a part on
 #     two staves, bottom line to top line, staff spaces (source: the distance
 #     of the source score; 1-40; `set ID "Trombones:group_gap=5"`)

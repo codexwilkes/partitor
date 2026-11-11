@@ -14,7 +14,7 @@ import math
 from dataclasses import dataclass, field
 
 from .config import PAPER
-from .reflow import _break_lines, find_prefixes
+from .reflow import _break_lines, find_prefixes, forced_starts
 from .render import (LARGE, RUN_HEAD, TITLE_BAND, flat_ok, fold_sides, line_spans, page_box, section_start, turns,
                      usable_width)
 from .strips import BAR_END_SP, pitch_at, pitch_terms
@@ -117,12 +117,15 @@ def read_source(strips: list, opts: dict, dpi: int, share: float = 1.0, label_px
     return src
 
 
-def _pieces(src: Source, width_px: float, full_px: float | None = None, cut: bool = True):
+def _pieces(src: Source, width_px: float, full_px: float | None = None, cut: bool = True,
+            breaks: list | None = None):
     """_pieces -> (pieces, too wide): the lines cut for a text width (width_px); a line that is not
     cut is too wide only past full_px (the text width; default width_px). cut False: no line is
     cut (a build without re-flow, 0.8.43). A piece:
     (source line, first piece of its line, bars of a merged rest at its start, at its end, number of
-    its last bar or None when the saved data cannot say: a manual break after that bar ends the piece)."""
+    its last bar or None when the saved data cannot say: a manual break after that bar ends the piece).
+    breaks: bar numbers after which a page ends: a cut line ends there, as re-flow ends it (0.8.47)."""
+    want = {int(b) for b in breaks or []}
     out, wide = [], None
     for i, ln in enumerate(src.lines):
         if ln["bars"] is None or not cut:
@@ -130,7 +133,6 @@ def _pieces(src: Source, width_px: float, full_px: float | None = None, cut: boo
                 wide = wide or (i, ln["whole"])
             out.append((i, True, ln.get("rin", 0), ln.get("rout", 0), (ln.get("span") or [None, None])[1]))
             continue
-        starts = _break_lines(ln["bars"], ln["copy"], width_px)
         rc = ln.get("rcount")
         sp_ = ln.get("span")
         num = None                      # the number of the last bar of each bar entry (a merged rest holds several)
@@ -141,6 +143,10 @@ def _pieces(src: Source, width_px: float, full_px: float | None = None, cut: boo
                 num.append(at)
             if num[-1] != sp_[1]:
                 num = None              # the numbers are not a plain run (a repeat, a movement): unknown
+        if num and want:
+            starts = forced_starts(ln["bars"], ln["copy"], width_px, {k for k, e in enumerate(num) if e in want})
+        else:
+            starts = _break_lines(ln["bars"], ln["copy"], width_px)
         for k, a in enumerate(starts):
             z = starts[k + 1] if k + 1 < len(starts) else len(ln["bars"])
             piece = (ln["copy"] if k else 0.0) + sum(ln["bars"][a:z])
@@ -193,7 +199,8 @@ def estimate(src: Source, opts: dict, paper: str, staff_mm: float, cut: bool = T
     else:
         s0 = s1
     k0, k1 = 72.0 / dpi * s0, 72.0 / dpi * s1
-    pieces, wide = _pieces(src, LINE_FIT * usable / k0, room / k1, cut)   # an uncut line: printed at s1
+    pieces, wide = _pieces(src, LINE_FIT * usable / k0, room / k1, cut,   # an uncut line: printed at s1
+                           opts.get("breaks"))
     if wide is not None:
         i, w = wide
         sp_ = src.lines[i].get("span")

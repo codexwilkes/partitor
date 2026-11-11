@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.47 — 2026-11-11
+
+### Fixed
+- Re-flow (`reflow: on`) ends a line after each manual break bar (`breaks`), so the page break
+  falls there. Before, the bar could fall inside a re-flowed line: the build warned `bar is inside
+  a line` and the break had no effect. `plan` cuts its estimates the same way. Without re-flow,
+  nothing changes.
+
 ## 0.8.46 — 2026-11-11
 
 ### Added

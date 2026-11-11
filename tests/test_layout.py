@@ -237,6 +237,38 @@ class TestReflow(unittest.TestCase):
         self.assertEqual(out[0].bar_no, None)              # movement start: no number
         self.assertEqual([o.bar_no for o in out[1:3]], [2, 3])
 
+    def numbered(self):
+        return [flow_line([(70, 44), (110, 60)], [100, 140, 198], key=True, nums=[1, 2, 3]),
+                flow_line([(75, 60), (120, 52)], [105, 150, 198], key=True, nums=[4, 5, 6]),
+                flow_line([(72, 52), (125, 44)], [110, 160, 198], key=True, nums=[7, 8, 9])]
+
+    def test_a_manual_break_ends_a_re_flowed_line(self):
+        """0.8.47: re-flow ends a line after each `breaks` bar, so the page break can fall there
+        (before, the bar could fall inside a line: `break after bar N: bar is inside a line`)."""
+        ls = self.numbered()
+        pre = pt.find_prefixes(ls)
+        free = pt.reflow(ls, 400.0, pre)
+        ends = [sp[1] for sp in pt.line_spans(free) if sp]
+        self.assertNotIn(5, ends)                                     # without the break: inside a line
+        out = pt.reflow(ls, 400.0, pre, breaks=[5])
+        self.assertIn(5, [sp[1] for sp in pt.line_spans(out) if sp])
+        j, warn = pt.break_lines(out, [5])
+        self.assertEqual((len(j), warn), (1, []))
+        self.assertTrue(all(o.img.shape[1] <= 400 for o in out))
+        self.assertEqual(pt.reflow(ls, 400.0, pre, breaks=[99])[0].img.shape, free[0].img.shape)  # unknown bar
+
+    def test_forced_starts_split_the_runs(self):
+        self.assertEqual(pt.forced_starts([30.0] * 6, 10.0, 200.0, set()), [0])
+        self.assertEqual(pt.forced_starts([30.0] * 6, 10.0, 200.0, {1}), [0, 2])
+        self.assertEqual(pt.forced_starts([30.0] * 6, 10.0, 200.0, {5}), [0])     # after the last bar: no cut
+        self.assertEqual(pt.forced_starts([30.0] * 4, 10.0, 75.0, {0}), [0, 1, 3])
+
+    def test_bar_ends_count_a_merged_rest(self):
+        ls = self.numbered()
+        ls[1].rest_counts = [0, 0, 4]
+        ends = pt.bar_ends(ls, [(1, 0), (1, 1), (1, 2)])
+        self.assertEqual(ends, [4, 5, 9])
+
     def test_borrowed_prefix_starts_a_line(self):
         ls = self.lines()
         pre = pt.find_prefixes(ls)

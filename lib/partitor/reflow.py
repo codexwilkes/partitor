@@ -573,13 +573,51 @@ def _join_rests(img: np.ndarray, hdr: np.ndarray, marks: list, labels: list,
     return img, hdr, marks, labels
 
 
-def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip]:
+def bar_ends(strips: list[Strip], bars: list[tuple[int, int]]) -> list[int | None]:
+    """bar_ends -> the number of the last bar of each bar entry (line i, bar b) of a run: the
+    number of the next entry less one, else its own number plus its merged rest (None when the
+    lines carry no numbers)."""
+    def first(i: int, b: int) -> int | None:
+        s_ = strips[i]
+        if b < len(s_.bar_nums):
+            return int(s_.bar_nums[b])
+        return None if s_.bar_no is None else int(s_.bar_no) + b
+    starts = [first(i, b) for i, b in bars]
+    out: list[int | None] = []
+    for k, (i, b) in enumerate(bars):
+        a = starts[k]
+        nxt = starts[k + 1] if k + 1 < len(bars) else None
+        if a is not None and nxt is not None and nxt > a:
+            out.append(nxt - 1)
+        elif a is not None:
+            rc = strips[i].rest_counts
+            out.append(a + max(1, int(rc[b]) if b < len(rc) else 1) - 1)
+        else:
+            out.append(None)
+    return out
+
+
+def forced_starts(widths: list[float], pre: float, W: float, cut_after: set) -> list[int]:
+    """forced_starts -> _break_lines over the runs between the forced line ends: a line ends
+    after each bar index in cut_after (a manual page break, 0.8.47)."""
+    starts, a = [], 0
+    for z in sorted(k + 1 for k in cut_after if 0 <= k < len(widths) - 1) + [len(widths)]:
+        if z > a:
+            starts += [a + x for x in _break_lines(widths[a:z], pre, W)]
+            a = z
+    return starts
+
+
+def reflow(strips: list[Strip], W: float, pre: list | None = None,
+           breaks: list | None = None) -> list[Strip]:
     """reflow -> new lines no wider than W (px, where possible), cut only
     at barlines. A continuation line starts with a copy of the clef and key
     signature of its source line (header text not copied). Lines that
     cannot be cut safely (no prefix found, not ending at a barline, two
     staves) stay whole. A movement always starts a new line; bars of two
-    source lines join only when their prefixes are the same."""
+    source lines join only when their prefixes are the same. breaks: bar
+    numbers after which a page ends (`breaks`): a line ends after each, so the
+    break can fall there (0.8.47; a bar number the lines do not carry is skipped)."""
     pre = find_prefixes(strips) if pre is None else pre
     bw = lambda s_: max(1, int(0.2 * s_.sp))         # barline width kept left
     donors: dict[int, int] = {}
@@ -644,7 +682,9 @@ def reflow(strips: list[Strip], W: float, pre: list | None = None) -> list[Strip
             return x0, max(x0, x1)       # a barline inside the prefix: a bar with no width, not a negative one
         widths = [span(i, b)[1] - span(i, b)[0] for i, b in bars]
         i0 = bars[0][0]
-        starts = _break_lines(widths, pre[donor(i0)][0], W)
+        want = {int(x) for x in breaks or []}
+        cut_after = {k for k, e in enumerate(bar_ends(strips, bars)) if e is not None and e in want}
+        starts = forced_starts(widths, pre[donor(i0)][0], W, cut_after)
         for k, a in enumerate(starts):
             z = starts[k + 1] if k + 1 < len(starts) else len(bars)
             i, b = bars[a]

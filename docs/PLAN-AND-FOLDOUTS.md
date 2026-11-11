@@ -214,8 +214,9 @@ A move up to a page with no room is refused: a break is a limit, so the page wou
 only get shorter. Move a system off that page first.
 
 `plan` keeps the manual breaks in its estimates (a break after bar N ends a page
-where a line ends after bar N). A row says "N break(s) end no line" when a break
-falls inside a line at that size. After `plan ID PART N`, check the breaks with
+where a line ends after bar N). With re-flow a line ends at each break bar, in the
+build and in the estimates. A row says "N break(s) end no line" when a break
+falls inside a line that is not cut, or names a bar the part does not have. After `plan ID PART N`, check the breaks with
 `pages`; if a break no longer ends a line, drop them with `--clear`. A part built
 before 0.8.21 has no bar numbers in its plan data: `plan` says so; rebuild once.
 
