@@ -1989,27 +1989,41 @@ class _PagesItem(unittest.TestCase):
     SYSTEMS, SHEETS = 2, 6
     __test__ = False
 
+    @classmethod
+    def setUpClass(cls):
+        """The item is built once per class (a detect and a build take 25-60 s); each test gets a
+        copy of the built share (setUp), so a test still starts from the same clean item (0.8.49)."""
+        cls._built = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls._built.cleanup)
+        tmp = cls._built.name
+        one = Path(tmp, "page.pdf")
+        make_score_pdf(str(one), systems=cls.SYSTEMS, staves=2, labels=("Alto", "Bass"), title="")
+        doc = pymupdf.open()
+        for _ in range(cls.SHEETS):
+            doc.insert_pdf(pymupdf.open(str(one)))
+        share = Path(tmp, "share")
+        (share / "inbox").mkdir(parents=True)
+        item = share / "library" / "2026-10-0001-c-t"
+        item.mkdir(parents=True)
+        doc.save(str(item / "2026-10-0001-source.pdf"))
+        pt.save_item(item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-27"})
+        with contextlib.redirect_stdout(io.StringIO()):
+            if pt.run_detect(item, None, "T", "C D") != 0:
+                raise AssertionError("detect of the fixture item failed")
+            d = pt.load_item(item)
+            pt.apply_set(d, ["pages=30", "max_staff_mm=8"])
+            pt.save_item(item, d)
+            if build.run_build(item) != 0:
+                raise AssertionError("build of the fixture item failed")
+        pt._reset_counts()
+        cls._share = share
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        tmp = self.tmp.name
-        one = Path(tmp, "page.pdf")
-        make_score_pdf(str(one), systems=self.SYSTEMS, staves=2, labels=("Alto", "Bass"), title="")
-        doc = pymupdf.open()
-        for _ in range(self.SHEETS):
-            doc.insert_pdf(pymupdf.open(str(one)))
-        self.share = Path(tmp, "share")
-        (self.share / "inbox").mkdir(parents=True)
+        self.share = Path(self.tmp.name, "share")
+        shutil.copytree(self._share, self.share, symlinks=True)
         self.item = self.share / "library" / "2026-10-0001-c-t"
-        self.item.mkdir(parents=True)
-        doc.save(str(self.item / "2026-10-0001-source.pdf"))
-        pt.save_item(self.item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-27"})
-        with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(pt.run_detect(self.item, None, "T", "C D"), 0)
-            d = pt.load_item(self.item)
-            pt.apply_set(d, ["pages=30", "max_staff_mm=8"])
-            pt.save_item(self.item, d)
-            self.assertEqual(build.run_build(self.item), 0)
         old = os.environ.get("PARTITOR_LIBRARY")
         os.environ["PARTITOR_LIBRARY"] = str(self.share)
         self.addCleanup(lambda: os.environ.pop("PARTITOR_LIBRARY", None) if old is None

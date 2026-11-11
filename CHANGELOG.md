@@ -7,6 +7,13 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.49 — 2026-11-11
+
+### Changed
+- The tests run faster: the classes that need a built item build it once and give each test a
+  copy (the `pages` tests: 455 s to 124 s). CI keeps its pip downloads between runs. The tests and
+  the engine do not change.
+
 ## 0.8.48 — 2026-11-11
 
 ### Fixed

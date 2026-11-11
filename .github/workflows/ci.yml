@@ -45,6 +45,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
+          cache: pip                 # wheels of requirements.txt, kept between runs (0.8.49)
       - name: install packages (binary wheels only)
         run: |
           python -m pip install --upgrade pip
@@ -65,6 +66,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+          cache: pip
       - name: install packages (binary wheels only)
         run: |
           python -m pip install --upgrade pip

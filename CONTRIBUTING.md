@@ -51,6 +51,11 @@ built before the choice builds the same.
 CI (`.github/workflows/ci.yml`) runs the same checks on every pull request:
 the repo gate, shellcheck at warning level, and the tests on Ubuntu 24.04
 (Python 3.12 and 3.13). The macOS run is best effort and does not block.
+CI keeps the pip wheels between runs (`cache: pip`).
+
+A test class that needs a built item builds it once, in `setUpClass`, and copies the
+built folder for each test (`_PagesItem` in `tests/test_render.py`). A detect and a build
+take 25-60 s; one per test made `test_render` the slowest module.
 
 ```bash
 cd /opt/partitor      # or your clone
