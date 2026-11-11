@@ -1965,6 +1965,10 @@ class _PagesItem(unittest.TestCase):
     def breaks(self):
         return pt.load_item(self.item).get("layout", {}).get("parts", {}).get("Alto", {}).get("breaks")
 
+    def pins(self):
+        pin = pt.load_item(self.item).get("layout", {}).get("parts", {}).get("Alto", {}).get("pins")
+        return pin["bars"] if pin else None
+
     def table(self, out):
         """-> {page number: (first bar, last bar)} read from the printed table."""
         rows = [ln.split() for ln in out.splitlines() if "/" in ln[:15] and ln.strip()[:1].isdigit()]
@@ -2040,6 +2044,30 @@ class TestPagesPins(unittest.TestCase):
     """A move must not change earlier pages (0.8.20)."""
 
     @needs_deps
+    def test_pins_limit_the_pages_and_are_marked_apart_from_breaks(self):
+        T = TestPagesReport("test_the_turn_words")
+        st = T.music(60, rests={9, 17, 25, 33, 41, 49})
+        base = pt.page_report(st, 400, T.OPTS)
+        bar = pt.line_spans(st)[base[0]["j"] - 2][1]                     # one line earlier than now
+        pinned = pt.page_report(st, 400, {**T.OPTS, "_pins": [bar]})
+        broken = pt.page_report(st, 400, {**T.OPTS, "breaks": [bar]})
+        self.assertNotEqual([r["j"] for r in broken], [r["j"] for r in base])
+        self.assertEqual([r["j"] for r in pinned], [r["j"] for r in broken])   # the same limit
+        self.assertEqual([r["pin"] for r in pinned], [r["manual"] for r in broken])
+        self.assertFalse(any(r["manual"] for r in pinned))
+        both = pt.page_report(st, 400, {**T.OPTS, "breaks": [bar], "_pins": [bar]})
+        self.assertEqual([r["manual"] for r in both], [r["manual"] for r in broken])
+        self.assertFalse(any(r["pin"] for r in both))                        # a break wins the mark
+
+    @needs_deps
+    def test_lines_sig_follows_the_bar_spans_of_the_lines(self):
+        T = TestPagesReport("test_the_turn_words")
+        st = T.music(20)
+        self.assertEqual(pt.lines_sig(st), pt.lines_sig(T.music(20)))
+        self.assertNotEqual(pt.lines_sig(st), pt.lines_sig(T.music(21)))
+        self.assertNotEqual(pt.lines_sig(st), pt.lines_sig(st[:-1]))
+
+    @needs_deps
     def test_a_trial_break_on_the_last_page_changes_earlier_pages_unless_pinned(self):
         T = TestPagesReport("test_the_turn_words")
         st = T.music(60, rests={9, 17, 25, 33, 41, 49})
@@ -2069,13 +2097,47 @@ class TestPagesPinning(_PagesItem):
         self.assertEqual(rc, 0, out)
         after = self.table(out)
         self.assertEqual(len(after), len(before) + 1, out)
-        saved = self.breaks()
+        saved = set(self.breaks() or []) | set(self.pins() or [])
         for p in before:
             if p != last:
                 self.assertEqual(after[p], before[p], out)     # earlier pages: the same bars
-                self.assertIn(before[p][1], saved)             # and pinned
+                self.assertIn(before[p][1], saved)             # and pinned (0.8.39: a pin or a break)
         rc, out = self.run_pages(clear=True)
         self.assertEqual(self.table(out), before)              # --clear brings back the first paging
+
+    def test_a_move_saves_one_break_and_the_pins_apart(self):
+        """0.8.39: the pins of a move were saved as breaks, and a later build with other lines
+        kept them (a break inside a line, short pages). Now: one break, the pins on their own."""
+        before = self.table(self.run_pages()[1])
+        last = str(len(before))
+        rc, out = self.run_pages(move=[f"{last}=1"])
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(len(self.breaks()), 1, out)                  # the move only
+        self.assertTrue(self.pins(), out)
+        self.assertFalse(set(self.breaks()) & set(self.pins()))
+        self.assertIn("[pin]", out)
+        self.assertIn("[manual]", out)
+        self.assertIn("pinned (page ends kept for the move)", out)
+        rc, out = self.run_pages(clear=True)
+        self.assertIsNone(self.breaks())
+        self.assertIsNone(self.pins())
+        self.assertNotIn("[pin]", out)
+
+    def test_pins_made_for_other_lines_are_dropped_by_repage_and_breaks_stay(self):
+        before = self.table(self.run_pages()[1])
+        self.run_pages(move=[f"{len(before)}=1"])
+        d = pt.load_item(self.item)
+        pt.set_pins(d, "Alto", self.pins(), "other-lines")              # as if the lines changed
+        pt.save_item(self.item, d)
+        rc, out = self.run_pages()
+        self.assertNotIn("[pin]", out)                                   # not applied
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            rc = pt._engine_step(pt.cmd_repage, argparse.Namespace(id="2026-10-0001", parts=["Alto"]))
+        self.assertEqual(rc, 0, buf.getvalue())
+        self.assertIn("pins) are dropped; your breaks stay", buf.getvalue())
+        self.assertIsNone(self.pins())
+        self.assertEqual(len(self.breaks()), 1)
 
     def test_a_move_up_to_a_page_with_no_room_is_refused(self):
         rc, out = self.run_pages()

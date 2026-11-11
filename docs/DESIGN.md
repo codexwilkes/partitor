@@ -938,9 +938,17 @@ the one before the next line's first, except across a movement), systems, the ro
 of that page (its tallest line pitch), the turn after it (`turn_list` or `plan_turn_list`) and whether a
 manual break ends it. `partitor pages ID PART` prints it; `--move PAGE=N` turns the move into a
 `breaks=+BAR` (and drops the manual break it replaces), calls `repage` for the part and prints the table
-again; `--clear` is `breaks=none`. A manual break is only a limit in the planner (no page runs past it), and
-the planner optimises the whole part, so one break can change the pages before it. `--move` therefore pins
-the ends of the earlier pages that a trial paging would change (extra `breaks=+BAR`). One `--move` for each
+again; `--clear` is `breaks=none` and drops the pins. A manual break is only a limit in the planner (no page
+runs past it), and the planner optimises the whole part, so one break can change the pages before it. `--move`
+therefore pins the ends of the earlier pages that a trial paging would change. Pins (0.8.39) are kept apart
+from `breaks` in the part's layout (`pins: {bars, lines}`; `library.part_pins`, `set_pins`): `lines` is
+`render.lines_sig` of the saved lines they were made for (a hash of the bar span of every line). The planner
+takes them as limits like breaks (`page_limits`); the table marks them `[pin]` (a break `[manual]`).
+They hold only for those lines: a build or `repage` whose lines have another signature drops them, says so
+(`the lines changed, so the page ends kept by pages --move (pins) are dropped; your breaks stay`) and keeps
+`breaks`. Before 0.8.39 pins were saved as breaks, so a build at another staff size or with re-flow kept
+them: a break inside a re-flowed line and short pages. Old items keep those breaks as they are. `plan` does
+not use pins (its rows are other lines). `show` lists them as `pins=[...]`. One `--move` for each
 call (each move changes the rows after it). `--dry-run` shows the result and saves nothing. If the repage
 fails, the settings are put back. A move whose page would not start where it did and end at the new break
 (a move up to a full page: the planner would cut the page short) is refused. `plan` keeps the manual

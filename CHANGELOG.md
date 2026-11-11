@@ -7,6 +7,17 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.39 — 2026-11-11
+
+### Changed
+- `pages --move` keeps the pages before the moved page with pins, and pins are now apart from your
+  manual breaks. Before, they were saved as breaks: one move saved three breaks, and after a
+  rebuild at another staff size or with re-flow they still held old page ends ("break after bar
+  35: bar is inside a line", short pages). Now the move saves one break and the pins on their own
+  (`[pin]` in the `pages` table, `pins=[...]` in `show`). A rebuild or `repage` whose lines changed
+  drops the pins, keeps the breaks and says so. `--clear` drops both. Items from before keep their
+  breaks as they are. The page breaks of a part without pins do not change.
+
 ## 0.8.38 — 2026-11-11
 
 ### Fixed

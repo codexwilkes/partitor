@@ -287,6 +287,41 @@ class TestPartialBuild(unittest.TestCase):
         for k in pt.PART_FILE_KEYS:
             self.assertTrue((self.item / "parts" / rec[k]).is_file(), k)
 
+    def test_a_build_drops_the_pins_of_a_part_whose_lines_changed(self):
+        """0.8.39: emit marks the record (pins_dropped) when the pins were made for other lines;
+        run_build then removes the pins from the settings, keeps the breaks, and the mark."""
+        d = pt.load_item(self.item)
+        pt.apply_set(d, ["A:breaks=5"])
+        pt.set_pins(d, "A", [3, 4], "old-lines")
+        pt.set_pins(d, "B", [7], "old-lines")
+        pt.save_item(self.item, d)
+        real = self.fake
+
+        def fake(ns):
+            rc = real(ns)
+            for r in build.LAST_BUILD:
+                if r["part"] == "A":
+                    r["pins_dropped"] = True
+            return rc
+        build.cmd_build = fake
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            build.run_build(self.item, ["A"])
+        d = pt.load_item(self.item)
+        self.assertIsNone(pt.part_pins(d, "A"))
+        self.assertEqual(d["layout"]["parts"]["A"]["breaks"], [5])
+        self.assertEqual(pt.part_pins(d, "B")["bars"], [7])               # another part: kept
+        self.assertFalse(any("pins_dropped" in r for r in d["built"]["parts"]))
+        self.assertIn("A: the lines changed", out.getvalue())
+
+    def test_set_pins_and_part_pins(self):
+        d = {"layout": {}}
+        pt.set_pins(d, "A", [9, 3, 3], "sig")
+        self.assertEqual(pt.part_pins(d, "A"), {"bars": [3, 9], "lines": "sig"})
+        pt.set_pins(d, "A", [])
+        self.assertIsNone(pt.part_pins(d, "A"))
+        self.assertEqual(d["layout"], {})                                 # nothing empty is left
+
     def test_a_missing_fold_out_file_makes_the_build_whole(self):
         self.folds = {"C"}
         self.build()

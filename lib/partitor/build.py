@@ -33,9 +33,9 @@ from .console import (
     _skip, _summary, _warn,
 )
 from .library import (
-    PARTS_NEW, PARTS_PREV, build_names, item_file, item_id, item_line, keep_lines,
+    PARTS_NEW, PARTS_PREV, PINS_KEY, build_names, item_file, item_id, item_line, keep_lines,
     keep_other_parts, library_logo, library_root, load_item, part_layout, partial_blocker,
-    piece_tag, recover_parts, save_item, score_name, swap_parts,
+    piece_tag, recover_parts, save_item, score_name, set_pins, swap_parts,
 )
 from .lines import (
     count_bad_turns, fill_rests, finish_lines, label_column, lines_path, merge_rest_bars, save_lines, turn_where,
@@ -48,7 +48,7 @@ from .parallel import RENDER_WORKER_GB, job_count, page_worker_gb, worker_peak_m
 from .reflow import find_prefixes, reflow_report
 from .render import (
     GROUP_REFLOW_PAGES, LARGE, LAST_RENDER, choose_layout, choose_reflow, fit_scale, large_copies,
-    prefix_notes, render_part, sheet_text, turns,
+    lines_sig, prefix_notes, render_part, sheet_text, turns,
 )
 from .strips import group_strip, make_strip, own_group_gap, set_bar_geometry
 
@@ -719,6 +719,11 @@ def cmd_build(a: argparse.Namespace) -> int:
                                   extra.get("ambitus_map"), extra.get("short_map"))
             sc, g, n_est = choose_layout(strips, dpi, opts)
         o = {**opts, "scale": sc, "gap": g}
+        # pins of `pages --move` (0.8.39): they hold for the lines they were made for only
+        pin = (plays.get(name) or {}).get(PINS_KEY)
+        pins_dropped = isinstance(pin, dict) and bool(pin.get("bars")) and pin.get("lines") != lines_sig(strips)
+        if isinstance(pin, dict) and pin.get("bars") and not pins_dropped:
+            o["_pins"] = list(pin["bars"])
         if sc < fit_scale(strips, dpi, opts) - 1e-6:
             _note(f"{name}: staff reduced to fit {n_est} page(s) (fewer page turns)")
         if opts.get("page_count") and n_est > opts["page_count"]:
@@ -749,7 +754,8 @@ def cmd_build(a: argparse.Namespace) -> int:
                "file": fn.name, **big,
                **({"foldout": LAST_RENDER["foldout"], "foldouts": LAST_RENDER["foldouts"],
                    "flaps": LAST_RENDER["flaps"], "assemble": LAST_RENDER["assemble"]} if LAST_RENDER.get("foldout") else {}),
-               **({"group": True} if extra.get("members") else {})}
+               **({"group": True} if extra.get("members") else {}),
+               **({"pins_dropped": True} if pins_dropped else {})}
         flow = f" (re-flowed from {nsrc})" if opts.get("reflow") == "on" else ""
         _ok(f"{name}:  {len(strips)} lines{flow}  {n} page(s)  staff {h_mm:.1f} mm  "
             f"gap {g:.2f} sp  -> {fn}")
@@ -890,6 +896,11 @@ def run_build(item: Path, only: list[str] | None = None, jobs: str | None = None
         keep_lines(item)
         _note(f"parts:  the set before is kept in {PARTS_PREV}/ until the next good build")
         data = load_item(item)
+        for r in new:
+            if r.pop("pins_dropped", False):
+                set_pins(data, r["part"], [])
+                _note(f"pages:  {r['part']}: the lines changed, so the page ends kept by "
+                      "`pages --move` (pins) are dropped; your breaks stay")
         if only:
             left = [x for x in data.get("pending") or []
                     if not any(x.startswith(f"{nm}:") for nm in only)]

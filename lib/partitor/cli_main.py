@@ -308,7 +308,7 @@ def main() -> int:
     pg.add_argument("--move", action="append", metavar="PAGE=N",
                     help="move the last N systems of PAGE to the next page (N negative: bring the "
                          "first systems of the next page up); the part is paged again")
-    pg.add_argument("--clear", action="store_true", help="drop the manual page breaks of the part")
+    pg.add_argument("--clear", action="store_true", help="drop the manual page breaks and the pins of the part")
     pg.add_argument("--dry-run", action="store_true", help="show the pages after --move, save nothing")
     rp = sub.add_parser("repage", help="new page breaks from the saved lines: turns while "
                         "resting, manual breaks (no analysis, no build)")

@@ -98,6 +98,36 @@ def set_value(key: str, val) -> str:
     return str(val)
 
 
+PINS_KEY = "pins"     # layout.parts.<part>.pins: {bars: [...], lines: <lines_sig>} (0.8.39)
+
+
+def part_pins(data: dict, part: str) -> dict | None:
+    """part_pins -> the pins of a part ({"bars": [...], "lines": signature}) or None. Pins are the
+    page ends that `pages --move` keeps so that a move does not change the pages before it; they
+    hold for the lines they were made for (`lines`: render.lines_sig). Apart from `breaks` (the
+    operator's own page ends), so a build that makes other lines can drop them and keep breaks."""
+    pin = (((data.get("layout") or {}).get(PART_LAYOUT_KEY) or {}).get(part) or {}).get(PINS_KEY)
+    return pin if isinstance(pin, dict) and pin.get("bars") else None
+
+
+def set_pins(data: dict, part: str, bars: list[int], sig: str = "") -> None:
+    """set_pins: save the pins of a part for the lines with signature sig; no bars removes them."""
+    lay = data.setdefault("layout", {}) or {}
+    data["layout"] = lay
+    plays = lay.setdefault(PART_LAYOUT_KEY, {}) or {}
+    lay[PART_LAYOUT_KEY] = plays
+    pl = plays.setdefault(part, {}) or {}
+    plays[part] = pl
+    if bars:
+        pl[PINS_KEY] = {"bars": sorted({int(b) for b in bars}), "lines": sig}
+    else:
+        pl.pop(PINS_KEY, None)
+        if not pl:
+            plays.pop(part, None)
+        if not plays:
+            lay.pop(PART_LAYOUT_KEY, None)
+
+
 def part_names(data: dict) -> list[str]:
     """part_names -> extracted parts (not skipped) and group names."""
     skip = set(data.get(SKIP_KEY) or [])

@@ -3,6 +3,7 @@
 """Paper, packing, page plan and part drawing."""
 from __future__ import annotations
 
+import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -346,6 +347,23 @@ def prefix_notes(strips: list[Strip], pre) -> list[str]:
                   if pre[i] is None and s_.rest_src is None and s_.ends_at_bar and len(s_.bars_x) >= 2]
 
 
+def lines_sig(strips: list[Strip]) -> str:
+    """lines_sig -> a short hash of the bar span of every line. The pins that `pages --move` saves
+    (page ends kept for a move) hold for these lines only; when a build makes other lines, the
+    pins are dropped (0.8.39)."""
+    return hashlib.sha1(repr(line_spans(strips)).encode()).hexdigest()[:12]
+
+
+def page_limits(strips: list[Strip], opts: dict) -> tuple[list[int], list[int], list[str]]:
+    """page_limits -> (breaks, pins, warnings): the lines before which a page must end, for the
+    manual breaks (`breaks`, warnings for those that end no line) and for the pins of
+    `pages --move` (`_pins`: valid for these lines, set by the caller; a pin that ends no line
+    is left out without a warning)."""
+    breaks, warn = break_lines(strips, opts.get("breaks") or [])
+    pins, _ = break_lines(strips, opts.get("_pins") or [])
+    return breaks, sorted(set(pins) - set(breaks)), warn
+
+
 def break_lines(strips: list[Strip], bars: list[int]) -> tuple[list[int], list[str]]:
     """break_lines -> (j list, warnings): a page break before line j for each
     bar N in `bars` ("break after bar N"). Lines are fixed, so N must be the
@@ -563,9 +581,10 @@ def page_report(strips: list[Strip], dpi: int, opts: dict) -> list[dict]:
     """page_report -> one row per face of the part as it would be laid out now (no drawing): page
     (the printed label), i and j (its lines i..j-1), first and last bar, systems, free (the spare
     height at the foot, in systems of the page: its tallest line pitch), turn (the turn after it: the dict of turn_list, or None),
-    role (normal, bound, flap), manual (a manual break ends the page)."""
-    breaks, _ = break_lines(strips, opts.get("breaks") or [])
-    o = {**opts, "_breaks": breaks}
+    role (normal, bound, flap), manual (a manual break ends the page), pin (a pin of `pages --move`
+    ends it, 0.8.39)."""
+    breaks, pins, _ = page_limits(strips, opts)
+    o = {**opts, "_breaks": sorted(set(breaks) | set(pins))}
     if folds_wanted(o):
         pages, title_page, plan = layout_plan(strips, dpi, o)
         flat = [pg for g in plan.groups for pg in g.pages]
@@ -597,7 +616,7 @@ def page_report(strips: list[Strip], dpi: int, opts: dict) -> list[dict]:
                              else (spans[j][0] - 1 if j < len(spans) and spans[j] else None)),
                     "free": max(0.0, (avail[c] - used) / (max(pit[i:max(j - 1, i + 1)] or [1.0]) * k)),
                     "turn": tmap.get(labels[c]),
-                    "role": roles[c], "manual": j in breaks})
+                    "role": roles[c], "manual": j in breaks, "pin": j in pins})
     return out
 
 
@@ -1212,10 +1231,10 @@ def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
     subtitle, composer, members (group score: its parts, top to bottom)."""
     pw, ph = PAPER[opts["paper"]]
     k = 72.0 / dpi * (opts.get("scale") or 1.0)
-    breaks, bwarn = break_lines(strips, opts.get("breaks") or [])
+    breaks, pins, bwarn = page_limits(strips, opts)
     for w_ in bwarn:
         _warn(f"{name}: {w_}")
-    opts = {**opts, "_breaks": breaks}
+    opts = {**opts, "_breaks": sorted(set(breaks) | set(pins))}
     if folds_wanted(opts):
         pages, title_page, plan = layout_plan(strips, dpi, opts)
         return render_plan(name, strips, meta, dpi, opts, out, pages, title_page, plan, breaks)

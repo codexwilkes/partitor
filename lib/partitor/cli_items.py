@@ -26,11 +26,11 @@ from .console import (
     ask, yes,
 )
 from .library import (
-    PART_FILE_KEYS, PARTS_NEW, PARTS_PREV, REPAGE_KEYS, ItemBusy, _id_parts, apply_set, build_names,
+    PART_FILE_KEYS, PARTS_NEW, PARTS_PREV, PINS_KEY, REPAGE_KEYS, ItemBusy, _id_parts, apply_set, build_names,
     folder_name, id_order, inbox_pdfs, item_dirs, item_file, item_id, item_line, item_lock, item_status,
     keep_other_parts, library_logo, library_root, load_item, mark_pending, merge_item_keys,
-    next_id, parse_parts, part_layout, recover_parts, restore_previous_parts, save_item,
-    selection_help, set_name, set_value, suggest_meta, swap_parts,
+    next_id, parse_parts, part_layout, part_pins, recover_parts, restore_previous_parts, save_item,
+    selection_help, set_name, set_pins, set_value, suggest_meta, swap_parts,
 )
 from .proof import annotate_proof, proof_from_preview
 
@@ -253,6 +253,7 @@ def review_lines(item: Path, data: dict) -> list[str]:
         "  (others default; partitor set <id> key=value)")
     for pname, pl in (lay.get(PART_LAYOUT_KEY) or {}).items():
         out.append(f"  {pname}:  " + "  ".join(
+            f"pins={pl[k].get('bars')}" if k == PINS_KEY and isinstance(pl[k], dict) else
             f"{set_name(k)}={set_value(set_name(k), v)}" for k, v in pl.items()))
     if data.get("pending"):
         out.append(f"  {YLW}not built: {', '.join(data['pending'])}{RST}")
@@ -774,7 +775,7 @@ def pages_table(nm: str, rows: list[dict]) -> int:
             f"{r['first']}-" if r["first"] is not None else "?")
         room = k + 1 < len(rows) and rows[k + 1]["free"] >= 1.0       # the next page can take a system
         flag = "  <- move a system?" if word == "PLAYING" and r["systems"] > 1 and room else ""
-        mark = " [manual]" if r["manual"] else ""
+        mark = " [manual]" if r["manual"] else " [pin]" if r.get("pin") else ""
         role = " (flap)" if r["role"] == "flap" else ""
         print(f"     {r['page']:>7}  {bars:<9} {r['systems']:>7}  {r['free']:>5.1f}  {word}{mark}{role}{flag}")
     return bad
@@ -791,7 +792,7 @@ def cmd_pages(a: argparse.Namespace) -> int:
     saves nothing."""
     import copy
     from .lines import lines_path, load_lines
-    from .render import page_report
+    from .render import lines_sig, page_report
     start = time.monotonic()
     item = _item_or_die(a.id)
     recover_parts(item)
@@ -809,12 +810,21 @@ def cmd_pages(a: argparse.Namespace) -> int:
     nm = names[0]
     dry = bool(getattr(a, "dry_run", False))
 
-    def report(breaks: list[int] | None = None) -> list[dict]:
-        pl = load_lines(lines_path(item / "lines", nm))
+    def lines_now() -> dict:
+        return load_lines(lines_path(item / "lines", nm))
+
+    def pins_now() -> list[int]:
+        """the pins of the part, when they hold for its saved lines (0.8.39)"""
+        pin = part_pins(load_item(item), nm)
+        return list(pin["bars"]) if pin and pin.get("lines") == lines_sig(lines_now()["strips"]) else []
+
+    def report(breaks: list[int] | None = None, pins: list[int] | None = None) -> list[dict]:
+        pl = lines_now()
         lay = part_layout(load_item(item), nm)
         o = {**pl["opts"], **{k: lay.get(k) for k in REPAGE_KEYS}}
         if breaks is not None:
             o["breaks"] = breaks
+        o["_pins"] = pins_now() if pins is None else pins
         return page_report(pl["strips"], pl["dpi"], o)
     try:
         rows = report()
@@ -827,8 +837,11 @@ def cmd_pages(a: argparse.Namespace) -> int:
         _note(f"pages:  not built yet: {', '.join(data['pending'])}. The table follows these settings; "
               "the PDF is the same after a rebuild or repage")
     pairs = []
+    pins = pins_now()
+    pins_new = None                                        # pins to save (None: no change)
     if getattr(a, "clear", False):
         pairs.append(f"{nm}:breaks=none")
+        pins_new = []
     for mv in moves:
         page, _, n_ = mv.partition("=")
         try:
@@ -850,34 +863,42 @@ def cmd_pages(a: argparse.Namespace) -> int:
             bar = sp[1] if sp else None
         if bar is None:
             _die(f"pages: page {page}: the bar numbers there are unknown", "Set the page break by hand: set Part:breaks=BAR")
-        old = [r for r in rows if r["manual"] and r["j"] == row["j"] and r["last"] is not None]
-        if old:
+        # the page end that the move replaces: an operator break, or a pin
+        old = [r for r in rows if (r["manual"] or r.get("pin")) and r["j"] == row["j"] and r["last"] is not None]
+        if old and old[0]["manual"]:
             pairs.append(f"{nm}:breaks=-{old[0]['last']}")
+        keep = set(pins) - ({old[0]["last"]} if old and old[0].get("pin") else set())
         pairs.append(f"{nm}:breaks=+{bar}")
         # the pages before the moved page keep their ends: a break alone lets the planner
-        # change them. Pin the ends a trial paging would move.
+        # change them. Pin the ends a trial paging would move (pins, apart from breaks: 0.8.39).
         cur = [int(x) for x in (part_layout(data, nm).get("breaks") or [])]
         gone = {int(p.rsplit("=", 1)[1][1:]) for p in pairs if "=-" in p}
         base = (set(cur) - gone) | {bar}
-        after = {r["j"] for r in report(sorted(base))}
-        pins = [r["last"] for r in rows
-                if r["j"] < row["j"] and r["j"] not in after and r["last"] is not None and r["last"] not in cur]
+        after = {r["j"] for r in report(sorted(base), sorted(keep))}
+        add = [r["last"] for r in rows
+               if r["j"] < row["j"] and r["j"] not in after and r["last"] is not None
+               and r["last"] not in cur and r["last"] not in keep]
         # a break is a limit, not a command: the page must now start where it did and end at j
-        if (row["i"], j) not in {(r["i"], r["j"]) for r in report(sorted(base | set(pins)))}:
+        if (row["i"], j) not in {(r["i"], r["j"]) for r in report(sorted(base), sorted(keep | set(add)))}:
             _die(f"pages: page {page}: no room for the move" if n < 0 else
                  f"pages: page {page}: the move does not give a page end there",
                  "See the room column. Move a system off the page first, or move less")
-        pairs += [f"{nm}:breaks=+{b_}" for b_ in pins]
+        pins_new = sorted(keep | set(add))
     if pairs:
         kept = copy.deepcopy(data)
         try:
             apply_set(data, pairs)
         except ValueError as e:
             _die(f"pages: {e}")
+        if pins_new is not None:
+            set_pins(data, nm, pins_new, lines_sig(lines_now()["strips"]))
         note = "breaks:  " + ", ".join(p.split("=", 1)[1] for p in pairs) + f"  ({nm})"
+        if pins_new:
+            note += f"; pinned (page ends kept for the move): {', '.join(str(b_) for b_ in pins_new)}"
         if dry:
             _note(note + "  (dry run: nothing saved)")
-            rows = report(sorted(int(x) for x in (part_layout(data, nm).get("breaks") or [])))
+            rows = report(sorted(int(x) for x in (part_layout(data, nm).get("breaks") or [])),
+                          pins if pins_new is None else pins_new)
         else:
             save_item(item, data)
             _note(note)
@@ -991,7 +1012,7 @@ def cmd_repage(a: argparse.Namespace) -> int:
     parts (kept by later builds); breaks, duplex and title_page are taken
     from the layout. Writes through parts.new/ like a build."""
     from .lines import count_bad_turns, lines_path, load_lines, turn_text
-    from .render import LAST_RENDER, large_copies, render_part, sheet_text, turns
+    from .render import LAST_RENDER, large_copies, lines_sig, render_part, sheet_text, turns
     start = time.monotonic()
     item = _item_or_die(a.id)
     recover_parts(item)
@@ -1030,6 +1051,13 @@ def cmd_repage(a: argparse.Namespace) -> int:
             continue
         lay = part_layout(data, nm)
         o = {**pl["opts"], **{k: lay.get(k) for k in REPAGE_KEYS}}
+        pin = part_pins(data, nm)
+        if pin and pin.get("lines") == lines_sig(pl["strips"]):
+            o["_pins"] = list(pin["bars"])
+        elif pin:                                   # made for other lines (0.8.39)
+            set_pins(data, nm, [])
+            _note(f"pages:  {nm}: the lines changed, so the page ends kept by `pages --move` (pins) "
+                  "are dropped; your breaks stay")
         lib_logo = library_logo(library_root())
         if lib_logo:
             o["_logo_file"] = str(lib_logo)
