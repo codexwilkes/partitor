@@ -39,6 +39,15 @@ PAPER_GUARD = 230         # local ink must be darker than this (flattened)
 
 TUNE = {'page_header_sp': PAGE_HEADER_SP}   # set from layout / CLI
 
+
+def yaml_load(text: str):
+    """yaml_load -> the data of a YAML text (safe: plain data only). The C loader of
+    libyaml when PyYAML has it (0.8.35: 8 to 11 times faster on a score.yaml, the same
+    data), else the pure-Python SafeLoader. Writing stays with yaml.safe_dump: the C
+    emitter can format the text another way."""
+    import yaml
+    return yaml.load(text, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader))
+
 # Owner codes in the per-pixel owner image. Staff owners are 0..n-1.
 OWN_NONE = -1             # must not remain after analysis
 OWN_DISCARD = -2          # unclassified discard: must not occur (gate)

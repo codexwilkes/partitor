@@ -154,7 +154,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
     prev_lay = out / getattr(a, "layout_name", "layout.yaml")
     if prev_lay.is_file():
         try:
-            sys_joins = list((yaml.safe_load(prev_lay.read_text(encoding="utf-8")) or {}
+            sys_joins = list((config.yaml_load(prev_lay.read_text(encoding="utf-8")) or {}
                               ).get("system_joins") or [])
         except yaml.YAMLError:
             sys_joins = []
@@ -239,7 +239,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
     old_lay = out / getattr(a, "layout_name", "layout.yaml")
     if old_lay.is_file():
         try:
-            old_rules = (yaml.safe_load(old_lay.read_text(encoding="utf-8")) or {}
+            old_rules = (config.yaml_load(old_lay.read_text(encoding="utf-8")) or {}
                          ).get("bar_rules") or {}
         except yaml.YAMLError:
             old_rules = {}
@@ -314,7 +314,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
 
 
 def load_layout(path: Path) -> dict:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    return config.yaml_load(path.read_text(encoding="utf-8"))
 
 
 REST_FREE_SP = 14.0     # staff start (clef, key, time) skipped by the empty-staff check

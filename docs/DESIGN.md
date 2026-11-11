@@ -102,6 +102,11 @@ Rules:
 
 ## 3. Settings per item (`score.yaml`)
 
+Read with `config.yaml_load`: safe data only, the C loader of libyaml when PyYAML has it
+(0.8.35; a 70-page score's file loads in 0.3 s instead of 3 s, and a command loads it several
+times), else the pure-Python loader; the data is the same. Written with `yaml.safe_dump` (the
+text format does not change).
+
 | Key | Example | Notes |
 |---|---|---|
 | `id`, `slug` | `2026-10-0012`, `composer-title` | Set by `new`. The id never changes (§2.1). |

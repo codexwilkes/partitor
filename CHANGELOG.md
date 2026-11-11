@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.35 — 2026-11-10
+
+### Changed
+- Faster commands on large items: `score.yaml` and `layout.yaml` are read with the C loader of
+  libyaml (part of PyYAML) when it is there, else as before. A rebuild reads `score.yaml` about 11
+  times; for a 70-page score that took 30 s and now takes about 3 s. The data read is the same; the
+  files are written as before.
+
 ## 0.8.34 — 2026-11-10
 
 ### Changed

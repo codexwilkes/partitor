@@ -1102,6 +1102,64 @@ class TestLibrary(unittest.TestCase):
 
 
 @needs_deps
+class TestYamlLoad(unittest.TestCase):
+    """config.yaml_load (0.8.35): the C loader of libyaml, the same data as yaml.safe_load."""
+
+    DATA = {"id": "2026-10-0001", "title": "Maria, gegreüsset — “seist” du", "pages": "1-12",
+            "dpi": 400, "gap": 10.0, "zero": "08", "flag": "on", "none": None, "date": "2026-10-28 00:05",
+            "map": ["Alto", "-", "?"], "nested": {"Trombones": {"breaks": [35, 61], "short": "Trb."}},
+            "built": {"parts": [{"part": "A", "staff_mm": 5.56, "reflow": False}]}}
+
+    def test_same_data_as_safe_load_on_a_saved_item(self):
+        import yaml
+        with tempfile.TemporaryDirectory() as d:
+            item = Path(d, "2026-10-0001-x")
+            item.mkdir()
+            pt.save_item(item, dict(self.DATA))
+            text = Path(item, "2026-10-0001-score.yaml").read_text(encoding="utf-8")
+            self.assertEqual(pt.yaml_load(text), yaml.safe_load(text))
+            self.assertEqual(pt.load_item(item), yaml.safe_load(text))
+
+    def test_uses_the_c_loader_when_there_is_one(self):
+        import yaml
+        if not getattr(yaml, "CSafeLoader", None):
+            self.skipTest("PyYAML without libyaml")
+        seen = []
+        real = yaml.load
+
+        def spy(text, Loader):
+            seen.append(Loader)
+            return real(text, Loader=Loader)
+        with mock.patch.object(yaml, "load", spy):
+            pt.yaml_load("a: 1\n")
+        self.assertEqual(seen, [yaml.CSafeLoader])
+
+    def test_pure_python_loader_without_libyaml_and_no_unsafe_tags(self):
+        import yaml
+        saved = getattr(yaml, "CSafeLoader", None)
+        try:
+            if hasattr(yaml, "CSafeLoader"):
+                delattr(yaml, "CSafeLoader")
+            self.assertEqual(pt.yaml_load("a: [1, 2]\n"), {"a": [1, 2]})
+        finally:
+            if saved is not None:
+                yaml.CSafeLoader = saved
+        with self.assertRaises(yaml.YAMLError):          # safe: no Python objects
+            pt.yaml_load("x: !!python/object/apply:os.system ['true']\n")
+
+    def test_load_item_reads_through_yaml_load(self):
+        cfg = sys.modules["partitor.config"]
+        seen = []
+        real = cfg.yaml_load
+        with tempfile.TemporaryDirectory() as d:
+            item = Path(d, "2026-10-0001-x")
+            item.mkdir()
+            pt.save_item(item, {"id": "2026-10-0001"})
+            with mock_attr(cfg, "yaml_load", lambda t: seen.append(1) or real(t)):
+                pt.load_item(item)
+        self.assertEqual(seen, [1])
+
+
 class TestBuildModule(unittest.TestCase):
     """build owns run_build and cmd_build (R1 names, no shim) and the LAST_BUILD list."""
 

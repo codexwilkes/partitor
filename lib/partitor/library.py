@@ -12,6 +12,7 @@ from pathlib import Path
 
 import yaml
 
+from . import config
 from .bars import renumber
 from .clef import order_pitches, parse_pitch, pitch_str, refresh_ambitus
 from .config import (
@@ -251,7 +252,7 @@ def load_item(item: Path) -> dict:
     """load_item -> score.yaml of an item. A missing id comes from the
     folder name (a failed detect left score.yaml without item keys; the
     menu showed "2026-10-", operator request 2026-10-25)."""
-    data = yaml.safe_load(item_file(item, SCORE_FILE).read_text(encoding="utf-8")) or {}
+    data = config.yaml_load(item_file(item, SCORE_FILE).read_text(encoding="utf-8")) or {}
     if not data.get("id") and ITEM_RE.match(item.name):
         data["id"] = item_id(item)
     return data
