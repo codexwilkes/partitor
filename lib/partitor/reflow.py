@@ -35,7 +35,25 @@ def _single(s: Strip) -> bool:
     return abs((s.staff_bottom - s.staff_top) - 4 * s.sp) <= 0.8 * s.sp
 
 
+# find_prefixes compares each line with its neighbours many times; while it runs, the band of a
+# line is made once (0.8.34). id(strip) -> (strip, band); the strip is kept, so no id is reused.
+_BAND_MEMO: dict = {}
+
+
 def _band(s: Strip) -> np.ndarray:
+    """_band -> _band_now(s); inside find_prefixes, made once per strip (read-only array)."""
+    if not _BAND_MEMO.get("on"):
+        return _band_now(s)
+    hit = _BAND_MEMO.get(id(s))
+    if hit is not None and hit[0] is s:
+        return hit[1]
+    out = _band_now(s)
+    out.flags.writeable = False
+    _BAND_MEMO[id(s)] = (s, out)
+    return out
+
+
+def _band_now(s: Strip) -> np.ndarray:
     """Own ink around the staff (1.5 sp above and below), staff lines
     removed, rows relative to the top line; header text and a system
     barline at the staff start excluded."""
@@ -280,7 +298,18 @@ class _Prefixes(list):
 
 
 def find_prefixes(strips: list[Strip]) -> _Prefixes:
-    """find_prefixes -> per strip (start, donor) or None.
+    """find_prefixes -> _find_prefixes(strips), with the band of each line made once
+    (_BAND_MEMO; the same result, 0.8.34)."""
+    _BAND_MEMO.clear()
+    _BAND_MEMO["on"] = True
+    try:
+        return _find_prefixes(strips)
+    finally:
+        _BAND_MEMO.clear()
+
+
+def _find_prefixes(strips: list[Strip]) -> _Prefixes:
+    """_find_prefixes -> per strip (start, donor) or None.
     start: x (img) where the music of the line's first bar starts; donor:
     the strip whose columns 0..its start are the clef + key signature copied
     to the front of a continuation line. None: the line is never cut.

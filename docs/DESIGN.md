@@ -195,6 +195,10 @@ notehead, slur or word goes whole to one owner.
      0.84 sp^2, ink ratio at most 0.04). Not covered: a flat that becomes a
      sharp on the same line, and a key change on a score whose lines differ
      in more than the key. The build lists every borrowed line.
+     Cost (0.8.34): each line is compared with its 6 nearest lines; the ink
+     band of a line (staff lines removed) is made once per line during one
+     search, not once per pair (about 15 times per line before). Same result,
+     about half the time.
    - Lines that cannot be cut safely stay whole: no prefix, not ending at a
      barline, one-line movements, multi-bar rests. A line ends at a barline
      when the last barline found lies within 2.5 sp of the staff end (0.8.2;

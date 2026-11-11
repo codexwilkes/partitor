@@ -255,6 +255,46 @@ class TestReflow(unittest.TestCase):
         pre[2] = None                                 # a line that stays whole
         self.assertEqual(pt.reflow_caps(ls, pre), 200)
 
+    def _six_lines(self):
+        return self.lines() + [flow_line([(73, 44), (115, 60)], [102, 145, 198], key=True),
+                               flow_line([(74, 60), (118, 52)], [104, 150, 198], key=True),
+                               flow_line([(71, 52), (121, 44)], [106, 155, 198], key=True)]
+
+    def test_find_prefixes_makes_each_band_once(self):
+        """0.8.34: find_prefixes compared each line with 6 neighbours and made the band of both
+        lines for each pair (about 15 bands per line). Now one band per line and view."""
+        reflow = sys.modules["partitor.reflow"]
+        ls = self._six_lines()
+        seen = []
+        real = reflow._band_now
+
+        def count(s):
+            seen.append(id(s))
+            return real(s)
+        with mock_attr(reflow, "_band_now", count):
+            pre = pt.find_prefixes(ls)
+        self.assertTrue(all(p is not None for p in pre))
+        self.assertEqual(len(seen), len(set(seen)))          # no band made twice
+        self.assertLessEqual(len(seen), 2 * len(ls))
+
+    def test_band_memo_gives_the_same_prefixes_and_ends_with_the_call(self):
+        reflow = sys.modules["partitor.reflow"]
+        ls = self._six_lines()
+        self.assertEqual(list(pt.find_prefixes(ls)), list(reflow._find_prefixes(ls)))
+        self.assertEqual(reflow._BAND_MEMO, {})             # nothing kept after the call
+        self.assertTrue(pt._band(ls[0]).flags.writeable)    # outside it: a new array each time
+
+    def test_band_memo_ends_when_find_prefixes_fails(self):
+        reflow = sys.modules["partitor.reflow"]
+
+        def boom(strips):
+            reflow._band(strips[0])
+            raise RuntimeError("stop")
+        with mock_attr(reflow, "_find_prefixes", boom):
+            with self.assertRaises(RuntimeError):
+                pt.find_prefixes(self._six_lines())
+        self.assertEqual(reflow._BAND_MEMO, {})
+
     def test_band_ignores_skewed_staff_lines_and_system_barline(self):
         s = flow_line([], [198])
         s.img[40:81, 0:2] = True                      # system barline at the start

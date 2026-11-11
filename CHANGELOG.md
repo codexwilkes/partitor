@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.34 — 2026-11-10
+
+### Changed
+- Faster build and `plan` data: the search for the clef and key signature of each line (used by
+  re-flow, rest merging and the plan data) made the ink band of a line once for each line it was
+  compared with, about 15 times per line. It now makes it once per line. Same result; on the saved
+  lines of four scores (40 parts) the search took 34 s instead of 72 s.
+
 ## 0.8.33 — 2026-11-10
 
 ### Changed
