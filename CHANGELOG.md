@@ -7,6 +7,15 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.40 — 2026-11-11
+
+### Changed
+- The page-turn planner of fold-out parts (`foldouts: on`, `plan`) is about 2.6 times faster: it
+  makes the page groups of the winning plan only, not of every candidate. The plans are the same.
+- The planner can now also plan single-sided print, a cost for the last page (room for the logo)
+  and turns at a section start. Nothing uses this yet: it prepares the move of every part to this
+  planner (next release). Output does not change.
+
 ## 0.8.39 — 2026-11-11
 
 ### Changed

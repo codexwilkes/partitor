@@ -41,6 +41,8 @@ class Boundary:
     rest_bars: int = 0
     movement: bool = False
     bridge_bars: int = 0
+    section: bool = False   # a section starts at line j (a rehearsal letter): class "section" (0.8.40)
+                            # when Costs.section is below Costs.bad
 
 
 @dataclass(frozen=True)
@@ -53,12 +55,13 @@ class Costs:
     page: float = PAGE_COST
     fill: float = REPAGE_FILL
     short_last: float = SHORT_LAST
+    section: float = PLAN_BAD      # a turn at a section start while playing (0.8.40; the caller sets it)
 
 
 @dataclass(frozen=True)
 class Turn:
     before: int             # the turn comes before this line
-    cls: str                # rest | rest1 | attacca | bridge | bad | end (the part ends)
+    cls: str                # rest | rest1 | attacca | section | bridge | bad | end (the part ends)
     cost: float
     bars: int               # rest bars next to the turn (0: none)
 
@@ -123,6 +126,8 @@ def classify(b: Boundary, costs: Costs) -> tuple[str, float]:
         options.append(("rest1", costs.rest_one))
     if b.movement:
         options.append(("attacca", costs.attacca))
+    if b.section and costs.section < costs.bad:      # else it is a bad turn, named so
+        options.append(("section", costs.section))
     if b.bridge_bars >= 1:
         options.append(("bridge", costs.bridge))
     options.append(("bad", costs.bad))
@@ -133,7 +138,8 @@ def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
                bounds: list, *, avail_first: float | None = None,
                title_page: bool = True, allow_fold: bool = True,
                forced: tuple = (), costs: Costs | None = None,
-               fold_sides: tuple = ("right",)) -> Plan:
+               fold_sides: tuple = ("right",), last_cost: Callable[[int], float] | None = None,
+               single: bool = False) -> Plan:
     """plan_turns -> Plan for n lines.
     used(i, j): height of lines i..j-1 on one page; avail: height of a page
     (avail_first: of the first content page); bounds[j]: Boundary before line
@@ -142,7 +148,10 @@ def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
     it. allow_fold: fold-out groups may be used, on the sides of fold_sides
     ("right", "left"; the cheapest wins, right on a tie). forced: line indices
     where a page must end (no page runs past one). Page breaks and fold-outs
-    are chosen for the whole part at once (dynamic programming)."""
+    are chosen for the whole part at once (dynamic programming).
+    last_cost(i): an extra cost of the last page when it holds lines i..n-1 (the
+    caller's logo room, 0.8.40). single: printed on one side, so a turn follows
+    every page and there are no spreads or fold-outs (0.8.40)."""
     costs = costs or Costs()
     avail_first = avail if avail_first is None else avail_first
     forced = tuple(sorted(f for f in set(forced) if 0 < f < n))
@@ -157,82 +166,138 @@ def plan_turns(n: int, used: Callable[[int, int], float], avail: float,
             turns[j] = Turn(j, cls, cost, b.rest_bars)
         return turns[j]
 
-    def page_ends(i: int):
-        """Possible ends j of a page that starts at line i."""
+    @functools.lru_cache(maxsize=None)
+    def page_ends(i: int) -> tuple:
+        """Possible ends j of a page that starts at line i (made once per i, 0.8.40)."""
         cap = avail_first if i == 0 else avail
         fj = next((f for f in forced if f > i), None)
+        out = []
         for j in range(i + 1, n + 1):
             if used(i, j) > cap and j > i + 1:
-                return
-            yield j
+                break
+            out.append(j)
             if fj is not None and j >= fj:
-                return
+                break
+        return tuple(out)
+
+    pcost: dict = {}
 
     def page_cost(i: int, j: int) -> float:
-        cap = avail_first if i == 0 else avail
-        if j == n:
-            return costs.page + (costs.short_last if n - i < MIN_LAST_LINES and i > 0 else 0.0)
-        return costs.page + costs.fill * max(0.0, 1.0 - used(i, j) / cap) ** 2
+        got = pcost.get((i, j))
+        if got is None:
+            cap = avail_first if i == 0 else avail
+            if j == n:
+                got = costs.page + (costs.short_last if n - i < MIN_LAST_LINES and i > 0 else 0.0)
+                if last_cost is not None:
+                    got += last_cost(i)
+            else:
+                got = costs.page + costs.fill * max(0.0, 1.0 - used(i, j) / cap) ** 2
+            pcost[(i, j)] = got
+        return got
 
     def foldable(t: Turn) -> bool:
         return t.cls in ("rest", "rest1")
 
-    sides = tuple(s for s in fold_sides if s in ("right", "left")) if allow_fold else ()
+    sides = tuple(s for s in fold_sides if s in ("right", "left")) if allow_fold and not single else ()
 
     @functools.lru_cache(maxsize=None)
     def best(i: int, entry_ok: bool, prev_right: bool = False):
         """Lines i..n-1 as groups, the first group starting on a verso.
         entry_ok: the turn before i is a rest turn (a fold-out may start).
-        prev_right: the group before i is a right fold-out."""
+        prev_right: the group before i is a right fold-out. The cheapest candidate
+        is kept as it is met (the first of equal costs, as min over the list in
+        this order); its groups are made only for it (0.8.40)."""
         if i >= n:
             return 0.0, ()
-        found = []
+        top, make = INF, None
         for a in page_ends(i):
             ca = page_cost(i, a)
             if a == n:
-                found.append((ca, (Group(((i, a),), False, turn(n)),)))
+                if ca < top:
+                    top, make = ca, (0, i, a)
                 continue
             for b in page_ends(a):
                 cb = ca + page_cost(a, b)
                 if b == n:
-                    found.append((cb, (Group(((i, a), (a, b)), False, turn(n)),)))
+                    if cb < top:
+                        top, make = cb, (1, i, a, b)
                     continue
                 t = turn(b)
-                sub, rest = best(b, foldable(t), False)
-                found.append((cb + t.cost + sub, (Group(((i, a), (a, b)), False, t),) + rest))
+                sub, _ = best(b, foldable(t), False)
+                c = cb + t.cost + sub
+                if c < top:
+                    top, make = c, (2, i, a, b)
                 if not (sides and entry_ok):
                     continue
-                for c in page_ends(b):
-                    cc = cb + page_cost(b, c) + costs.fold
+                for c_ in page_ends(b):
+                    cc = cb + page_cost(b, c_) + costs.fold
                     for side in sides:
                         if side == "left" and (prev_right or (i == 0 and title_page)):
                             continue
-                        pages3 = ((i, a), (a, b), (b, c))
-                        if c == n:
-                            found.append((cc, (Group(pages3, True, turn(n), side),)))
+                        if c_ == n:
+                            if cc < top:
+                                top, make = cc, (3, i, a, b, c_, side)
                             continue
-                        t = turn(c)
-                        if not foldable(t):
+                        t3 = turn(c_)
+                        if not foldable(t3):
                             continue
-                        sub, rest = best(c, True, side == "right")
-                        found.append((cc + t.cost + sub, (Group(pages3, True, t, side),) + rest))
-        if not found:
+                        sub, _ = best(c_, True, side == "right")
+                        c = cc + t3.cost + sub
+                        if c < top:
+                            top, make = c, (4, i, a, b, c_, side)
+        if make is None:
             return INF, ()
-        return min(found, key=lambda f: f[0])
+        kind = make[0]
+        if kind == 0:
+            return top, (Group(((i, make[2]),), False, turn(n)),)
+        if kind == 1:
+            return top, (Group(((i, make[2]), (make[2], make[3])), False, turn(n)),)
+        if kind == 2:
+            _, _, a, b = make
+            t = turn(b)
+            return top, (Group(((i, a), (a, b)), False, t),) + best(b, foldable(t), False)[1]
+        _, _, a, b, c_, side = make
+        pages3 = ((i, a), (a, b), (b, c_))
+        if kind == 3:
+            return top, (Group(pages3, True, turn(n), side),)
+        t3 = turn(c_)
+        return top, (Group(pages3, True, t3, side),) + best(c_, True, side == "right")[1]
+
+    @functools.lru_cache(maxsize=None)
+    def best_single(i: int):
+        """Lines i..n-1 printed on one side: one page per group, a turn after each page."""
+        if i >= n:
+            return 0.0, ()
+        top, pick = INF, None
+        for a in page_ends(i):
+            c = page_cost(i, a)
+            if a < n:
+                c += turn(a).cost + best_single(a)[0]
+            if c < top:
+                top, pick = c, a
+        if pick is None:
+            return INF, ()
+        return top, (Group(((i, pick),), False, turn(pick)),) + best_single(pick)[1]
 
     if n <= 0:
         return Plan((), 0.0)
+    if single:
+        cost, groups = best_single(0)
+        return Plan(groups, cost)
     if title_page:
         cost, groups = best(0, True)
         return Plan(groups, cost)
     # no title page: content page 1 is a recto on its own, a turn after it
-    found = []
+    top, pick = INF, None
     for a in page_ends(0):
         if a == n:
-            found.append((page_cost(0, a), (Group(((0, a),), False, turn(n)),)))
-            continue
-        t = turn(a)
-        sub, rest = best(a, foldable(t), False)
-        found.append((page_cost(0, a) + t.cost + sub, (Group(((0, a),), False, t),) + rest))
-    cost, groups = min(found, key=lambda f: f[0])
-    return Plan(groups, cost)
+            c = page_cost(0, a)
+        else:
+            t = turn(a)
+            c = page_cost(0, a) + t.cost + best(a, foldable(t), False)[0]
+        if c < top:
+            top, pick = c, a
+    if pick == n:
+        return Plan((Group(((0, n),), False, turn(n)),), top)
+    t = turn(pick)
+    return Plan((Group(((0, pick),), False, t),) + best(pick, foldable(t), False)[1], top)

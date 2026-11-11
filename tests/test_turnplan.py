@@ -212,5 +212,51 @@ class TestLeftFoldOuts(unittest.TestCase):
         self.assertEqual(run(12, allow_fold=False, fold_sides=("right", "left")).folds, 0)
 
 
+
+class TestPlannerAdditions(unittest.TestCase):
+    """0.8.40: what only render.plan_pages had (single-sided print, a cost on the last page,
+    turns at a section start), and the groups made only for the winner. All off by default."""
+
+    def test_single_sided_has_one_page_per_group_and_a_turn_after_each(self):
+        p = run(10, {4: B(rest_bars=3)}, single=True)
+        self.assertTrue(all(g.faces == 1 and not g.fold for g in p.groups))
+        self.assertEqual(sum(1 for g in p.groups if g.turn.cls != "end"), p.pages - 1)
+        self.assertEqual(p.groups[0].pages, ((0, 4),))           # the turn at the rest
+        self.assertEqual(p.folds, 0)
+        self.assertEqual(run(10, single=True, allow_fold=True).folds, 0)
+
+    def test_last_cost_counts_on_the_last_page_only(self):
+        # 7 lines, 4 per page: the last page holds 3 lines (4+3), or 4 (3+4) when the cost
+        # of a last page that starts at line 4 is high (the logo would not fit there)
+        base = run(7, title_page=False, allow_fold=False)
+        self.assertEqual(base.groups[-1].pages[-1], (4, 7))
+        moved = run(7, title_page=False, allow_fold=False, last_cost=lambda i: 25.0 if i == 4 else 0.0)
+        self.assertEqual(moved.groups[-1].pages[-1], (3, 7))
+        self.assertEqual(run(7, title_page=False, allow_fold=False, last_cost=lambda i: 0.0).cost, base.cost)
+
+    def test_a_section_turn_when_its_cost_is_set(self):
+        cheap = tp.Costs(section=60.0)
+        self.assertEqual(tp.classify(B(section=True), cheap), ("section", 60.0))
+        self.assertEqual(tp.classify(B(section=True, movement=True), cheap), ("section", 60.0))
+        self.assertEqual(tp.classify(B(section=True), tp.Costs()), ("bad", tp.PLAN_BAD))   # default: a bad turn
+        self.assertEqual(tp.classify(B(section=True, rest_bars=2), cheap), ("rest", 0.0))
+
+    def test_groups_are_made_for_the_winner_of_each_state_only(self):
+        made = []
+        real = tp.Group
+
+        class Count(real):
+            def __init__(self, *a, **kw):
+                made.append(1)
+                super().__init__(*a, **kw)
+        try:
+            tp.Group = Count
+            p = run(60, {j: B(rest_bars=2) for j in range(5, 60, 7)}, fold_sides=("right", "left"))
+        finally:
+            tp.Group = real
+        self.assertGreaterEqual(len(made), len(p.groups))
+        self.assertLess(len(made), 3 * 60)          # one per state at most (old: one per candidate)
+
+
 if __name__ == "__main__":
     unittest.main()

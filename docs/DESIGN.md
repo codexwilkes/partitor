@@ -833,6 +833,14 @@ the cost. The pure planner is in `turnplan`; `render` feeds it (`plan_faces`, `l
   fold-out cannot be the first group after a title page (the title page would be on its back).
 - Pages and fold-outs are chosen for the whole part at once (dynamic programming), with the page
   costs of §5.4 (`PAGE_COST`, `REPAGE_FILL`, `SHORT_LAST`). Manual breaks (`breaks`) end a page.
+- 0.8.40 (for the move of every part to this planner, §5.4): `plan_turns` also takes `single`
+  (printed on one side: one page per group, a turn after each page, no fold-outs), `last_cost(i)`
+  (an extra cost of the last page when it starts at line i: the room for the logo) and a turn
+  class `section` (`Boundary.section`: a rehearsal letter; `Costs.section`, used only when it is
+  below `Costs.bad`). The build does not use them yet. The search keeps the cheapest candidate as it
+  goes and makes the groups of the winner only (one per state; before, one per candidate): the same
+  plans (3 000 random cases against 0.8.39, 0 differences), about 2.6 times faster. Checked against
+  a brute force: 1 600 cases for spreads and fold-outs (2026-11-10), 800 for the single-sided mode.
 
 Print of a part with fold-outs (`render_plan`). Four files per part (0.8.12), and with the
 large-print copy two more (`-11x17.pdf` and `-foldout-flaps-11x17.pdf`, §5.6). A fold-out is made in
