@@ -38,7 +38,7 @@ from .library import (
     piece_tag, recover_parts, save_item, score_name, set_pins, swap_parts,
 )
 from .lines import (
-    count_bad_turns, fill_rests, finish_lines, label_column, lines_path, merge_rest_bars, save_lines, turn_where,
+    coalesce_rest_lines, count_bad_turns, fill_rests, finish_lines, label_column, lines_path, merge_rest_bars, save_lines, turn_where,
 )
 from .partplan import read_source
 from .mapping import assign_maps
@@ -638,7 +638,8 @@ def cmd_build(a: argparse.Namespace) -> int:
     if _counts["fail"]:
         return _summary(start)
 
-    part_strips = {p: merge_rest_bars(fill_rests(v, opts), opts) for p, v in part_strips.items()}
+    part_strips = {p: coalesce_rest_lines(merge_rest_bars(fill_rests(v, opts), opts), opts)
+                   for p, v in part_strips.items()}
     group_strips = {g: merge_rest_bars(fill_rests(v, opts), opts) for g, v in group_strips.items()}
     for v in group_strips.values():
         for s_ in v:

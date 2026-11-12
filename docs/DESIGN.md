@@ -291,8 +291,13 @@ notehead, slur or word goes whole to one owner.
    (`Strip.rest_labels`); the barlines inside the run go, the merged bar keeps
    the number of its first bar, and the line gets shorter, so re-flow and the
    planner see fewer lines. The test is made for certain: a note, a stem, a
-   hollow whole note, a rest of another length, a dot, text, a rehearsal mark
-   or a printed number keeps the bar as engraved. A merged rest that starts or ends a line is
+   hollow whole note, a rest of another length, a dot away from the rest, text, a rehearsal mark
+   or a printed number keeps the bar as engraved. The rest may be a whole,
+   half or breve rest (a block up to 1.2 sp high), with the dot of a dotted
+   rest (0.8.56). Lines that are nothing but rests (a rest line, or every bar
+   merged) are joined: two or more in a row, one staff each, are one line
+   whose count is the sum (`coalesce_rest_lines`, 0.8.56); a title, a mark or
+   a number ends the run. A merged rest that starts or ends a line is
    recorded (`Strip.rest_in`, `rest_out`; re-flow gives each piece those of its first and last
    bar) and counts as a rest at a page turn: the planner, `plan` and the turn report take the
    longest of a rest line on either side and these edges, with the same minimum of 2 bars. A single rest-only bar at a line edge, or a line with no

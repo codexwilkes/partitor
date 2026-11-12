@@ -469,6 +469,7 @@ def fill_rests(items: list, opts: dict) -> list[Strip]:
 # =============================================================================
 # Bars of rests inside a line, merged (0.8.11)
 # =============================================================================
+REST_BLOCK_MAX_SP = 1.2   # a measure rest block is up to this high: a whole rest 0.5 sp, a breve rest a space (0.8.56)
 MERGE_MIN_BARS = 2      # a run of this many rest-only bars becomes one multi-bar rest
 
 
@@ -506,9 +507,10 @@ def staff_lines(s: Strip) -> list[list[float]]:
 
 def _only_measure_rests(s: Strip, lines: list[list[float]], xa: int, xb: int) -> bool:
     """True when columns xa..xb of the line hold, on every staff, one filled
-    rest block (a whole or half rest) and nothing else but staff lines. Any
-    other ink (note, stem, rest of another length, dot, text, a number) makes
-    it False: a bar is merged only when this is certain."""
+    rest block (a whole, half or breve rest, with the dot of a dotted rest) and
+    nothing else but staff lines. Any other ink (note, stem, rest of another
+    length, text, a number) makes it False: a bar is merged only when this is
+    certain."""
     sp = s.sp
     tops = [int(round(ln[0])) for ln in lines]
     if xb - xa < 2 * sp or not tops:
@@ -537,13 +539,27 @@ def _only_measure_rests(s: Strip, lines: list[list[float]], xa: int, xb: int) ->
         if not part.any():
             return False
         n, lab, stats, _ = cv2.connectedComponentsWithStats(part.astype(np.uint8), connectivity=8)
-        if n != 2:                             # background and one block
+        # pieces of a staff line left by a faint scan (0.2 sp high or less) are not ink
+        # here; what is left is one block, and a dot at most
+        keep = [j for j in range(1, n) if stats[j, cv2.CC_STAT_HEIGHT] > 0.2 * sp
+                and not (stats[j, cv2.CC_STAT_WIDTH] > 4 * sp          # or a long sparse run of
+                         and stats[j, cv2.CC_STAT_AREA] < 0.4 * stats[j, cv2.CC_STAT_WIDTH]
+                         * stats[j, cv2.CC_STAT_HEIGHT])]               # such pieces joined
+        if len(keep) not in (1, 2):
             return False
-        w, h, area = (int(stats[1, cv2.CC_STAT_WIDTH]), int(stats[1, cv2.CC_STAT_HEIGHT]),
-                      int(stats[1, cv2.CC_STAT_AREA]))
-        if not (0.8 * sp <= w <= 2.2 * sp and 0.25 * sp <= h <= 0.75 * sp
+        k = max(keep, key=lambda j: stats[j, cv2.CC_STAT_AREA])
+        w, h, area = (int(stats[k, cv2.CC_STAT_WIDTH]), int(stats[k, cv2.CC_STAT_HEIGHT]),
+                      int(stats[k, cv2.CC_STAT_AREA]))
+        if not (0.8 * sp <= w <= 2.2 * sp and 0.25 * sp <= h <= REST_BLOCK_MAX_SP * sp
                 and area >= 0.85 * w * h):
             return False
+        if len(keep) == 2:                     # the dot of a dotted rest: small, right of the block
+            j = keep[0] if keep[1] == k else keep[1]
+            dx, dy, dw, dh, da = (int(v) for v in stats[j])
+            bx = int(stats[k, cv2.CC_STAT_LEFT]) + w
+            if not (dw <= 0.6 * sp and dh <= 0.6 * sp and da >= 0.04 * sp * sp
+                    and 0 <= dx - bx <= 1.5 * sp):
+                return False
     return True
 
 
@@ -653,6 +669,63 @@ def merge_rest_bars(strips: list[Strip], opts: dict, pre: list | None = None) ->
                 b = run[1] + 1 if run else b + 1
             edge["rest_counts"] = counts
         out.append(dc_replace(s, **edge) if edge else s)
+    return out
+
+
+def _all_rest_bars(s: Strip) -> int:
+    """_all_rest_bars -> the bars of rest a one-staff line holds when it is
+    nothing else: a rest line, or a line whose every bar was merged or is a
+    rest bar (rest_counts), with no mark, number or title; else 0."""
+    if not _single(s):
+        return 0
+    if s.rest_src is not None:
+        return int(s.rest_src[2].bars)
+    if not s.rest_counts or not s.bars_x or not all(c > 0 for c in s.rest_counts):
+        return 0
+    if s.marks or s.movement or s.hdr.any() or (s.num_mask is not None and s.num_mask.any()):
+        return 0
+    return int(sum(s.rest_counts))
+
+
+def coalesce_rest_lines(strips: list[Strip], opts: dict) -> list[Strip]:
+    """coalesce_rest_lines -> the lines with each run of two or more lines
+    that hold only rests made one multi-bar rest line (the bars add up).
+
+    A part with a long rest was printed as several lines "2", "2", "4": one
+    line "8" saves lines, and so page turns (Grillo Sonata Bassus, bars 71 to
+    74; 0.8.56). One-staff lines only; a movement start (title) or a line
+    with a mark or a number ends the run and keeps its own line.
+    `rests: keep` leaves the lines alone."""
+    if opts.get("rests", "compress") != "compress" or len(strips) < 2:
+        return strips
+    n = [_all_rest_bars(s) for s in strips]
+    if sum(1 for v in n if v) < 2:
+        return strips
+    pre = find_prefixes(strips)
+    out: list[Strip] = []
+    i = 0
+    while i < len(strips):
+        if not n[i]:
+            out.append(strips[i])
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(strips) and n[j + 1] and not strips[j + 1].movement:
+            j += 1
+        if j == i or (strips[i].hdr.any() and strips[i].rest_src is None):
+            out.extend(strips[i:j + 1])
+            i = j + 1
+            continue
+        a = strips[i]
+        if a.rest_src is not None:
+            src, cw, run0 = a.rest_src
+            run = RestRun(sum(n[i:j + 1]), run0.first, run0.movement, run0.header)
+        else:
+            p = pre[i]
+            src, cw = (strips[p[1]], pre[p[1]][0]) if p else (None, 0)
+            run = RestRun(sum(n[i:j + 1]), a.bar_no, False, None)
+        out.append(make_rest_strip(a, src, cw, run, opts))
+        i = j + 1
     return out
 
 

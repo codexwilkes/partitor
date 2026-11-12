@@ -1425,7 +1425,8 @@ class TestMergeRestBars(unittest.TestCase):
     BARS = [130, 230, 330, 430]       # barline x: bar 0 starts at PRE
     PRE = 30
 
-    def line(self, staves=1, hollow=None, note=None, mark=None, rests=(0, 1, 2)):
+    def line(self, staves=1, hollow=None, note=None, mark=None, rests=(0, 1, 2),
+             kind="whole", dot=None):
         """sp 10; a staff top at 40, 140, ...; a whole rest hangs under line 2 in each
         bar of `rests`; `note` (bar, staff): a quarter note instead; `hollow`
         (bar, staff): a whole note."""
@@ -1445,8 +1446,13 @@ class TestMergeRestBars(unittest.TestCase):
                 elif (b, k) == hollow:
                     img[t0 + 20:t0 + 30, cx:cx + 13] = True
                     img[t0 + 22:t0 + 28, cx + 3:cx + 10] = False
+                elif kind == "breve":
+                    img[t0 + 10:t0 + 21, cx:cx + 11] = True          # a block filling a space, 1 sp
                 else:
                     img[t0 + 11:t0 + 16, cx:cx + 14] = True          # whole rest, 0.5 sp
+                if dot and (b, k) != note:
+                    dx = cx + (14 if kind == "whole" else 11) + (8 if dot == "near" else 80)
+                    img[t0 + 12:t0 + 15, dx:dx + 3] = True           # the dot of a dotted rest
         for b in self.BARS:
             img[tops[0]:tops[-1] + 41, b:b + 2] = True
         s = pt.Strip(img, 0, tops[0], tops[0] + 40, 10.0, np.zeros_like(img),
@@ -1471,6 +1477,16 @@ class TestMergeRestBars(unittest.TestCase):
         """A hollow whole note on one staff keeps its bar."""
         self.assertEqual(pt.rest_bar_runs(self.line(staves=3, hollow=(0, 1)), self.PRE), [(1, 2)])
 
+    def test_breve_and_dotted_rests_are_merged(self):
+        # Grillo Sonata Bassus: a block filling a space, and dotted whole rests
+        self.assertEqual(pt.rest_bar_runs(self.line(kind="breve"), self.PRE), [(0, 2)])
+        self.assertEqual(pt.rest_bar_runs(self.line(dot="near"), self.PRE), [(0, 2)])
+        self.assertEqual(pt.rest_bar_runs(self.line(staves=3, kind="breve", dot="near"), self.PRE),
+                         [(0, 2)])
+
+    def test_a_dot_far_from_the_rest_keeps_the_bar(self):
+        self.assertEqual(pt.rest_bar_runs(self.line(dot="far"), self.PRE), [])
+
     def test_a_single_rest_bar_is_kept(self):
         self.assertEqual(pt.rest_bar_runs(self.line(rests=(0,)), self.PRE), [])
 
@@ -1480,6 +1496,39 @@ class TestMergeRestBars(unittest.TestCase):
 
     def merged(self, **kw):
         return pt.merge_rest_bars([self.line(**kw)], {"rests": "compress"}, pre=[(self.PRE, 0)])[0]
+
+    def rest_line(self, bar_no, **kw):
+        s = self.merged(rests=(0, 1, 2, 3), **kw)
+        s.bar_no = bar_no
+        return s
+
+    def test_lines_of_rests_become_one_line(self):
+        # Grillo Sonata Bassus: lines "2", "2" and "4" are one line "8"
+        a, b, c = self.rest_line(71), self.rest_line(73), self.rest_line(75)
+        self.assertEqual(a.rest_counts, [4])
+        out = pt.coalesce_rest_lines([a, b, c], {"rests": "compress"})
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0].rest_label[1], "12")
+        self.assertEqual(out[0].bar_no, 71)
+        self.assertIsNotNone(out[0].rest_src)
+
+    def test_a_line_with_a_note_ends_the_run(self):
+        note = self.line(note=(1, 0))
+        note.bar_no = 73
+        out = pt.coalesce_rest_lines([self.rest_line(71), note, self.rest_line(75), self.rest_line(77)],
+                                     {"rests": "compress"})
+        self.assertEqual(len(out), 3)
+        self.assertIs(out[1], note)
+        self.assertEqual(out[2].rest_label[1], "8")
+
+    def test_rest_lines_stay_when_rests_are_kept_or_marked(self):
+        a, b = self.rest_line(71), self.rest_line(73)
+        self.assertEqual(len(pt.coalesce_rest_lines([a, b], {"rests": "keep"})), 2)
+        b.marks = [(120, "B")]
+        self.assertEqual(len(pt.coalesce_rest_lines([a, b], {"rests": "compress"})), 2)
+        c = self.rest_line(75)
+        c.movement = True
+        self.assertEqual(len(pt.coalesce_rest_lines([self.rest_line(71), c], {"rests": "compress"})), 2)
 
     def test_the_merge_rebuilds_the_line(self):
         s = self.line(staves=3)

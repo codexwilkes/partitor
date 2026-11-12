@@ -7,6 +7,16 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.56 — 2026-11-11
+
+### Changed
+- Lines that hold only rests are condensed. A bar of a breve rest (a block filling a space) or
+  of a dotted rest is now a rest bar and merges into a multi-bar rest (Grillo Sonata, Bassus:
+  lines of rests were printed bar by bar). Lines of one staff that are nothing but rests, two
+  or more in a row, become one multi-bar rest line with the sum of the bars, which saves lines
+  and page turns. A title, a rehearsal mark or a printed number ends the run; `rests=keep`
+  leaves everything as engraved.
+
 ## 0.8.55 — 2026-11-11
 
 ### Added
