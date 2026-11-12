@@ -323,7 +323,18 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
      of the page, 4 or more within 3 sp of one another, outside every staff) are
      `_fail`: a staff of another size than the page's, such as an organ
      realization printed larger (Riccio Canzon, 0.8.51), was never found and
-     its ink went to the nearest staff. `proof.pdf` marks it in red.
+     its ink went to the nearest staff. `proof.pdf` marks it in red. Before
+     the failure, `analyse_page_mixed` (0.8.52) tries the page as two pages:
+     the staves of the page's size with the bands of the other size blanked,
+     and the other size alone, each an ordinary analysis (its own `sp`). The
+     results merge (`merge_sizes`): staves are renumbered top first, a staff
+     of the other size keeps `Staff.sp` and `Staff.thick`, a system of that
+     size under a system of the page's size joins it when it stands nearer to
+     it than to the next one (3 instrument staves and 2 organ staves are one
+     system of 5; the barlines are those of the first), and text between the
+     staves goes to the staff of the other size just below it. A strip takes
+     its `sp` from its staff. A page with a third size, or a staff that is
+     still unexplained, keeps the failure.
    - Discarded ink outside the header/footer zones above a budget (per page)
      is `_fail`, and `proof.pdf` marks it.
    - Footer: below the last staff of a page, text farther than

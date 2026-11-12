@@ -71,7 +71,7 @@ def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: boo
     jn = (joins or {}).get(pno, ())
     res = cache.get(pno, nsys, jn) if cache is not None else None
     if res is None:
-        res = ownership.analyse_page(doc[pno], pno, dpi, nsys, ocr=ocr, joins=jn)
+        res = ownership.analyse_page_mixed(doc[pno], pno, dpi, nsys, ocr=ocr, joins=jn)
         if cache is not None:
             cache.put(pno, nsys, res, jn)
     for j, grp in enumerate(res.systems):

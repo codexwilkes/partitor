@@ -66,9 +66,9 @@ def make_strip(res: PageResult, st_idx: list[int], header_owner: int,
     above the system's top staff, and moved up if it would touch own ink.
     darker: dilate the ink by 1 px."""
     o = res.owner
-    sp = res.sp
     boxes = owner_boxes(o)
     sts = [res.staves[i] for i in st_idx]
+    sp = sts[0].sp or res.sp                # a staff of another size than the page's (0.8.52)
     ys, xs = _codes_in_box(o, boxes, list(st_idx))
     y0, y1 = int(ys.min()), int(ys.max())
     x0, x1 = int(xs.min()), int(xs.max())
@@ -141,7 +141,8 @@ def group_bars(res: PageResult, idx: list[int], gsys: int, nums: list
     for the re-flow report when no barline is left or the numbers cannot
     follow the merged bars (then no cut at all)."""
     allb = res.barlines.get(gsys, [])
-    sp, thick = res.sp, res.thick
+    st0_ = res.staves[idx[0]]
+    sp, thick = st0_.sp or res.sp, st0_.thick or res.thick
     w = max(1, int(round(GROUP_BAR_SP * sp)))
     kept: list[int] = []
     bad = ""
@@ -416,8 +417,8 @@ def set_bar_geometry(stp: Strip, res: PageResult, idx: list[int], gsys: int,
     stp.bar_nums = [int(n) for n in nums]
     end = max(res.staves[i].x1 for i in idx) + off
     # a repeat or final barline (thin + thick) is found at its middle
-    stp.ends_at_bar = bool(stp.bars_x) and end - stp.bars_x[-1] <= BAR_END_SP * res.sp
-    stp.end_gap_sp = (end - stp.bars_x[-1]) / res.sp if stp.bars_x else -1.0
+    stp.ends_at_bar = bool(stp.bars_x) and end - stp.bars_x[-1] <= BAR_END_SP * stp.sp
+    stp.end_gap_sp = (end - stp.bars_x[-1]) / stp.sp if stp.bars_x else -1.0
 
 
 def anchor(s: Strip) -> int:

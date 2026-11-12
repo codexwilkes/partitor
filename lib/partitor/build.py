@@ -330,7 +330,7 @@ def staff_is_empty(res: "PageResult", idx: int) -> bool:
     no notehead was read without the ledger-line rule (`loose_heads`: a
     stemless breve or whole note, 0.8.50)."""
     st = res.staves[idx]
-    sp = res.sp
+    sp = st.sp or res.sp
     if st.loose_heads:
         return False                    # stemless notes (breve, whole note): not rests
     x1 = int(st.x1)

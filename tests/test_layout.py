@@ -454,6 +454,59 @@ class TestUnseenStaves(unittest.TestCase):
 
 
 @needs_deps
+class TestMixedStaffSizes(unittest.TestCase):
+    """A page with two staff sizes: each size is analysed as a page of its own and merged (0.8.52)."""
+
+    def page(self):
+        def big(page, tops):            # two staves 1.4 x larger, under the 3-staff system
+            for y0 in (430, 500):
+                for ln in range(5):
+                    page.draw_line((110, y0 + ln * 1.4 * SP), (560, y0 + ln * 1.4 * SP), width=0.6)
+                for bx in (280, 420, 560):
+                    page.draw_line((bx, y0), (bx, y0 + 4 * 1.4 * SP), width=0.8)
+            page.draw_line((110, 430), (110, 500 + 4 * 1.4 * SP), width=0.8)
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d, True)
+        path = os.path.join(d, "s.pdf")
+        make_score_pdf(path, systems=1, staves=3, extra=big)
+        return pymupdf.open(path)[0]
+
+    def test_both_sizes_found_in_one_system(self):
+        res = pt.analyse_page_mixed(self.page(), 0, 400, 0)
+        self.assertEqual(res.gate, [])
+        self.assertEqual(len(res.staves), 5)
+        self.assertEqual([len(g) for g in res.systems], [5])
+        self.assertEqual([st.idx for st in res.staves], [0, 1, 2, 3, 4])
+        small, big = res.staves[:3], res.staves[3:]
+        self.assertTrue(all(st.sp == 0 for st in small))
+        self.assertTrue(all(abs(st.sp / res.sp - 1.4) < 0.08 for st in big), [st.sp for st in big])
+        self.assertTrue(all(st.system == res.staves[0].system for st in res.staves))
+
+    def test_owner_has_no_unowned_staff_ink(self):
+        res = pt.analyse_page_mixed(self.page(), 0, 400, 0)
+        for st in res.staves[3:]:       # the big staff lines belong to their own staff
+            y = int(st.lines[2])
+            self.assertGreater(int((res.owner[y - 1:y + 2, 1000:2000] == st.idx).sum()), 600)
+
+    def test_strip_of_the_other_size_has_its_own_sp(self):
+        res = pt.analyse_page_mixed(self.page(), 0, 400, 0)
+        stp = pt.make_strip(res, [3, 4], pt.OWN_HEADER_BASE + res.staves[0].system)
+        self.assertAlmostEqual(stp.sp, res.staves[3].sp)
+        self.assertGreater(stp.sp, 1.3 * res.sp)
+        self.assertEqual(pt.make_strip(res, [0], pt.OWN_HEADER_BASE + res.staves[0].system).sp, res.sp)
+
+    def test_one_size_page_is_the_plain_analysis(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "s.pdf")
+            make_score_pdf(path)
+            page = pymupdf.open(path)[0]
+            a = pt.analyse_page(page, 0, 400, 0)
+            b = pt.analyse_page_mixed(page, 0, 400, 0)
+            self.assertEqual(len(a.staves), len(b.staves))
+            self.assertTrue((a.owner == b.owner).all())
+
+
+@needs_deps
 class TestRestsAndTitles(unittest.TestCase):
     """Multi-bar rests for systems without a part's staff; no false title."""
 

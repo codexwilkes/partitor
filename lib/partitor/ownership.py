@@ -196,13 +196,17 @@ def group_components(comps: list[int], stats: np.ndarray, sp: float
     return list(out.values())
 
 
-def prepare(page: pymupdf.Page, dpi: int
+def prepare(page: pymupdf.Page, dpi: int, blank: "tuple | list" = ()
             ) -> tuple[np.ndarray, float, float, int, int, list]:
     """prepare -> (ink, skew, dewarp px, thick, gap, tracks).
 
     Render, flatten, binarize, deskew, track staves, straighten, and
-    binarize again. Tracks are returned in straightened coordinates."""
+    binarize again. Tracks are returned in straightened coordinates.
+    blank: row ranges (y0, y1) of the render that are made white first (the
+    other staff size of a page, analyse_page_mixed)."""
     grey = flatten(render_page(page, dpi))
+    for y0_, y1_ in blank:
+        grey[max(0, int(y0_)):max(0, int(y1_)), :] = grey.max()
     ink = binarize(grey)
     skew = estimate_skew(ink)
     if abs(skew) >= 0.05:
@@ -243,14 +247,15 @@ def align_system_start(grp: list[Staff], sp: float) -> None:
 
 
 def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
-                 ocr: bool = True, joins: tuple[int, ...] = ()) -> PageResult:
+                 ocr: bool = True, joins: tuple[int, ...] = (),
+                 blank: "tuple | list" = ()) -> PageResult:
     """analyse_page -> PageResult with a complete owner image.
 
     Every ink pixel gets exactly one owner: a staff index, the header of a
     system (OWN_HEADER_BASE + global system index), or a discard class.
     The safety gate results are in PageResult.gate. joins: staff numbers on
     this page after which the operator says no system ends (join_groups)."""
-    ink, skew, dmax, thick, gap, tracks = prepare(page, dpi)
+    ink, skew, dmax, thick, gap, tracks = prepare(page, dpi, blank)
     sp = float(thick + gap)
     h, w = ink.shape
     owner = np.full((h, w), OWN_NONE, np.int32)
@@ -1076,6 +1081,172 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
     return res
 
 
+def _size_bands(res: PageResult) -> list[tuple[int, int]]:
+    """_size_bands -> row ranges of the staves that no accepted staff
+    explains (res.unseen), each cut half way to the nearest staff of the
+    other size. Neighbours of one size share a band (the two organ staves
+    of a system, Riccio Canzon)."""
+    h = res.shape[0]
+    ent = [(st.top, st.bottom, 0, res.sp) for st in res.staves]
+    ent += [(a, b, 1, (b - a) / 4.0) for a, b in res.unseen]
+    ent.sort()
+    bands: list[tuple[int, int]] = []
+    i = 0
+    while i < len(ent):
+        j = i
+        while j + 1 < len(ent) and ent[j + 1][2] == ent[i][2]:
+            j += 1
+        if ent[i][2] == 1:
+            sp2 = ent[i][3]
+            y0 = (ent[i - 1][1] + ent[i][0]) / 2 if i > 0 else ent[i][0] - 6 * sp2
+            y1 = (ent[j][1] + ent[j + 1][0]) / 2 if j + 1 < len(ent) else ent[j][1] + 8 * sp2
+            bands.append((max(0, int(y0)), min(h, int(y1))))
+        i = j + 1
+    return bands
+
+
+def analyse_page_mixed(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
+                       ocr: bool = True, joins: tuple[int, ...] = ()) -> PageResult:
+    """analyse_page_mixed -> PageResult of a page whose staves have two sizes.
+
+    analyse_page measures one staff size per page. When ruled staves are
+    left that no accepted staff explains (res.unseen: an organ realization
+    printed 1.3 x larger than the instrument staves, Riccio Canzon), the
+    page is analysed twice more, as two ordinary pages: the staves of the
+    first size with the bands of the other size blanked, and the other
+    size alone. The two results are merged (merge_sizes): every staff keeps
+    its own sp, each real system keeps all its staves. A page where this
+    leaves ruled lines unexplained keeps the gate failure (0.8.52)."""
+    res = analyse_page(page, pno, dpi, sys_base, ocr=ocr, joins=joins)
+    if not res.unseen or not res.music:
+        return res
+    bands = _size_bands(res)
+    h = res.shape[0]
+    comp, y = [], 0
+    for a, b in bands:
+        if a > y:
+            comp.append((y, a))
+        y = b
+    if y < h:
+        comp.append((y, h))
+    res_b = analyse_page(page, pno, dpi, sys_base, ocr=ocr, blank=comp)
+    if res_b.unseen or not res_b.staves:
+        return res
+    res_a = analyse_page(page, pno, dpi, sys_base, ocr=ocr, blank=bands)
+    if res_a.unseen or not res_a.staves:
+        return res
+    return merge_sizes(res_a, res_b, sys_base, joins)
+
+
+def merge_sizes(a: PageResult, b: PageResult, sys_base: int,
+                joins: tuple[int, ...] = ()) -> PageResult:
+    """merge_sizes -> one PageResult from two passes of one page (a: the
+    staves of the page's size, b: the staves of another size).
+
+    Staves are renumbered top first; those of b keep their sp and line
+    thickness (Staff.sp, Staff.thick). A system of b joins the system of a
+    just above it when it stands nearer to it than to the next one (the
+    organ staves under the instrument staves); the barlines of that system
+    are a's. Owner pixels of b fill what a left empty. joins: the
+    operator's system joins, counted on the merged staves."""
+    for st in b.staves:
+        st.sp, st.thick = b.sp, b.thick
+    order = sorted([(st.top, 0, st) for st in a.staves] + [(st.top, 1, st) for st in b.staves],
+                   key=lambda t: t[0])
+    new_a = np.full(len(a.staves), -1, np.int64)
+    new_b = np.full(len(b.staves), -1, np.int64)
+    staves: list[Staff] = []
+    for k, (_, src, st) in enumerate(order):
+        (new_a if src == 0 else new_b)[st.idx] = k
+        st.idx = k
+        staves.append(st)
+    # system pairing: groups of b under the nearest group of a above them
+    ga = [list(g) for g in a.systems]
+    gb = [list(g) for g in b.systems]
+    paired: dict[int, int] = {}                    # index in gb -> index in ga
+    for j, g in enumerate(gb):
+        above = [i for i, x in enumerate(ga) if x[-1].bottom <= g[0].top]
+        if not above:
+            continue
+        i = max(above, key=lambda q: ga[q][-1].bottom)
+        nxt = [x[0].top for x in ga if x[0].top > g[0].top]
+        d_up = g[0].top - ga[i][-1].bottom
+        if (not nxt or d_up < min(nxt) - g[-1].bottom) and i not in paired.values():
+            paired[j] = i
+    merged: list[tuple[list[Staff], PageResult, int]] = []    # (staves, barline source, its old system)
+    for i, g in enumerate(ga):
+        mem = list(g)
+        for j, q in paired.items():
+            if q == i:
+                mem += gb[j]
+        mem.sort(key=lambda st: st.top)
+        merged.append((mem, a, g[0].system))
+    for j, g in enumerate(gb):
+        if j not in paired:
+            merged.append((list(g), b, g[0].system))
+    merged.sort(key=lambda t: t[0][0].top)
+    groups = join_groups([m[0] for m in merged], joins)
+    srcs: list[list[tuple[PageResult, int]]] = []
+    for gr in groups:                              # the sources inside a (joined) group
+        ids = {id(st) for st in gr}
+        got = [(m[1], m[2]) for m in merged if id(m[0][0]) in ids]
+        srcs.append(sorted(got, key=lambda t: t[0] is not a))    # a's barlines first
+    res = PageResult(a.page, a.shape, a.sp, a.thick, a.skew, max(a.dewarp, b.dewarp),
+                     staves, [], a.owner.copy(), list(a.review) + list(b.review),
+                     list(a.gate) + list(b.gate), list(a.gate_boxes) + list(b.gate_boxes),
+                     {k: a.discard.get(k, 0) + b.discard.get(k, 0)
+                      for k in set(a.discard) | set(b.discard)},
+                     a.ink_px + b.ink_px, a.title or b.title, a.composer or b.composer, True)
+    sysmap_a: dict[int, int] = {}
+    sysmap_b: dict[int, int] = {}
+    for k, gr in enumerate(groups):
+        gsys = sys_base + k
+        for st in gr:
+            st.system = gsys
+        for src_res, old in srcs[k]:
+            (sysmap_a if src_res is a else sysmap_b)[old] = gsys
+        first = srcs[k][0]
+        for fld in ("barlines", "anchors", "num_boxes", "mensur", "repeats"):
+            d = getattr(first[0], fld).get(first[1])
+            if d is not None:
+                getattr(res, fld)[gsys] = d
+        if any(old in src_res.restart for src_res, old in srcs[k]):
+            res.restart.add(gsys)
+    res.systems = groups
+    # owner: b fills what a left empty; staff and header codes are renumbered
+    bo = b.owner
+    take = (bo != OWN_NONE) & (res.owner == OWN_NONE)
+    vals = bo[take]
+    out = vals.copy()
+    st_m = (vals >= 0) & (vals < OWN_HEADER_BASE)
+    out[st_m] = new_b[vals[st_m]]
+    hd_m = vals >= OWN_HEADER_BASE
+    out[hd_m] = [OWN_HEADER_BASE + sysmap_b.get(int(v) - OWN_HEADER_BASE, 0) for v in vals[hd_m]]
+    res.owner[take] = out
+    # a's own codes: staff and header numbers follow the merge too
+    ao = res.owner
+    am = (ao >= 0) & (ao < OWN_HEADER_BASE) & ~take
+    ao[am] = new_a[ao[am]]
+    ah = (ao >= OWN_HEADER_BASE) & ~take
+    ao[ah] = [OWN_HEADER_BASE + sysmap_a.get(int(v) - OWN_HEADER_BASE, 0) for v in ao[ah]]
+    # text between the staves of a system (a title over the organ staves,
+    # "Generalbassaussetzung") was the header of its system in a's pass: it
+    # goes to the staff of the other size just below it (up to 6 of its sp)
+    for k, gr in enumerate(groups):
+        hm = ao == OWN_HEADER_BASE + sys_base + k
+        if not hm.any():
+            continue
+        top = min(st.top for st in gr)
+        ys, xs = np.nonzero(hm)
+        for st in gr:
+            if not st.sp:
+                continue
+            sel = (ys > top) & (ys < st.top) & (ys >= st.top - 6 * st.sp)
+            if sel.any():
+                ao[ys[sel], xs[sel]] = st.idx
+    return res
+
+
 def _gate_unseen_staves(res: PageResult, ink: np.ndarray, staves: list[Staff],
                         sp: float, thick: int) -> None:
     """Safety gate: ruled lines that no accepted staff explains.
@@ -1100,6 +1271,7 @@ def _gate_unseen_staves(res: PageResult, ink: np.ndarray, staves: list[Staff],
     for y in cs + [1e9]:
         if run and y - run[-1] > 3 * sp:
             if len(run) >= 4:
+                res.unseen.append((float(run[0]), float(run[-1])))
                 yc = int(np.mean(run))
                 res.gate.append(f"ruled lines at y={yc} that no staff explains "
                                 "(a staff of another size?)")

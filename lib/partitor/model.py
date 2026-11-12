@@ -22,6 +22,8 @@ class Staff:
     clef: str = "?"       # clef signature: G, F, C3, C4, ... or ?
     brace: int = -1       # bracket group id on the page
     steps: tuple | None = None   # (lowest, highest, x low, x high, bar index low, bar index high)
+    sp: float = 0.0       # staff space of this staff when it differs from the page's (0: the page's; 0.8.52)
+    thick: int = 0        # staff line thickness of this staff (0: the page's)
     loose_heads: int = 0  # noteheads read without the ledger-line rule (stemless notes; build.staff_is_empty)
     x0_found: int = -1    # start as found by detect_staves, before extend_starts (-1: not known)
 
@@ -60,6 +62,7 @@ class PageResult:
     restart: set[int] = field(default_factory=set)  # systems that start a movement
     mensur: dict[int, list[int]] = field(default_factory=dict)  # system -> dotted bar x
     repeats: dict[int, list[tuple[int, str]]] = field(default_factory=dict)
+    unseen: list[tuple[float, float]] = field(default_factory=list)   # (first, last line row) of ruled staves no accepted staff explains (the gate)
 
 
 # =============================================================================

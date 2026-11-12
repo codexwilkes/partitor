@@ -7,6 +7,15 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.52 — 2026-11-11
+
+### Added
+- A page with two staff sizes is read: an organ realization printed larger than the instrument
+  staves (Riccio, Canzon La Rubina and La Pichi) was missed, with its ink given to the nearest
+  staff. Each size is now analysed as a page of its own and the results are merged: the
+  instrument and organ staves are one system, and each staff keeps its own size, so the part is
+  built at its right size. A page that still has unexplained ruled lines fails as before (0.8.51).
+
 ## 0.8.51 — 2026-11-11
 
 ### Fixed
