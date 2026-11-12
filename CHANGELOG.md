@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.51 — 2026-11-11
+
+### Fixed
+- A staff printed at another size than the rest of the page (an organ realization 1.3 times
+  larger, Riccio Canzon) was not found and went unreported: its ink was given to the nearest
+  staff. The safety gate now fails a page that has ruled lines no staff explains, and the proof
+  marks them in red. Reading such staves follows in a later release.
+
 ## 0.8.50 — 2026-11-11
 
 ### Fixed

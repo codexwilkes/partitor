@@ -319,6 +319,11 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
      page-edge artefacts.
    - Discarded ink that holds long horizontal line structure (a missed staff)
      is `_fail`, never discard.
+   - Ruled lines that no accepted staff explains (rows with a line across 35%
+     of the page, 4 or more within 3 sp of one another, outside every staff) are
+     `_fail`: a staff of another size than the page's, such as an organ
+     realization printed larger (Riccio Canzon, 0.8.51), was never found and
+     its ink went to the nearest staff. `proof.pdf` marks it in red.
    - Discarded ink outside the header/footer zones above a budget (per page)
      is `_fail`, and `proof.pdf` marks it.
    - Footer: below the last staff of a page, text farther than

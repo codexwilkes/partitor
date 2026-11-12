@@ -277,6 +277,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
             res.gate.append(f"staff track at y={int(yc)} not accepted as a staff")
             res.gate_boxes.append((0, int(yc - 3 * sp), w, int(6 * sp)))
 
+    _gate_unseen_staves(res, ink, staves, sp, thick)
     systems = join_groups(group_systems(ink, staves, sp, thick), joins)
     for k, grp in enumerate(systems):
         for st in grp:
@@ -1073,6 +1074,38 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
     _gate_discards(res, ink, thick, sp)
     _finish_discard(res)
     return res
+
+
+def _gate_unseen_staves(res: PageResult, ink: np.ndarray, staves: list[Staff],
+                        sp: float, thick: int) -> None:
+    """Safety gate: ruled lines that no accepted staff explains.
+
+    Staff tracks are searched at one line spacing per page. Staves printed
+    at another size (an organ realization 1.3 x larger, Riccio Canzon p1)
+    were never found, and their ink went to the nearest staff. A ruled
+    line is a row with a horizontal run of 35% of the page width. Lines
+    outside every accepted staff (2 line thicknesses of slack) that stand in
+    a run of 4 or more, each within 3 sp of the next, are a staff that
+    was missed: the page fails (0.8.51)."""
+    import cv2
+    h, w = ink.shape
+    k = cv2.getStructuringElement(cv2.MORPH_RECT, (max(3, int(0.35 * w)), 1))
+    lines = cv2.morphologyEx(ink.astype(np.uint8), cv2.MORPH_OPEN, k).any(axis=1)
+    d = np.diff(np.concatenate(([0], lines.astype(np.int8), [0])))
+    cs = [(a + z - 1) / 2.0 for a, z in zip(np.flatnonzero(d == 1), np.flatnonzero(d == -1))
+          if z - a <= 3 * thick + 3]
+    pad = 2 * thick
+    cs = [y for y in cs if not any(st.top - pad <= y <= st.bottom + pad for st in staves)]
+    run: list[float] = []
+    for y in cs + [1e9]:
+        if run and y - run[-1] > 3 * sp:
+            if len(run) >= 4:
+                yc = int(np.mean(run))
+                res.gate.append(f"ruled lines at y={yc} that no staff explains "
+                                "(a staff of another size?)")
+                res.gate_boxes.append((0, int(run[0] - sp), w, int(run[-1] - run[0] + 2 * sp)))
+            run = []
+        run.append(y)
 
 
 def _gate_discards(res: PageResult, ink: np.ndarray, thick: int, sp: float) -> None:

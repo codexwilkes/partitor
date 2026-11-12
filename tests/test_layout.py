@@ -433,6 +433,27 @@ class TestVerdict(unittest.TestCase):
 
 
 @needs_deps
+class TestUnseenStaves(unittest.TestCase):
+    """The gate fails a page with a staff of another size (0.8.51)."""
+
+    def gate(self, extra=None):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "s.pdf")
+            make_score_pdf(path, extra=extra)
+            return pt.analyse_page(pymupdf.open(path)[0], 0, 400, 0).gate
+
+    def test_staff_of_another_size_fails_the_page(self):
+        def big(page, tops):                  # a 1.4 x larger staff under the systems
+            for ln in range(5):
+                page.draw_line((110, 700 + ln * 1.4 * SP), (560, 700 + ln * 1.4 * SP), width=0.6)
+        g = self.gate(big)
+        self.assertTrue(any("no staff explains" in m for m in g), g)
+
+    def test_normal_page_passes(self):
+        self.assertEqual(self.gate(), [])
+
+
+@needs_deps
 class TestRestsAndTitles(unittest.TestCase):
     """Multi-bar rests for systems without a part's staff; no false title."""
 
