@@ -420,7 +420,14 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
 5. **System grouping without a solid connector.** Mensurstriche (barlines
    only between staves) and dotted lines in scans break the "solid column"
    test. Group by bracket/brace, left barline with holes allowed, and the gap
-   pattern of the page.
+   pattern of the page. The rhythm of the page too (0.8.53): two small
+   neighbouring groups are one system when together they have as many staves
+   as the full systems of the page (the largest size of 3 or more that two
+   groups have), they start at one x, and the gap between them is no wider
+   than 1.1 times the widest gap a connector proves to be inside a system (a
+   first system with no connector between its instrument and organ staves,
+   2 + 2, on a page of systems of 4). Pages with one system size only keep
+   every cut.
 6. **Text ownership rules.** Lyrics and figured-bass numbers belong to the
    staff above. Applied before the "midpoint" review rule, so a lyric-heavy
    page does not give 30+ review items. An item joins a row when its box

@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.53 — 2026-11-11
+
+### Fixed
+- A first system with no connector between its instrument and organ staves (Riccio, La Pichi
+  p1: 2 + 2 staves) was read as two systems. When two small neighbouring groups make up the
+  number of staves of the full systems on the page, and the gap is no wider than a gap that a
+  connector proves to be inside a system, they are one system.
+
 ## 0.8.52 — 2026-11-11
 
 ### Added

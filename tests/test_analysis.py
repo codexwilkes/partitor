@@ -154,6 +154,26 @@ class TestStaffTracking(unittest.TestCase):
         """A vertical line over the gap between staff i and i + 1."""
         ink[int(st[i].bottom):int(st[i + 1].top) + 1, x:x + w] = True
 
+    def test_group_systems_two_small_groups_make_a_full_system(self):
+        # Riccio La Pichi p1: the first system has no connector between its
+        # 2 + 2 staves, the others have (4 + 4 + 4): the page shows the rhythm
+        st = [pt.Staff(0, i, [t + k * 20 for k in range(5)], 100, 1800)
+              for i, t in enumerate((100, 240, 440, 580, 1060, 1200, 1400, 1540, 2020, 2160, 2360, 2500))]
+        ink = np.zeros((2700, 1900), bool)
+        for i in (0, 2):                      # first system: a connector on each pair only
+            self._link(ink, st, i, 100)
+        for i in (4, 5, 6, 8, 9, 10):         # the others: connected the whole way
+            self._link(ink, st, i, 100)
+        self.assertEqual([len(g) for g in pt.group_systems(ink, st, 20, 3)], [4, 4, 4])
+
+    def test_group_systems_small_groups_with_a_wide_gap_stay_cut(self):
+        st = [pt.Staff(0, i, [t + k * 20 for k in range(5)], 100, 1800)
+              for i, t in enumerate((100, 240, 700, 840, 1320, 1460, 1600, 1740, 2220, 2360, 2500, 2640))]
+        ink = np.zeros((2800, 1900), bool)
+        for i in (0, 2, 4, 5, 6, 8, 9, 10):
+            self._link(ink, st, i, 100)
+        self.assertEqual([len(g) for g in pt.group_systems(ink, st, 20, 3)], [2, 2, 4, 4])
+
     def test_join_groups(self):
         st = self._gap_staves(7)
         groups = [st[:2], st[2:4], st[4:]]

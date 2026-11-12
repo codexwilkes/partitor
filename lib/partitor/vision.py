@@ -373,7 +373,8 @@ def group_systems(ink: np.ndarray, staves: list[Staff], sp: float, thick: int
     1.2 x the median joined gap on the page. A page with no joined gap
     falls back to gap-size clustering. Rule (c) needs some ink (0.15) in
     the system-start zone when two or more gaps on the page have a bracket
-    or barline (0.3.0-dev.21)."""
+    or barline (0.3.0-dev.21). Two small neighbouring groups that
+    make a full system of the page are joined (_join_by_rhythm, 0.8.53)."""
     if not staves:
         return []
     joined: list[bool | None] = []
@@ -444,7 +445,46 @@ def group_systems(ink: np.ndarray, staves: list[Staff], sp: float, thick: int
             groups.append(cur)
             cur = [st]
     groups.append(cur)
-    return groups
+    return _join_by_rhythm(groups, gaps_all, zone_max, sp)
+
+
+def _join_by_rhythm(groups: list[list[Staff]], gaps_all: list[float],
+                    zone_max: list[float], sp: float) -> list[list[Staff]]:
+    """_join_by_rhythm -> groups, two small neighbours joined into one system.
+
+    Two neighbouring groups are one system when together they have as many
+    staves as the full systems of the page (the size 2 or more groups have,
+    the largest such size), both are smaller, they start at one x, and the
+    gap between them is no wider than the widest gap a connector proves to
+    be inside a system. Riccio La Pichi p1: the first system has no
+    connector between its instrument staves and its organ staves (2 + 2),
+    the others have (4 + 4 + 4); the gap is 131 px against 150 connected and
+    193 between systems (0.8.53). Biber p38 (two systems of two staves, one
+    size only) stays cut."""
+    from collections import Counter
+    sizes = Counter(len(g) for g in groups)
+    full = [n for n, c in sizes.items() if c >= 2 and n >= 3]
+    proven = [g for g, zm in zip(gaps_all, zone_max) if zm >= 0.5]
+    if not full or not proven:
+        return groups
+    n = max(full)
+    wmax = 1.1 * max(proven)
+    out: list[list[Staff]] = []
+    k = 0
+    pos = 0                                       # staff index of groups[k][0]
+    while k < len(groups):
+        g = groups[k]
+        if k + 1 < len(groups) and len(g) < n and len(g) + len(groups[k + 1]) == n and \
+                len(groups[k + 1]) < n and gaps_all[pos + len(g) - 1] <= wmax and \
+                abs(g[0].x0 - groups[k + 1][0].x0) <= 4 * sp:
+            out.append(g + groups[k + 1])
+            pos += len(g) + len(groups[k + 1])
+            k += 2
+            continue
+        out.append(g)
+        pos += len(g)
+        k += 1
+    return out
 
 
 def join_groups(groups: list[list[Staff]], cuts: "tuple[int, ...] | list[int]"
