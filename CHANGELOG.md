@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.50 — 2026-11-11
+
+### Fixed
+- A part whose last staff held only stemless notes (breves, whole notes) was printed as a
+  multi-bar rest, so its final bars were lost (Grillo Sonata, Bassus, last system). The empty-staff
+  check now reads a notehead far outside the staff even when the print has no ledger line, and
+  keeps the staff as engraved.
+
 ## 0.8.49 — 2026-11-11
 
 ### Changed

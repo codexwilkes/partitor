@@ -443,7 +443,8 @@ def _ledger_beside(own: np.ndarray, ly: float, x: int, w: int, sp: float,
 
 def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
                sp: float, thick: int, heads_out: list | None = None,
-               blank: list | None = None, barxs: list | None = None) -> tuple | None:
+               blank: list | None = None, barxs: list | None = None,
+               ledgers: bool = True) -> tuple | None:
     """note_steps -> (lowest step, highest step, noteheads found) of a staff,
     or None. Noteheads: the staff's ink after the clef without its staff
     lines, holes filled (half and whole notes), opened with an ellipse
@@ -454,7 +455,11 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
     have none). A single head is 1.1 times as wide as high or more
     (letters and time-signature digits are not); printed bar numbers and
     the barlines (1.2 sp each side) are blanked. Accidentals are not
-    read: the steps are letter names.
+    read: the steps are letter names. ledgers=False drops the ledger-line
+    rule: a head far outside the staff counts without a ledger line (the
+    empty-staff check of build: a breve or whole note under a staff whose
+    ledger line the print left out, Grillo Sonata p32, is a note, not a
+    rest; lyrics there only keep a staff as engraved).
     Returns (lowest, highest, count, x of the lowest, x of the highest)."""
     import cv2
     import numpy as np
@@ -535,7 +540,7 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
                 continue                           # floats above: text, not a head
             if step == -1 and y > bot_y + 2 * thick:
                 continue
-            if step >= 10 or step <= -2:           # needs every ledger line
+            if ledgers and (step >= 10 or step <= -2):   # needs every ledger line
                 # between the staff and the head (a lyric under a ledger
                 # note passed with the first one only: Maria p11 F1)
                 need = range(10, step + 1, 2) if step >= 10 else range(-2, step - 1, -2)

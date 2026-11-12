@@ -553,6 +553,19 @@ class TestRestsAndTitles(unittest.TestCase):
             self.assertIn("ink that is not a rest", r.stdout + r.stderr)
             self.assertNotIn(digits, text("03-Bass.pdf").split())
 
+    def test_stemless_note_without_ledger_keeps_staff_as_engraved(self):
+        # Grillo Sonata p32 Bassus: whole notes (no stem) below the staff, no
+        # ledger line printed; the staff was compressed to a multi-bar rest
+        def whole(page, tops):
+            bot = tops[3 + 2] + 4 * SP              # Bass, system 2: bottom line
+            for x in (300, 400):
+                page.draw_oval(pymupdf.Rect(x, bot + 0.8 * SP, x + 1.5 * SP, bot + 1.9 * SP),
+                               width=1.0)
+        with tempfile.TemporaryDirectory() as d:
+            r, digits, text = self._rests_run(d, {(1, 2)}, extra=whole)
+            self.assertIn("ink that is not a rest", r.stdout + r.stderr)
+            self.assertNotIn(digits, text("03-Bass.pdf").split())
+
     def test_text_line_shape(self):
         self.assertTrue(pt.looks_like_text([30, 25, 40, 28, 60], 40))
         self.assertFalse(pt.looks_like_text([1465], 21))            # page edge

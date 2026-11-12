@@ -278,6 +278,11 @@ notehead, slur or word goes whole to one owner.
    a wrong barline count), else the counted bars. A movement start begins a
    new rest line and keeps the movement title. The H-bar has a serif at
    each end; its look is the layout key `rest_bar` (0.8.31, §5.5). "Tacet" is not built.
+   A part whose staves in a system show no notehead and no stem is a rest
+   too (`rests=compress`). A stemless note (a breve or whole note) counts as a
+   note even without a ledger line, under or over the staff (0.8.50; the last
+   bars of the Grillo Sonata Bassus were lost as a rest before): the system
+   stays as engraved and the build warns "ink that is not a rest".
    Bars of rests inside a line that is printed (0.8.11, `merge_rest_bars` in
    `lines`, before re-flow): a run of 2 or more bars is one measure when every
    staff of the line holds, in that bar, one filled rest block (a whole or half

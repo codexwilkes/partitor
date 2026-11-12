@@ -326,9 +326,13 @@ def staff_is_empty(res: "PageResult", idx: int) -> bool:
     """staff_is_empty -> True when a staff holds only rests: past its start
     (clef, key, time: 14 sp) and clear of the barlines (0.8 sp), no column
     of its ink has a vertical run of 2.6 sp or more (a stem; an H-bar's
-    ends, a rest block, a staff line, text and numbers are shorter)."""
+    ends, a rest block, a staff line, text and numbers are shorter), and
+    no notehead was read without the ledger-line rule (`loose_heads`: a
+    stemless breve or whole note, 0.8.50)."""
     st = res.staves[idx]
     sp = res.sp
+    if st.loose_heads:
+        return False                    # stemless notes (breve, whole note): not rests
     x1 = int(st.x1)
     x0 = int(st.x0 + min(REST_FREE_SP * sp, 0.4 * (x1 - st.x0)))
     y0 = max(0, int(st.top - REST_BAND_SP * sp))

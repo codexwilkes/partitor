@@ -1062,6 +1062,13 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
             st.steps = (r_[0], r_[1], r_[3], r_[4], bix(r_[3]), bix(r_[4]))
         else:
             st.steps = None
+            # no head read: stemless notes far outside the staff with no
+            # ledger line printed (Grillo Sonata p32 Bassus) are not rests
+            # (build.staff_is_empty checks this count)
+            r2_ = note_steps(owner, line_px, st, i, sp, thick,
+                             blank=res.num_boxes.get(st.system, []) + bl_boxes,
+                             barxs=res.barlines.get(st.system, []), ledgers=False)
+            st.loose_heads = r2_[2] if r2_ else 0
 
     _gate_discards(res, ink, thick, sp)
     _finish_discard(res)
