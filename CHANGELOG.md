@@ -7,6 +7,13 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.54 — 2026-11-11
+
+### Fixed
+- Printed staff labels: a bare numeral in brackets (`[I]`, `[II]`, `[III]`, also read as `[1]`
+  or `[11]`) is kept as the name of the staff, and OCR debris such as "eee" no longer becomes a
+  part name.
+
 ## 0.8.53 — 2026-11-11
 
 ### Fixed

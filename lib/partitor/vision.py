@@ -599,11 +599,18 @@ def clean_title(text: str) -> str:
 
 def clean_label(text: str) -> str:
     """clean_label -> label text without OCR debris: keeps words of 2+
-    letters and roman/arabic numbers; '' when no word of 3+ letters."""
+    letters and roman/arabic numbers; '' when no word of 3+ letters. One
+    letter repeated ("eee") is debris. A bare numeral in brackets stays as
+    "[I]", "[II]", "[III]", "[IV]" or "[V]" (0.8.54)."""
+    m = re.fullmatch(r"\s*[\[(]\s*([Il1|!]{1,3}|IV|V)\s*[\])]\s*", text)
+    if m:                                             # "[I]" (read "[1]", "[11]"): a bare
+        n = len(m.group(1))                           # numeral in brackets is a name (0.8.54)
+        return "[" + ("I" * n if m.group(1) not in ("IV", "V") else m.group(1)) + "]"
     t = re.sub(r"\bII[\]\|l1!]", "III", text)        # OCR reads I as ] | l 1 !
     t = re.sub(r"\bI[\]\|l1!](?![a-z])", "II", t)
     toks = re.findall(r"[A-Za-zÀ-ÿ]+|\d+", t.replace("[", "").replace("]", ""))
-    keep = [t for t in toks if len(t) >= 2 or t.lower() in _NUMERALS]
+    keep = [t for t in toks if (len(t) >= 2 or t.lower() in _NUMERALS)
+            and not (len(t) >= 3 and len(set(t.lower())) == 1 and t.lower() not in _NUMERALS)]
     if not any(len(t) >= 3 and t.isalpha() for t in keep):
         return ""
     return " ".join(keep)

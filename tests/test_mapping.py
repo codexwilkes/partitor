@@ -99,6 +99,17 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(pt.clean_label("_ a"), "")
         self.assertEqual(pt.clean_label("[BASSO] TROMBONE"), "BASSO TROMBONE")
 
+    def test_clean_label_bracketed_numeral_and_debris(self):
+        # Riccio Canzon: "[I] [II] [III]" label the three instrument staves
+        self.assertEqual(pt.clean_label("[I]"), "[I]")
+        self.assertEqual(pt.clean_label("[1]"), "[I]")
+        self.assertEqual(pt.clean_label("[11]"), "[II]")
+        self.assertEqual(pt.clean_label("[III]"), "[III]")
+        self.assertEqual(pt.clean_label("[IV]"), "[IV]")
+        self.assertEqual(pt.clean_label("eee"), "")           # one letter repeated: debris
+        self.assertEqual(pt.clean_label("Tenore I]"), "Tenore II")
+        self.assertEqual(pt.clean_label("Basso eee"), "Basso")
+
     def test_clean_title(self):
         self.assertEqual(pt.clean_title("  Ich will alle meine Tage. "), "Ich will alle meine Tage")
         self.assertEqual(pt.clean_title("|- ."), "")

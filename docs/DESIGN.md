@@ -373,7 +373,12 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
    labels at the staff start read by OCR, (b) the clef and key of each staff,
    matched as an ordered subset of the full system, and (c) continuity with
    the previous system. The CLI asks only about systems whose suggestion is
-   uncertain.
+   uncertain. The label text is cleaned (`clean_label`): words of 2 or more
+   letters and numerals stay, one letter repeated ("eee") is OCR debris, and
+   a bare numeral in brackets stays a name with its brackets, "[I]", "[II]",
+   "[III]" (read "[1]", "[11]" too; 0.8.54). Brackets round a name of 3 or
+   more letters are dropped; type them in `parts` when the name is not in the
+   score and the part should show them.
    - The reference is the system with the most printed labels (page 1 often
      names every part), not the most staves. Label matching knows continuo
      names as one part (Continuo, Basso continuo, Organo, B.C.) and common
