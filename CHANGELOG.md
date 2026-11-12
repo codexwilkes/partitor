@@ -7,6 +7,13 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.55 — 2026-11-11
+
+### Added
+- `partitor parts ID`: `N/k` keeps only staff k of a part that is on two staves (`N/last` the
+  lowest), in every system; the other staves are left out. For example `3/last` takes the organ
+  bass line of a realized continuo (Riccio, La Pichi) without editing the layout file.
+
 ## 0.8.54 — 2026-11-11
 
 ### Fixed

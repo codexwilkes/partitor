@@ -1121,7 +1121,10 @@ Details:
 - Couple or leave out: `N=-` leaves part N out everywhere (it stays in the
   list, shown as "not extracted"; `N=+` extracts it again). `N+M` joins part N
   into part M as one part on two staves. Example, continuo only from a keyboard
-  part: `7=-; 8=Continuo`. In choices, the same number twice = one part on two
+  part: `7=-; 8=Continuo`. `N/k` (0.8.55): part N is on two staves in the maps
+  (one name twice) and only its staff k is wanted, counted from the top in each
+  system, `N/last` the lowest; the other staves become `-` in every map and
+  suggestion. Example, the organ bass line of a realized continuo: `4/last`. In choices, the same number twice = one part on two
   staves. Staff size rules use one staff (4 sp) for such parts.
 - `expand` / `contract`: one step. Expand: one more page while a part's staff is
   below its full-width size; then, when the page width holds the staff below

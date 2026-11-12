@@ -235,7 +235,7 @@ def _choose_maps(item: Path) -> bool | None:
     return True
 
 
-PART_OPS = re.compile(r"^\s*(\d+)\s*(?:(\+)\s*(\d+)|=\s*(.+?))\s*$")
+PART_OPS = re.compile(r"^\s*(\d+)\s*(?:(\+)\s*(\d+)|/\s*(\d+|last)|=\s*(.+?))\s*$", re.IGNORECASE)
 
 
 def apply_part_ops(data: dict, line: str) -> str:
@@ -247,16 +247,20 @@ def apply_part_ops(data: dict, line: str) -> str:
       N=+      extract part N again
       N+M      join part N into part M: one part on two staves (piano,
                organ); M keeps its name
+      N/k      part N on two staves: keep only its staff k (from the top;
+               N/last = the lowest) in every system, the others are left out
+               ('-' in the maps), e.g. the continuo line of an organ part
     Maps and suggestions follow; nothing changes when one item is bad."""
     parts = list(data.get("parts") or [])
     ren: dict[int, str] = {}
     drop: set[int] = set()
     undrop: set[int] = set()
     join: dict[int, int] = {}
+    only: dict[int, str] = {}
     for op in (x for x in line.split(";") if x.strip()):
         m = PART_OPS.match(op)
         if not m:
-            return f"not understood: {op.strip()} (N=name, N=-, N+M)"
+            return f"not understood: {op.strip()} (N=name, N=-, N+M, N/k)"
         n = int(m.group(1))
         if not 1 <= n <= len(parts):
             return f"no part {n} (1-{len(parts)})"
@@ -265,14 +269,20 @@ def apply_part_ops(data: dict, line: str) -> str:
             if not 1 <= t <= len(parts) or t == n:
                 return f"cannot join {n} into {t}"
             join[n - 1] = t - 1
-        elif m.group(4).strip() == "-":
+        elif m.group(4):
+            if m.group(4).lower() != "last" and int(m.group(4)) < 1:
+                return f"no staff {m.group(4)} of part {n}"
+            only[n - 1] = m.group(4).lower()
+        elif m.group(5).strip() == "-":
             drop.add(n - 1)
-        elif m.group(4).strip() == "+":
+        elif m.group(5).strip() == "+":
             undrop.add(n - 1)
         else:
-            ren[n - 1] = m.group(4).strip()
+            ren[n - 1] = m.group(5).strip()
     if set(join) & set(join.values()) or drop & undrop:
         return "a part cannot be joined twice, or left out and extracted at once"
+    if set(only) & set(join):
+        return "a part joined into another has no staff to choose"
     keep = [k for k in range(len(parts)) if k not in join]
     new_name = {k: ren.get(k, parts[k]) for k in keep}
     if len(set(new_name.values())) != len(new_name):
@@ -288,10 +298,20 @@ def apply_part_ops(data: dict, line: str) -> str:
     data[SKIP_KEY] = [new_name[k] for k in keep if k in skipped]
     if not data[SKIP_KEY]:
         data.pop(SKIP_KEY)
+    pick = {new_name[k]: v for k, v in only.items()}
     for s_ in data.get("systems") or []:
-        s_["map"] = [target.get(x, x) for x in s_.get("map") or []]
-        if s_.get("suggest"):
-            s_["suggest"] = [target.get(x, x) for x in s_["suggest"]]
+        for key in ("map", "suggest"):
+            if not s_.get(key):
+                continue
+            s_[key] = [target.get(x, x) for x in s_[key]]
+            for name, which in pick.items():
+                at = [i for i, x in enumerate(s_[key]) if x == name]
+                if len(at) < 2:
+                    continue
+                keep_i = at[-1] if which == "last" else at[min(int(which), len(at)) - 1]
+                for i in at:
+                    if i != keep_i:
+                        s_[key][i] = "-"
     pl = (data.get("layout") or {}).get(PART_LAYOUT_KEY)
     if pl:                                  # per-part layout follows a rename
         data["layout"][PART_LAYOUT_KEY] = {
@@ -311,11 +331,12 @@ def rename_parts(item: Path) -> list[str] | None:
         _head("Parts (names come from the printed labels)")
         show_parts(data)
         print("     N=name rename   N=- do not extract   N=+ extract again   "
-              "N+M join N into M (two staves, e.g. piano)   ; between several")
+              "N+M join N into M (two staves, e.g. piano)   "
+              "N/k keep only staff k of a two-staff part (N/last)   ; between several")
         ans = ask("change (Enter = done)", "")
         if not ans:
             break
-        if any(c in ans for c in "=+"):
+        if any(c in ans for c in "=+/"):
             err = apply_part_ops(data, ans)
             if err:
                 print(f"     {YLW}{err}{RST}")

@@ -951,6 +951,27 @@ class TestLibrary(unittest.TestCase):
                 self.assertNotEqual(pt.apply_part_ops(d3, bad), "")
                 self.assertEqual(d3, data)
 
+    def test_keep_one_staff_of_a_two_staff_part(self):
+        # Riccio La Pichi: Violin, Trombone and the organ twice (right and left hand);
+        # only the left hand (the continuo line) is wanted
+        data = {"parts": ["Violin", "Trombone", "Organ"],
+                "systems": [{"map": ["Violin", "Trombone", "Organ", "Organ"]},
+                            {"map": ["?", "?", "?"], "suggest": ["Trombone", "Organ", "Organ"]},
+                            {"map": ["Violin", "Trombone", "Organ"]}]}
+        d1 = __import__("copy").deepcopy(data)
+        self.assertEqual(pt.apply_part_ops(d1, "3/last"), "")
+        self.assertEqual(d1["systems"][0]["map"], ["Violin", "Trombone", "-", "Organ"])
+        self.assertEqual(d1["systems"][1]["suggest"], ["Trombone", "-", "Organ"])
+        self.assertEqual(d1["systems"][2]["map"], ["Violin", "Trombone", "Organ"])   # one staff: kept
+        d2 = __import__("copy").deepcopy(data)
+        self.assertEqual(pt.apply_part_ops(d2, "3/1; 3=Continuo"), "")
+        self.assertEqual(d2["systems"][0]["map"], ["Violin", "Trombone", "Continuo", "-"])
+        for bad in ("3/0", "3/x", "9/1"):
+            d3 = __import__("copy").deepcopy(data)
+            with self.subTest(bad=bad):
+                self.assertNotEqual(pt.apply_part_ops(d3, bad), "")
+                self.assertEqual(d3, data)
+
     def test_proof_from_preview(self):
         item = Path(self.tmp.name, "item")
         (item / "preview").mkdir(parents=True)

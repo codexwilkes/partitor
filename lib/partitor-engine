@@ -41,7 +41,8 @@
 #                                          starts, letters; ? = help; v = proof
 #   partitor proof ID                      draw proof.pdf again (bar numbers)
 #   partitor parts ID                      parts: N=name, N=- (not extracted),
-#                                          N=+, N+M (join N into M: two staves)
+#                                          N=+, N+M (join N into M: two staves),
+#                                          N/k (keep only staff k of a two-staff part)
 #   partitor groups ID                     group scores: Name=4,5,6
 #   partitor set ID key=value ...          keys: see SET_KEYS (title, pages,
 #                                          paper, gap, margin_side, ...)
