@@ -7,6 +7,15 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.57 — 2026-11-12
+
+### Fixed
+- A staff is no longer lost when the line gaps of a scan are a little below the page estimate
+  (Riccio, La Pichi: the Violin staff of a system was missed, so the system had three staves
+  and the analysis asked for parts it could not map; the same loss on La Rubina). The five
+  lines of a staff must have a mean gap near the page value and single gaps near that mean.
+
+
 ## 0.8.56 — 2026-11-11
 
 ### Changed

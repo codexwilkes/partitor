@@ -227,7 +227,7 @@ def detect_staves(ink: np.ndarray, thick: int, gap: int, page: int
 
     Runs on a straightened page. Lines = row runs of the line mask longer
     than 25% of the longest; 5 lines at staff spacing = one staff. A staff
-    must be at least 8 sp long."""
+    must be at least 8 sp long. Gaps: the mean near sp (0.3 sp), each near the mean (0.2 sp)."""
     sp = gap + thick
     hmask = line_mask(ink, sp, max(6 * sp, 15))
     # unbridged lines for the staff extent: bridging would join a bracket
@@ -254,7 +254,9 @@ def detect_staves(ink: np.ndarray, thick: int, gap: int, page: int
     while i + 4 < len(lines):
         grp = lines[i:i + 5]
         ds = np.diff([g[0] for g in grp])
-        if np.all(np.abs(ds - sp) < tol):
+        # the mean gap is near sp; each gap is near the mean (a scan whose
+        # pitch is a little below the page estimate, 0.8.57)
+        if abs(float(np.mean(ds)) - sp) < tol and np.all(np.abs(ds - np.mean(ds)) < 0.2 * sp):
             ext = staff_extent(hmask, grp, thick, sp)
             if ext is not None:
                 ext = (refine_start(raw, grp, thick, sp, ext[0]), ext[1])

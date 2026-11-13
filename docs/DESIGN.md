@@ -477,6 +477,9 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
       light print bolder.
     The safety gate (item 1) also covers this step: ink removed as noise is
     counted and reported.
+    A staff is five lines whose mean gap is within 0.3 sp of the page's sp and
+    whose single gaps stay within 0.2 sp of that mean (0.8.57): a scan whose real
+    pitch is a little below the page estimate keeps every staff.
 11. **Group outputs (for example "Trombones").** Besides one PDF per part, an
     item can define named groups. A group is an ordered list of parts that
     print together as a small score: the selected staves only, joined by a

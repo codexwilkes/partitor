@@ -120,6 +120,24 @@ class TestStaffTracking(unittest.TestCase):
         self.assertEqual(dmax, 0.0)
         self.assertIs(out, grey)
 
+    def test_staff_with_uneven_line_gaps_is_found(self):
+        # a scan whose real pitch (about 17.5 px) is below the page estimate
+        # (sp 23): line gaps 16, 19, 17.5, 17. One gap is 7 px off sp, over
+        # 0.3 sp, yet the five lines are one even staff (a lost Violin staff).
+        img = np.zeros((900, 2000), bool)
+        for y in (336, 352, 371, 388, 405, 507, 525, 543, 561, 579):
+            img[y - 4:y + 5, 300:1900] = True
+        staves, _ = pt.detect_staves(img, 5, 18, 0)
+        self.assertEqual(len(staves), 2)
+        self.assertLess(staves[0].top, 340)
+
+    def test_irregular_five_lines_are_not_a_staff(self):
+        img = np.zeros((900, 2000), bool)
+        for y in (300, 330, 380, 400, 460):          # gaps 30, 50, 20, 60
+            img[y - 4:y + 5, 300:1900] = True
+        staves, _ = pt.detect_staves(img, 5, 18, 0)
+        self.assertEqual(len(staves), 0)
+
     def test_staff_extent_ignores_label_text(self):
         img, th, sp = self.synthetic(0)
         # "label" blocks on two line rows left of the staff (bridged text)
