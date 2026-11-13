@@ -7,6 +7,16 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.58 — 2026-11-13
+
+### Changed
+- The proof PDF is easier to read. The staff number is drawn large in the left margin with its
+  clef small below it (it was small, with the clef beside it, over the start of the staff).
+  Part names are 13 pt (9), bar numbers 11 pt (8.5), rehearsal letters 12 pt (11), system ids
+  14 pt (11). The white box behind a bar number is more see-through, so it hides less of the
+  staff above.
+
+
 ## 0.8.57 — 2026-11-12
 
 ### Fixed

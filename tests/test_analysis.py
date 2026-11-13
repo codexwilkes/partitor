@@ -283,6 +283,22 @@ class TestPageAnalysis(unittest.TestCase):
         for grp in self.res.systems:
             self.assertEqual(len({s.x0 for s in grp}), 1)
 
+    def test_preview_staff_number_is_large_and_left_of_the_staff(self):
+        # the number stands in the margin, over 2.4 staff spaces high (it was
+        # 1.5 high with the clef beside it); no black ink touches the staff
+        res, recs = pt.analyse_one(pymupdf.open(self.vec), 0, 400, 0)
+        out = Path(self.tmp.name, "pv")
+        out.mkdir(exist_ok=True)
+        pt.preview_page(res, recs, out)
+        png = cv2.imread(str(out / "page-01.png"))
+        f = png.shape[0] / res.shape[0]
+        st = res.staves[0]
+        band = png[int((st.lines[0] - 4 * res.sp) * f):int((st.lines[4] + 2 * res.sp) * f),
+                   :int(st.x0 * f)]
+        ys = np.flatnonzero((band.max(axis=2) < 40).any(axis=1))
+        self.assertGreater(len(ys), 0)
+        self.assertGreater((ys.max() - ys.min() + 1) / (res.sp * f), 2.4)
+
     def test_joins_make_one_system(self):
         # the synthetic page has two systems of three staves; "no system
         # ends after staff 3" joins them (the operator's correction)

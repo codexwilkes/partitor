@@ -913,6 +913,19 @@ class TestLibrary(unittest.TestCase):
         self.assertNotIn("to choose", text)
         self.assertIn("(left out)", text)
 
+    def test_proof_labels_are_large(self):
+        # part names 13 pt, system ids 14 pt (they were 9 and 11)
+        item = self.item_with_choice()
+        pt.proof_from_preview(item)
+        sizes = {}
+        for blk in pymupdf.open(pt.item_file(item, "proof.pdf"))[0].get_text("dict")["blocks"]:
+            for ln in blk.get("lines", []):
+                for sp_ in ln["spans"]:
+                    sizes[sp_["text"].strip()] = sp_["size"]
+        self.assertGreaterEqual(sizes["p3.s1"], 14.0)
+        self.assertGreaterEqual(sizes["Alto"], 13.0)
+        self.assertGreaterEqual(sizes["? Tenor"], 13.0)
+
     def test_rename_one_part(self):
         item = self.item_with_choice()
         res, _ = self.quiet_input(["2=Tenore", "9=X", "3=Alto", "3=Basso; 1=Altus", ""],

@@ -1124,6 +1124,9 @@ Details:
   suggestion with part numbers. `proof.pdf` names every system (blue), labels
   every staff with its part, frames systems that need a choice in red with
   `? suggestion`, and is redrawn after each answer or rename.
+  Labels are set large to read on a printed page (0.8.58): the staff number in
+  the left margin with its clef small below it, part names 13 pt, bar numbers
+  11 pt, rehearsal letters 12 pt, system ids 14 pt.
 - Part names one at a time: `N=name` (several with `;`), Enter ends; a comma
   list still replaces all. `parts ID` renames later.
 - Couple or leave out: `N=-` leaves part N out everywhere (it stays in the

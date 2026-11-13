@@ -183,10 +183,22 @@ def preview_page(res: PageResult, recs: list[dict], pdir: Path) -> str:
         cv2.rectangle(ov, (x, y), (x + cw, y + ch), (0, 0, 255), -1)
         img = cv2.addWeighted(ov, 0.25, img, 0.75, 0)
     for st in res.staves:
-        tag = f"{st.idx + 1} {st.clef}"
-        cv2.putText(img, tag, (max(0, st.x0 - int(4 * res.sp)), int(st.lines[3])),
-                    cv2.FONT_HERSHEY_SIMPLEX, res.sp / 14, (0, 0, 0),
-                    max(1, int(res.sp / 10)))
+        # the number is large, right-aligned in the margin left of the staff
+        # (shrunk to fit it); the clef stands small below it
+        avail = max(1.0, st.x0 - 0.4 * res.sp)
+        num = str(st.idx + 1)
+        scale, thick = res.sp / STAFF_TAG_DIV, max(2, int(res.sp / 6))
+        (tw, _), _ = cv2.getTextSize(num, cv2.FONT_HERSHEY_SIMPLEX, scale, thick)
+        if tw > avail:
+            scale *= avail / tw
+        (tw, _), _ = cv2.getTextSize(num, cv2.FONT_HERSHEY_SIMPLEX, scale, thick)
+        x_r = int(max(0, st.x0 - 0.4 * res.sp))
+        cv2.putText(img, num, (max(0, x_r - tw), int(st.lines[3])),
+                    cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), thick)
+        cs = res.sp / 16
+        (cw_, _), _ = cv2.getTextSize(st.clef, cv2.FONT_HERSHEY_SIMPLEX, cs, 2)
+        cv2.putText(img, st.clef, (max(0, x_r - cw_), int(st.lines[3] + 1.1 * res.sp)),
+                    cv2.FONT_HERSHEY_SIMPLEX, cs, (0, 0, 0), 2)
     f = PROOF_H / h
     small = cv2.resize(img, (int(w * f), 1400), interpolation=cv2.INTER_AREA)
     name = f"page-{res.page + 1:02d}.png"
@@ -217,3 +229,4 @@ def write_preview_index(pdir: Path, items: list[str], pdfname: str) -> Path:
 
 
 PROOF_H = 1400        # preview page height (px); a constant, nothing sets it
+STAFF_TAG_DIV = 7.0      # staff number drawn at sp / STAFF_TAG_DIV (cv2 font scale)

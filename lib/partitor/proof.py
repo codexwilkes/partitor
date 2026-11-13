@@ -46,6 +46,10 @@ def _proof_pages(data: dict) -> list[int]:
 
 PROOF_BAR = (0.62, 0.0, 0.62)       # bar numbers and barline ticks (magenta)
 PROOF_LETTER = (0.85, 0.38, 0.0)    # rehearsal letters (orange)
+NAME_FS = 13.0     # part name above a staff (pt)
+BAR_FS = 11.0      # bar numbers
+LETTER_FS = 12.0   # rehearsal letters
+ID_FS = 14.0       # system id (p3.s1)
 
 
 def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list) -> None:
@@ -70,7 +74,7 @@ def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list) -> Non
     maps = e.get("map") or []
     nm = maps[0] if maps else ""
     name_w = pymupdf.get_text_length(nm if nm not in ("?", "-") else "(left out)",
-                                     fontname="helv", fontsize=9.0) + 8
+                                     fontname="helv", fontsize=NAME_FS) + 8
     edge = x0
     for i, n in enumerate(nums):
         left = edge * f
@@ -80,17 +84,17 @@ def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list) -> Non
         lab = str(n) + (" cont." if f"{e['id']}:{i}" in split else "")
         x = left + 2 + (name_w if i == 0 else 0)
         if i in letters:
-            fs = 11.0
+            fs = LETTER_FS
             tw = pymupdf.get_text_length(letters[i], fontname="hebo", fontsize=fs)
-            box = pymupdf.Rect(x, ty - 24, x + tw + 6, ty - 10)
+            box = pymupdf.Rect(x, ty - 11 - fs - 3, x + tw + 6, ty - 10)
             page.draw_rect(box, color=PROOF_LETTER, fill=(1, 1, 1), width=1.2)
-            page.insert_text((x + 3, ty - 12.5), letters[i], fontsize=fs, fontname="hebo",
+            page.insert_text((x + 3, ty - 12.0), letters[i], fontsize=fs, fontname="hebo",
                              color=PROOF_LETTER)
             x = box.x1 + 2
-        lw = pymupdf.get_text_length(lab, fontname="hebo", fontsize=8.5)
-        page.draw_rect(pymupdf.Rect(x - 1, ty - 21, x + lw + 1, ty - 10), color=None,
-                       fill=(1, 1, 1), fill_opacity=0.8)
-        page.insert_text((x, ty - 12.5), lab, fontsize=8.5, fontname="hebo", color=PROOF_BAR)
+        lw = pymupdf.get_text_length(lab, fontname="hebo", fontsize=BAR_FS)
+        page.draw_rect(pymupdf.Rect(x - 1, ty - 11 - BAR_FS, x + lw + 1, ty - 10), color=None,
+                       fill=(1, 1, 1), fill_opacity=0.6)
+        page.insert_text((x, ty - 12.0), lab, fontsize=BAR_FS, fontname="hebo", color=PROOF_BAR)
 
 
 def annotate_proof(item: Path, data: dict | None = None) -> None:
@@ -168,7 +172,7 @@ def annotate_proof(item: Path, data: dict | None = None) -> None:
                                             page.rect.width - 4, sts[-1][2] + 0.5 * hgt),
                                color=col, width=2)
             page.insert_text((max(2.0, sts[0][0] - 3.2 * hgt), sts[0][1] - 0.5 * hgt),
-                             e["id"], fontsize=11, fontname="hebo", color=col)
+                             e["id"], fontsize=ID_FS, fontname="hebo", color=col)
             maps = e.get("map") or []
             sug = e.get("suggest") or []
             proof_bars(page, e, eff_.get(e["id"], e), rules_, f, sts)
@@ -180,7 +184,7 @@ def annotate_proof(item: Path, data: dict | None = None) -> None:
                     txt = "(left out)"
                 else:
                     txt = name
-                fs = 9.0
+                fs = NAME_FS
                 w = pymupdf.get_text_length(txt, fontname="helv", fontsize=fs)
                 r = pymupdf.Rect(x0 + 2, t - fs - 3, x0 + w + 6, t - 1)
                 page.draw_rect(r, color=None, fill=(1, 1, 1), fill_opacity=0.85)
