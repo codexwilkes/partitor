@@ -7,6 +7,18 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.59 — 2026-11-13
+
+### Added
+- An incipit is a recognised first bar. Some editions print the original notation of the opening
+  (old clefs, old note values) above the modern score. That bar is not a measure: it stays in
+  the part, has no number, and the next bar is 1. `bar_rules.incipit` lists the movement-first
+  systems. The analysis still proposes a short first bar as a pickup. `partitor new` and
+  `analyse` now ask `p` pickup (Enter), `i` incipit or `n` neither. `partitor bars ID`: `i N`
+  switches an incipit on or off (it and `p N` replace each other). The proof shows `inc.`
+  instead of a number; the build reports it as a note, not a warning.
+
+
 ## 0.8.58 — 2026-11-13
 
 ### Changed

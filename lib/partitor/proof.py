@@ -71,6 +71,7 @@ def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list) -> Non
     ty = top * f                                  # top line of the top staff
     letters = {int(m[0]): m[1] for m in e.get("marks") or []}
     split = set(rules.get("split") or [])
+    incipit = set(rules.get("incipit") or [])
     maps = e.get("map") or []
     nm = maps[0] if maps else ""
     name_w = pymupdf.get_text_length(nm if nm not in ("?", "-") else "(left out)",
@@ -82,6 +83,8 @@ def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list) -> Non
         if i > 0:                                 # tick at the barline before bar i
             page.draw_line((left, ty - 9), (left, ty - 1), color=PROOF_BAR, width=1.0)
         lab = str(n) + (" cont." if f"{e['id']}:{i}" in split else "")
+        if i == 0 and e["id"] in incipit:
+            lab = "inc."                           # an incipit has no number
         x = left + 2 + (name_w if i == 0 else 0)
         if i in letters:
             fs = LETTER_FS

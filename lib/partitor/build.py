@@ -269,9 +269,11 @@ def cmd_detect(a: argparse.Namespace) -> int:
             f"{sum(len(e.get('marks') or []) for e in entries)}")
     for sid in bar_rules["pickup"]:
         _warn(f"bars:  pickup at {sid} (first bar short): numbered from 0 — check")
+    for sid in bar_rules.get("incipit") or []:
+        _ok(f"bars:  incipit at {sid}: kept in the part, no number; the next bar is 1")
     for key in bar_rules["split"]:
         _warn(f"bars:  bar split by a repeat at {key}: counted once — check")
-    if bar_rules["pickup"] or bar_rules["split"]:
+    if bar_rules["pickup"] or bar_rules.get("incipit") or bar_rules["split"]:
         _note(f"printed numbers in the source: {scheme} count. Change: bar_rules in "
               "the layout (partitor bars <id> in the library)")
     ref_n = max(len(r["staves"]) for r in sysrecs)

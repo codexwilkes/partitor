@@ -45,18 +45,24 @@ def confirm_bar_mismatches(item: Path) -> None:
 
 
 def confirm_bar_rules(item: Path) -> None:
-    """Ask Y/n for each proposed pickup and split bar (detect proposes them
-    from bar widths), then renumber and save."""
+    """Ask about each proposed pickup (a pickup, an incipit or neither) and
+    split bar (detect proposes them from bar widths), then renumber and save."""
     confirm_bar_mismatches(item)
     data = load_item(item)
     rules = data.get("bar_rules") or {"pickup": [], "split": [], "fix": {}}
     if data.get("bar_rules_status") == "confirmed":
         return
     keep_p, keep_s = [], []
+    keep_i = list(rules.get("incipit") or [])
     if rules.get("pickup") or rules.get("split"):
         _head("Bar numbers (see proof.pdf)")
         for sid in rules.get("pickup") or []:
-            if yes(f"{sid}: the first bar is short. A pickup (bar 0, the next bar is 1)?"):
+            ans = ask(f"{sid}: the first bar is short. p = a pickup (bar 0, the next bar is 1); "
+                      "i = an incipit (the original notation: kept in the part, no number, "
+                      "the next bar is 1); n = neither  [P/i/n]", "p").lower()
+            if ans.startswith("i"):
+                keep_i.append(sid)
+            elif not ans.startswith("n"):
                 keep_p.append(sid)
         for key in rules.get("split") or []:
             sid, i = key.split(":")
@@ -65,6 +71,8 @@ def confirm_bar_rules(item: Path) -> None:
                 keep_s.append(key)
     data["bar_rules"] = {**rules, "pickup": keep_p, "split": keep_s,
                          "fix": rules.get("fix") or {}}
+    if keep_i:
+        data["bar_rules"]["incipit"] = keep_i
     data["bar_rules_status"] = "confirmed"
     renumber(data)
     save_item(item, data)
@@ -80,6 +88,9 @@ BARS_HELP = """\
                and the source differ and the source is right)
     f N=B      line N starts at bar B; the lines after it follow (f N= clears)
     p N        pickup: the movement that starts at line N begins at bar 0
+    i N        incipit: the first bar of the movement at line N shows the original
+               notation. It stays in the part with no number; the next bar is 1.
+               (p and i on the same line replace each other; the same command = off)
     s N I      bar I of line N completes the bar before it: both keep one number
                (a bar cut by a line break, a repeat sign or a change of mensuration).
                The same command again = off.   s K  = bar after repeat sign K (below)
@@ -172,6 +183,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
     systems = data.get("systems") or []
     rules = data.get("bar_rules") or {}
     rules = {**rules, "pickup": list(rules.get("pickup") or []),
+             "incipit": list(rules.get("incipit") or []),
              "split": list(rules.get("split") or []), "fix": dict(rules.get("fix") or {}),
              "bar_edits": list(rules.get("bar_edits") or []),
              "bars_ack": list(rules.get("bars_ack") or [])}
@@ -198,6 +210,8 @@ def cmd_bars(a: argparse.Namespace) -> int:
                 tags = []
                 if e["id"] in rules["pickup"]:
                     tags.append("pickup")
+                if e["id"] in rules["incipit"]:
+                    tags.append("incipit")
                 if e["id"] in rules["fix"]:
                     tags.append("fixed")
                 if any(parse_bar_edit(t) and parse_bar_edit(t)["sid"] == e["id"]
@@ -253,10 +267,23 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     if sid not in movement_first:
                         print(f"     {YLW}line {arg} does not start a movement{RST}")
                         continue
+                    if sid in rules["incipit"]:
+                        rules["incipit"].remove(sid)
                     if sid in rules["pickup"]:
                         rules["pickup"].remove(sid)
                     else:
                         rules["pickup"].append(sid)
+                elif op == "i":
+                    sid = systems[int(arg) - 1]["id"]
+                    if sid not in movement_first:
+                        print(f"     {YLW}line {arg} does not start a movement{RST}")
+                        continue
+                    if sid in rules["pickup"]:
+                        rules["pickup"].remove(sid)
+                    if sid in rules["incipit"]:
+                        rules["incipit"].remove(sid)
+                    else:
+                        rules["incipit"].append(sid)
                 elif op == "s":
                     w_ = arg.split()
                     if len(w_) == 2:                       # s N I: bar I of line N
@@ -368,7 +395,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
         pass
     if not changed:
         return 0
-    for k_ in ("bar_edits", "bars_ack"):
+    for k_ in ("bar_edits", "bars_ack", "incipit"):
         if not rules.get(k_):
             rules.pop(k_, None)
     data["bar_rules"] = rules

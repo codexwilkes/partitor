@@ -252,6 +252,12 @@ notehead, slur or word goes whole to one owner.
      its own and the movement's median bar.
    - Pickup: the first bar of a movement, less clef and key width, is at
      least 0.4 of a bar short -> bar 0; the next bar is 1.
+   - Incipit (0.8.59): a first bar that shows the original notation of the
+     opening (an edition's old clefs and note values above the modern
+     score) is not a measure. `bar_rules.incipit` lists the movement-first
+     systems. It numbers like a pickup (bar 0, the next bar is 1), stays in
+     the part, prints no number, and shows `inc.` in the proof. A proposal
+     from widths is always a pickup; the operator makes it an incipit.
    - Split bar: the bars before and after a repeat are each at most 0.85 and
      together at most 1.35 of a bar -> one number (the second half keeps the
      number of the first).
@@ -260,8 +266,9 @@ notehead, slur or word goes whole to one owner.
    - Printed source numbers: when they follow the plain count they are
      converted; when they already follow these rules they are used as they
      are.
-   - The CLI asks Y/n for each proposal (`new`). `partitor bars ID` corrects
-     by hand: pickup on/off, split on/off, line start fixed (`f 3=16`); the
+   - The CLI asks about each proposal (`new`): a pickup (Enter), an incipit
+     (`i`) or neither (`n`), and Y/n for a split bar. `partitor bars ID`
+     corrects by hand: pickup on/off (`p N`), incipit on/off (`i N`), split on/off, line start fixed (`f 3=16`); the
      lines after it follow.
 8. **Rehearsal letters.** A boxed bold letter at the first full bar after
    each repeat (after the completing half of a split bar), A, B, ...

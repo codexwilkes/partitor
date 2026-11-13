@@ -531,6 +531,69 @@ class TestBarRules(unittest.TestCase):
         self.assertEqual([e["bar"] for e in lay["systems"]], [0, 7, 15, 21])
         self.assertIn("marks", lay["systems"][1])
 
+    def test_incipit_numbers_like_a_pickup(self):
+        sy = bach_like()
+        base = pt.number_bars(sy, {"pickup": ["p1.s1"], "split": [], "fix": {}})[0]
+        inc = pt.number_bars(sy, {"pickup": [], "incipit": ["p1.s1"], "split": [], "fix": {}})[0]
+        self.assertEqual(inc, base)
+        self.assertEqual(inc[0], 0)
+        self.assertEqual(pt.zero_first({"pickup": ["a"], "incipit": ["b"]}), {"a", "b"})
+        self.assertEqual(pt.zero_first(None), set())
+
+    def test_mismatch_left_out_with_an_incipit_rule(self):
+        sy = [{"id": "a", "bars": 4, "anchors": [[0, 2]], "restart": True}]
+        self.assertTrue(pt.bar_mismatches(sy, {"incipit": []}))
+        self.assertEqual(pt.bar_mismatches(sy, {"incipit": ["a"]}), [])
+
+    def test_confirm_bar_rules_incipit_answer(self):
+        with tempfile.TemporaryDirectory() as d:
+            item = Path(d)
+            pt.save_item(item, {"id": "2026-001", "slug": "x", "systems": bach_like(),
+                                "bar_rules": pt.propose_bar_rules(bach_like()),
+                                "bar_rules_status": "proposed"})
+            answers = iter(["i", "n"])           # incipit, split no
+            real = builtins.input
+            builtins.input = lambda prompt="": next(answers)
+            try:
+                with open(os.devnull, "w") as dn, contextlib.redirect_stdout(dn):
+                    pt.confirm_bar_rules(item)
+            finally:
+                builtins.input = real
+            data = pt.load_item(item)
+            self.assertEqual(data["bar_rules"]["incipit"], ["p1.s1"])
+            self.assertEqual(data["bar_rules"]["pickup"], [])
+            self.assertEqual([e["bar"] for e in data["systems"]], [0, 7, 15, 21])
+            self.assertEqual(data["systems"][0]["bar_nums"][0], 0)
+
+    def test_bars_menu_incipit_and_pickup_replace_each_other(self):
+        with tempfile.TemporaryDirectory() as d:
+            item, env = self.half_bar_item(d)
+            r = subprocess.run([sys.executable, SRC, "bars", "4"], input="i 1\ni 2\n\n",
+                               capture_output=True, text=True, env=env, timeout=120)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("(incipit)", r.stdout)
+            self.assertIn("line 2 does not start a movement", r.stdout)
+            self.assertEqual(pt.load_item(item)["bar_rules"]["incipit"], ["p1.s1"])
+            r = subprocess.run([sys.executable, SRC, "bars", "4"], input="p 1\n\n",
+                               capture_output=True, text=True, env=env, timeout=120)
+            br = pt.load_item(item)["bar_rules"]
+            self.assertEqual((br["pickup"], br.get("incipit")), (["p1.s1"], None))
+            r = subprocess.run([sys.executable, SRC, "bars", "4"], input="i 1\ni 1\n\n",
+                               capture_output=True, text=True, env=env, timeout=120)
+            br = pt.load_item(item)["bar_rules"]
+            self.assertEqual((br["pickup"], br.get("incipit")), ([], None))     # i then off
+
+    def test_proof_marks_an_incipit(self):
+        with tempfile.TemporaryDirectory() as d:
+            item, env = self.half_bar_item(d)
+            data = pt.load_item(item)
+            data["bar_rules"]["incipit"] = ["p1.s1"]
+            pt.save_item(item, data)
+            r = subprocess.run([sys.executable, SRC, "proof", "4"], capture_output=True,
+                               text=True, env=env, timeout=120)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("inc.", pymupdf.open(pt.item_file(item, "proof.pdf"))[0].get_text())
+
     def test_confirm_bar_rules_asks_each(self):
         with tempfile.TemporaryDirectory() as d:
             item = Path(d)

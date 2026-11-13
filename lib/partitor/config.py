@@ -166,7 +166,9 @@ LAYOUT_HELP = """\
 #   on source page 5: two systems that the analysis took apart are one. Set in
 #   the choices of the analysis (answer j) or with partitor analyse <id> --join
 #   p5:4 (--unjoin p5:4 takes it back); kept by every analysis again.
-# bar_rules: pickup (movement-first system ids: first bar is bar 0), split
+# bar_rules: pickup (movement-first system ids: first bar is bar 0), incipit
+#   (the same, for a first bar that shows the original notation: kept in the
+#   part, no number; the next bar is 1), split
 #   ('<system id>:<bar index>': that bar completes the bar before it and
 #   keeps its number), fix ({system id: first bar}); bar and marks
 #   (rehearsal letters) of every system follow from them at build.

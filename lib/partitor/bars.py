@@ -114,6 +114,14 @@ def _boundaries(systems: list[dict], seg: list[int], flat: list[tuple[int, int]]
     return sorted(out)
 
 
+def zero_first(rules: dict | None) -> set:
+    """zero_first -> the movement-first system ids whose first bar is bar 0:
+    bar_rules `pickup` (a short bar before the first full bar) and `incipit`
+    (the original notation of the opening, kept in the part, no number)."""
+    r = rules or {}
+    return set(r.get("pickup") or []) | set(r.get("incipit") or [])
+
+
 def propose_bar_rules(systems: list[dict]) -> dict:
     """propose_bar_rules -> {'pickup': [movement-first system ids],
     'split': ['<system id>:<bar index>' of the bar that completes the bar
@@ -176,7 +184,9 @@ def number_bars(systems: list[dict], rules: dict | None) -> tuple[list[int], dic
     {system id: [[bar index, letter], ...]}, anchor scheme).
 
     Without rules: assign_bars (plain count, printed numbers). With rules:
-    a pickup is bar 0; the bar that completes a split bar keeps the number
+    a pickup is bar 0, and so is an incipit (the first bar of a movement
+    that shows the original notation: kept, never numbered; the next bar is
+    1); the bar that completes a split bar keeps the number
     of the bar before it; endings count on (each printed bar its own
     number). Printed numbers that follow the plain count ('naive' source)
     are converted; numbers that already follow these rules ('standard')
@@ -184,7 +194,7 @@ def number_bars(systems: list[dict], rules: dict | None) -> tuple[list[int], dic
     the systems after it in the movement follow. Marks: A, B, ... per
     movement at the first full bar after each repeat."""
     rules = rules or {}
-    pick = set(rules.get("pickup") or [])
+    pick = zero_first(rules)
     split = set(rules.get("split") or [])
     fix = {str(k): int(v) for k, v in (rules.get("fix") or {}).items()}
     marks: dict[str, list[list]] = {}
@@ -540,11 +550,11 @@ def bar_mismatches(systems: list[dict], rules: dict | None) -> list[dict]:
     """bar_mismatches -> the places where the printed bar numbers of the
     source disagree with the count of barlines: [{id, prev, counted,
     printed, key}], one per change of the difference. systems: effective.
-    Movements with a pickup or split bar rule are left out (their numbers
-    differ from the count on purpose). Answers already given
+    Movements with a pickup, incipit or split bar rule are left out (their
+    numbers differ from the count on purpose). Answers already given
     (bar_rules.bars_ack, the key of each) are left out."""
     rules = rules or {}
-    pick = set(rules.get("pickup") or [])
+    pick = zero_first(rules)
     split = {str(k).split(":")[0] for k in rules.get("split") or []}
     recs = [{**e, "nbars": int(e.get("bars", e.get("nbars", 0)) or 0),
              "anchors": [(int(x[0]), int(x[1])) for x in e.get("anchors") or []]}
