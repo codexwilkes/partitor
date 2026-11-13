@@ -21,6 +21,7 @@ from .config import (
 from .model import PageResult, Staff
 from .vision import (
     binarize, clean_label, clean_title, detect_staves, dewarp, estimate_skew, flatten,
+    gap_column_fraction,
     group_systems, is_cue_text, is_footer_text, join_groups, looks_like_text, ocr_line,
     read_text, render_page, rotate, run_lengths, staff_tracks, text_in_rect,
 )
@@ -227,7 +228,8 @@ def prepare(page: pymupdf.Page, dpi: int, blank: "tuple | list" = ()
     return ink, skew, dmax, thick, gap, tracks
 
 
-def align_system_start(grp: list[Staff], sp: float) -> None:
+def align_system_start(grp: list[Staff], sp: float, ink: np.ndarray | None = None,
+                       thick: int = 0) -> None:
     """Give the staves of one system a common start x.
 
     Engraved systems start together: the leftmost start within 4 sp of the
@@ -235,15 +237,27 @@ def align_system_start(grp: list[Staff], sp: float) -> None:
     broken scan lines only push a measured start to the right). A staff
     more than 4 sp away keeps its own start (indent). With an even number
     of staves the median can lie between two distant starts; then no staff
-    is within 4 sp and all keep their own start."""
+    is within 4 sp and all keep their own start.
+
+    A staff that starts more than 4 sp right of the system's start is an
+    indent, unless a barline or bracket at the system start runs solid
+    through the gap between it and its neighbour (ink given): then its start
+    was lost (a tilted staff that no track straightened, the clef and key
+    broken the lines: Riccio Canzon p3.s1, the Violin staff at x 515 against
+    146) and it takes the start of the system (0.8.60)."""
     med = float(np.median([st.x0 for st in grp]))
     near = [st.x0 for st in grp if abs(st.x0 - med) <= 4 * sp]
     if not near:
         return
     x_sys = min(near)
-    for st in grp:
+    for k, st in enumerate(grp):
         if abs(st.x0 - med) <= 4 * sp:
             st.x0 = x_sys
+        elif ink is not None and st.x0 - x_sys > 4 * sp and len(grp) > 1:
+            a, b = (grp[k], grp[k + 1]) if k + 1 < len(grp) else (grp[k - 1], grp[k])
+            fr = gap_column_fraction(ink, a, b, thick)[max(0, int(x_sys - sp)):int(x_sys + sp) + 1]
+            if fr.size and float(fr.max()) >= 0.9:
+                st.x0 = x_sys
 
 
 def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
@@ -287,7 +301,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
     for k, grp in enumerate(systems):
         for st in grp:
             st.system = sys_base + k
-        align_system_start(grp, sp)
+        align_system_start(grp, sp, ink, thick)
     # systems of a page start at one x: a system starting 1-4 sp right of
     # the others (the clef hid the short line start, Schein Nun p3.s1:
     # clefs misread, brace lost) takes their median start. An indented

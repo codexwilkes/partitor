@@ -131,6 +131,22 @@ class TestStaffTracking(unittest.TestCase):
         self.assertEqual(len(staves), 2)
         self.assertLess(staves[0].top, 340)
 
+    def test_staff_one_third_larger_than_the_page_is_not_found(self):
+        # gaps of 23-24 px on a page of sp 18: an organ-size staff. It stays
+        # unseen so that the page is read as two sizes (0.8.57 let it in and
+        # Riccio Canzon p2 fell apart into systems of 3, 2 and 1 staves).
+        img = np.zeros((900, 2000), bool)
+        for y in (300, 323, 346, 370, 393):      # gaps 23, 23, 24, 23
+            img[y - 2:y + 3, 300:1900] = True
+        staves, _ = pt.detect_staves(img, 5, 13, 0)
+        self.assertEqual(len(staves), 0)
+
+    def test_gaps_fit_bounds(self):
+        self.assertTrue(pt.gaps_fit([16, 19, 17.5, 17], 23.0, 0.3))
+        self.assertFalse(pt.gaps_fit([14, 19, 17.5, 17], 23.0, 0.3))      # under 0.65 sp
+        self.assertFalse(pt.gaps_fit([18, 18, 18, 24], 18.0, 0.3))        # over 1.3 sp
+        self.assertTrue(pt.gaps_fit([18, 18, 18, 23], 18.0, 0.3))
+
     def test_irregular_five_lines_are_not_a_staff(self):
         img = np.zeros((900, 2000), bool)
         for y in (300, 330, 380, 400, 460):          # gaps 30, 50, 20, 60
@@ -510,6 +526,21 @@ class TestSystemStart(unittest.TestCase):
         grp = self.staves(100, 100, 100, 400)
         ownership.align_system_start(grp, 22.0)
         self.assertEqual([s.x0 for s in grp], [100, 100, 100, 400])
+
+    def test_a_staff_lost_from_its_system_takes_the_start_through_a_barline(self):
+        # staves 4 sp or more right of the system start are indents, unless
+        # a solid barline at the start runs through the gap beside them
+        sp, th = 22, 5
+        grp = [pt.Staff(0, i, [100.0 + 200 * i + sp * j for j in range(5)], x, 900)
+               for i, x in enumerate((100, 100, 100, 500))]
+        ink = np.zeros((1100, 1000), bool)
+        ink[:, 97:103] = True
+        ownership.align_system_start(grp, float(sp), ink, th)
+        self.assertEqual([s.x0 for s in grp], [100, 100, 100, 100])
+        grp = [pt.Staff(0, i, [100.0 + 200 * i + sp * j for j in range(5)], x, 900)
+               for i, x in enumerate((100, 100, 100, 500))]
+        ownership.align_system_start(grp, float(sp), np.zeros((1100, 1000), bool), th)
+        self.assertEqual([s.x0 for s in grp], [100, 100, 100, 500])       # no barline: an indent
 
     def test_no_staff_near_the_median(self):
         # two staves 20 sp apart: the median lies between them, so no

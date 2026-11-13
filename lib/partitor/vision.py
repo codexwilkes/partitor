@@ -221,13 +221,30 @@ def dewarp(grey: np.ndarray, tracks: list, w: int, h: int
 # =============================================================================
 # Staff and system detection
 # =============================================================================
+LOW_GAP = 0.35       # a line gap may be this fraction of sp below sp (see gaps_fit)
+
+
+def gaps_fit(gaps, sp: float, up: float) -> bool:
+    """gaps_fit -> True when every line gap of a 5-line group is a staff gap
+    of the page: up to `up` x sp above sp and up to LOW_GAP x sp below it.
+    The bounds are not equal on purpose. A staff 1.3 x larger than the page
+    size (an organ realization) has to stay outside, so that it is read as a
+    second size (analyse_page_mixed); a smaller staff (Riccio Canzon: 17.5 px
+    on a page of 23) has to be found, and the centres of its lines are
+    measured to about 1 px, so its first gap stood 0.1 px outside the old
+    bound (0.8.57, 0.8.60)."""
+    g = np.asarray(gaps, float)
+    return bool(np.all((g > sp - LOW_GAP * sp) & (g < sp + up * sp)))
+
+
 def detect_staves(ink: np.ndarray, thick: int, gap: int, page: int
                   ) -> tuple[list[Staff], np.ndarray]:
     """detect_staves -> (staves, long-horizontal-line mask).
 
     Runs on a straightened page. Lines = row runs of the line mask longer
     than 25% of the longest; 5 lines at staff spacing = one staff. A staff
-    must be at least 8 sp long. Gaps: the mean near sp (0.3 sp), each near the mean (0.2 sp)."""
+    must be at least 8 sp long. Each line gap
+    must fit gaps_fit()."""
     sp = gap + thick
     hmask = line_mask(ink, sp, max(6 * sp, 15))
     # unbridged lines for the staff extent: bridging would join a bracket
@@ -250,13 +267,10 @@ def detect_staves(ink: np.ndarray, thick: int, gap: int, page: int
              if e0 - s0 <= 3 * thick + 4]
     staves: list[Staff] = []
     i = 0
-    tol = 0.3 * sp
     while i + 4 < len(lines):
         grp = lines[i:i + 5]
         ds = np.diff([g[0] for g in grp])
-        # the mean gap is near sp; each gap is near the mean (a scan whose
-        # pitch is a little below the page estimate, 0.8.57)
-        if abs(float(np.mean(ds)) - sp) < tol and np.all(np.abs(ds - np.mean(ds)) < 0.2 * sp):
+        if gaps_fit(ds, sp, 0.3):
             ext = staff_extent(hmask, grp, thick, sp)
             if ext is not None:
                 ext = (refine_start(raw, grp, thick, sp, ext[0]), ext[1])

@@ -484,9 +484,16 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
       light print bolder.
     The safety gate (item 1) also covers this step: ink removed as noise is
     counted and reported.
-    A staff is five lines whose mean gap is within 0.3 sp of the page's sp and
-    whose single gaps stay within 0.2 sp of that mean (0.8.57): a scan whose real
-    pitch is a little below the page estimate keeps every staff.
+    A staff is five lines whose gaps each lie between 0.65 sp and 1.3 sp of the
+    page's sp (0.8.60; the lower bound was 0.7 sp). The bounds are not equal: a
+    staff 1.3 x larger than the page size (an organ realization) stays outside,
+    so that the page is read as two sizes (item 12 of section 12); a smaller
+    staff is found even when the centre of one line is measured 1 px off.
+    The staves of one system start together. A staff that starts more than
+    4 sp right of its system is an indent, unless a barline or bracket runs
+    solid through the gap between it and its neighbour at the system start;
+    then it takes the start of the system (0.8.60: a tilted staff with broken
+    lines left of its notes lost its clef and key).
 11. **Group outputs (for example "Trombones").** Besides one PDF per part, an
     item can define named groups. A group is an ordered list of parts that
     print together as a small score: the selected staves only, joined by a

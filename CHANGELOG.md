@@ -7,6 +7,23 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.60 — 2026-11-13
+
+### Fixed
+- Riccio, La Pichi: a tilted staff keeps its clef and key. The Violin staff of a system began 370 px
+  right of the others (its lines are broken left of the notes and no staff track straightened it),
+  so the part lost its clef and key. Staves of one system start together: a staff that starts more
+  than 4 spaces right of its system now takes the start of the system when a barline or bracket
+  runs solid through the gap beside it. A real indent has no such line and keeps its start. The same
+  fix corrects staves that began too far right in Grillo, Sonata seconda a 7 (pages 5, 7, 9, 11, 13, 15,
+  17, 21, 31) and in Riccio, La Rubina (page 5).
+- Riccio, La Pichi p2: the staff test of 0.8.57 let in staves 1.3 times larger than the page's size
+  (the organ staves). They must stay outside, so that a page with two staff sizes is read as two
+  sizes. The test has a lower and an upper bound again: a line gap of 0.65 to 1.3 times the page's
+  staff space (it was 0.7 to 1.3). The smaller Violin staff is still found; p2 has four systems of
+  four staves again. La Pichi p4 now reads 16 staves in four systems (it read 13 in 5 systems
+  before 0.8.57).
+
 ## 0.8.59 — 2026-11-13
 
 ### Added
@@ -18,7 +35,6 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
   switches an incipit on or off (it and `p N` replace each other). The proof shows `inc.`
   instead of a number; the build reports it as a note, not a warning.
 
-
 ## 0.8.58 — 2026-11-13
 
 ### Changed
@@ -27,7 +43,6 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
   Part names are 13 pt (9), bar numbers 11 pt (8.5), rehearsal letters 12 pt (11), system ids
   14 pt (11). The white box behind a bar number is more see-through, so it hides less of the
   staff above.
-
 
 ## 0.8.57 — 2026-11-12
 
