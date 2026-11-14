@@ -7,6 +7,17 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.61 — 2026-11-14
+
+### Fixed
+- Riccio, Canzon La Finetta p2: a page with two staff sizes was not split into two sizes. One organ
+  staff (1.26 times larger than the page's size) passed the staff test at the page size, so its band
+  was not set aside. The pass of the page's size still held it, found a ruled line no staff explains,
+  and dropped the merge. The page became one system of 5 staves and 3 more staves that no part could
+  take, with the gate failing. A staff whose line pitch is above 1.15 times the page's staff space now
+  counts as the other size. The page has four systems of four staves again.
+
+
 ## 0.8.60 — 2026-11-13
 
 ### Fixed

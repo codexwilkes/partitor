@@ -1095,13 +1095,24 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
     return res
 
 
+OTHER_SIZE = 1.15     # a staff with a pitch above this x sp belongs to the other size (_size_bands)
+
+
 def _size_bands(res: PageResult) -> list[tuple[int, int]]:
     """_size_bands -> row ranges of the staves that no accepted staff
     explains (res.unseen), each cut half way to the nearest staff of the
     other size. Neighbours of one size share a band (the two organ staves
-    of a system, Riccio Canzon)."""
+    of a system, Riccio Canzon). An accepted staff whose own line pitch is
+    above OTHER_SIZE x sp is of the other size too: its gaps passed the
+    staff test (gaps_fit allows 0.3 sp above sp) but it is no staff of the
+    page size. Left out of the bands, it stayed in the pass of the page size
+    and the merge was dropped (an organ staff 1.26 x larger, 0.8.61)."""
     h = res.shape[0]
-    ent = [(st.top, st.bottom, 0, res.sp) for st in res.staves]
+    big = [(st.top, st.bottom) for st in res.staves
+           if (st.bottom - st.top) / 4.0 > OTHER_SIZE * res.sp]
+    ent = [(st.top, st.bottom, 0, res.sp) for st in res.staves
+           if (st.top, st.bottom) not in big]
+    ent += [(a, b, 1, (b - a) / 4.0) for a, b in big]
     ent += [(a, b, 1, (b - a) / 4.0) for a, b in res.unseen]
     ent.sort()
     bands: list[tuple[int, int]] = []

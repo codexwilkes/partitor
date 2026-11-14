@@ -482,6 +482,26 @@ class TestMixedStaffSizes(unittest.TestCase):
         self.assertTrue(all(abs(st.sp / res.sp - 1.4) < 0.08 for st in big), [st.sp for st in big])
         self.assertTrue(all(st.system == res.staves[0].system for st in res.staves))
 
+    def test_larger_staff_inside_the_gap_bound_is_a_second_size(self):
+        """Riccio Canzon La Finetta p2: one organ staff, 1.2 to 1.26 x larger, passed the staff test at
+        the page size and was kept out of the bands; the other organ staves of the page were
+        not merged and the page kept the gate failure (0.8.61)."""
+        def big(page, tops):            # 1.2 x and 1.4 x larger: the first one passes the staff test
+            for y0, f in ((430, 1.2), (500, 1.4)):
+                for ln in range(5):
+                    page.draw_line((110, y0 + ln * f * SP), (560, y0 + ln * f * SP), width=0.6)
+                for bx in (280, 420, 560):
+                    page.draw_line((bx, y0), (bx, y0 + 4 * f * SP), width=0.8)
+            page.draw_line((110, 430), (110, 500 + 4 * 1.4 * SP), width=0.8)
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d, True)
+        path = os.path.join(d, "s.pdf")
+        make_score_pdf(path, systems=1, staves=3, extra=big)
+        res = pt.analyse_page_mixed(pymupdf.open(path)[0], 0, 400, 0)
+        self.assertEqual(res.gate, [])
+        self.assertEqual(len(res.staves), 5)
+        self.assertEqual([len(g) for g in res.systems], [5])
+
     def test_owner_has_no_unowned_staff_ink(self):
         res = pt.analyse_page_mixed(self.page(), 0, 400, 0)
         for st in res.staves[3:]:       # the big staff lines belong to their own staff

@@ -344,7 +344,10 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
      size under a system of the page's size joins it when it stands nearer to
      it than to the next one (3 instrument staves and 2 organ staves are one
      system of 5; the barlines are those of the first), and text between the
-     staves goes to the staff of the other size just below it. A strip takes
+     staves goes to the staff of the other size just below it. A staff that
+     was accepted but has a line pitch above 1.15 x the page's sp (0.8.61: an
+     organ staff 1.26 x larger passed the staff test) counts as the other size
+     too, so that its band is blanked in the pass of the page's size. A strip takes
      its `sp` from its staff. A page with a third size, or a staff that is
      still unexplained, keeps the failure.
    - Discarded ink outside the header/footer zones above a budget (per page)
