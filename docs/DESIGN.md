@@ -1216,7 +1216,14 @@ Details:
      run. `--undrop` sets `?` for every staff, suggests the map of the nearest
      system with the same staves and clefs. In the choices `d`, or `0` for every
      staff, drops the system asked about, and its map is no suggestion for the
-     systems after it (0.8.63);
+     systems after it (0.8.63). The analysis marks a system `title_above` when
+     its header holds a wide (12 sp), high (1.8 sp) text line centred on the page
+     and the system is not the first of its page (`ownership.header_titles`).
+     When the first such system has systems above it on the first page, and no
+     movement start comes before it, the choices ask first whether to drop
+     them (`cli_parts.offer_title_drop`, default no, once per analysis,
+     `title_asked`); `analyse --yes` prints the `--drop` command instead
+     (0.8.64);
      `analyse --all` analyses every library item that way (after an engine
      update); one failure does not stop the rest. The proof rings each part's
      lowest and highest note in green, named with bar, page and system, and page

@@ -231,6 +231,8 @@ def cmd_detect(a: argparse.Namespace) -> int:
             e["steps"] = r["steps"]
         if r.get("restart"):
             e["restart"] = True
+        if r.get("title_above"):
+            e["title_above"] = True
         if r.get("geom"):
             e["geom"] = {"page": int(r["page"]) + 1, **r["geom"]}
     # the operator's bar edits and answers of an earlier analysis stay (each

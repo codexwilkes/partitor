@@ -7,6 +7,18 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.64 — 2026-11-14
+
+### Added
+- A scan that begins with the end of another piece: the choices ask about it. When a title stands low
+  on the first page, above a system, and other systems lie above it (Riccio, Canzon La Finetta: two
+  systems of the piece before it), the CLI tells the operator to look at the proof or the score, names
+  the systems and asks whether to drop them (default: no; nothing is dropped without a yes). The
+  analysis finds the title as a centred text line at least 12 spaces wide and 1.8 spaces high in the
+  header of a system that is not the first of its page. Asked once per analysis. `analyse ID --yes`
+  and `analyse --all` ask nothing and print the `--drop` command.
+
+
 ## 0.8.63 — 2026-11-14
 
 ### Added

@@ -527,6 +527,38 @@ class TestMixedStaffSizes(unittest.TestCase):
 
 
 @needs_deps
+class TestHeaderTitles(unittest.TestCase):
+    """A centred title over a system low on the page is a hint for the CLI (0.8.64)."""
+
+    def titled(self, text, x=236.0, size=18, systems=2, dy=30):
+        def extra(page, tops):
+            if text:
+                page.insert_text((x, tops[min(3, len(tops) - 1)] - dy), text, fontsize=size)
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d, True)
+        path = os.path.join(d, "s.pdf")
+        make_score_pdf(path, systems=systems, staves=3, extra=extra)
+        res = pt.analyse_page(pymupdf.open(path)[0], 0, 400, 0)
+        return res, pt.header_titles(res)
+
+    def test_a_centred_title_over_the_second_system_is_found(self):
+        res, got = self.titled("Canzon La Finetta")
+        self.assertEqual(got, {res.systems[1][0].system})
+
+    def test_no_text_no_title(self):
+        self.assertEqual(self.titled("")[1], set())
+
+    def test_text_not_centred_is_no_title(self):          # a composer line, a tempo mark
+        self.assertEqual(self.titled("Canzon La Finetta", x=60.0)[1], set())
+
+    def test_small_text_is_no_title(self):                # a cue, a bar number
+        self.assertEqual(self.titled("Canzon La Finetta", size=7, x=262.0)[1], set())
+
+    def test_one_system_has_no_second_one(self):
+        self.assertEqual(self.titled("Canzon La Finetta", systems=1)[1], set())
+
+
+@needs_deps
 class TestRestsAndTitles(unittest.TestCase):
     """Multi-bar rests for systems without a part's staff; no false title."""
 

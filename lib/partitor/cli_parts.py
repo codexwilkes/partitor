@@ -11,7 +11,7 @@ from pathlib import Path
 from .clef import ambitus_report, part_clefs
 from .cli_common import _item_or_die, cmd_set, locks_item, saved
 from .config import PART_LAYOUT_KEY, SKIP_KEY
-from .console import Abort, DIM, RST, YLW, _die, _fail, _head, _ok, _reset_counts, _warn, ask
+from .console import Abort, DIM, RST, YLW, _die, _fail, _head, _ok, _reset_counts, _warn, ask, yes
 from .bars import system_dropped
 from .library import (
     drop_systems, item_file, load_item, mark_pending, merge_item_keys, part_names, save_item,
@@ -175,6 +175,61 @@ def system_where(data: dict, e: dict) -> str:
     return f"source page {pno}, system {sno} of {n_on} from the top{pp}"
 
 
+def systems_above_title(data: dict) -> tuple[str, list[str]]:
+    """systems_above_title -> (id of the system with a title, ids of the
+    systems above it on its page) or ('', []). The title of a piece that
+    begins low on the first page of the score (`title_above` of the
+    analysis); what stands above it may be the end of the piece before.
+    Nothing when a movement start (`restart`) comes earlier, when the title is
+    on another page than the first system, or when the systems above are
+    dropped already."""
+    systems = data.get("systems") or []
+    k = next((i for i, e in enumerate(systems) if e.get("title_above")), None)
+    if not k:
+        return "", []
+    if any(e.get("restart") for e in systems[:k]):
+        return "", []
+    page = lambda e: (e.get("geom") or {}).get("page")      # noqa: E731
+    above = [e["id"] for e in systems[:k] if page(e) == page(systems[k]) and not system_dropped(e)]
+    if not above or page(systems[0]) != page(systems[k]):
+        return "", []
+    return systems[k]["id"], above
+
+
+def offer_title_drop(item: Path) -> None:
+    """After an analysis: when the first page shows a title low on the page
+    with systems above it, ask whether those systems are another piece and
+    to be dropped (default: no). The operator is told to look at the proof or
+    the score first; nothing is dropped without the answer y. Asked once per
+    analysis (`title_asked`)."""
+    data = load_item(item)
+    tid, above = systems_above_title(data)
+    if not tid or tid in (data.get("title_asked") or []):
+        return
+    page = (next(e for e in data["systems"] if e["id"] == tid).get("geom") or {}).get("page", "?")
+    _head("Title below the top of the page")
+    print(f"     A title stands above {tid}, and {', '.join(above)} lie above it on source page {page}.")
+    print("     They may be the end of another piece. Look at proof.pdf (item folder) or at the")
+    print("     score before you answer; the proof marks every system with its id.")
+    data["title_asked"] = [tid]
+    if yes(f"Drop {', '.join(above)} (no part reads them; undo with --undrop)", False):
+        drop_systems(data, above)
+        _ok(f"drop:  {', '.join(above)} left out")
+    save_item(item, data)
+    annotate_proof(item)
+
+
+def title_drop_note(data: dict) -> str:
+    """The line for a run without questions (analyse --yes, --all): what the
+    operator can drop. '' when there is nothing."""
+    tid, above = systems_above_title(data)
+    if not tid or tid in (data.get("title_asked") or []):
+        return ""
+    return (f"a title stands above {tid}; {', '.join(above)} lie above it and may be another "
+            f"piece: look at the proof, then partitor analyse {data.get('id', '<id>')} "
+            + " ".join(f"--drop {i}" for i in above))
+
+
 def choose_maps(item: Path) -> bool:
     """Ask for every system marked '?'. For each: where it is (source and
     proof page, red frame on the proof), its clefs and printed labels, and
@@ -182,7 +237,9 @@ def choose_maps(item: Path) -> bool:
     staff, top staff first ('2 3 4'; 0 leaves a staff out), or j: the
     system and the one below it on the page are one system (the analysis
     took them apart; it is run again and the questions start over). True
-    when all systems are set."""
+    when all systems are set. Before the first question: a title low on the
+    first page with systems above it (offer_title_drop)."""
+    offer_title_drop(item)
     while True:
         again = _choose_maps(item)
         if again is not None:

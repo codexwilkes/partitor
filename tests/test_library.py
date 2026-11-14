@@ -795,6 +795,76 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(data["systems_drop"], ["p1.s1", "p1.s2"])
         self.assertEqual(data["systems"][2]["bar"], 1)
 
+    def title_item(self, n=8, **top):
+        item = self.share / "library" / f"2026-{n:03d}-t"
+        item.mkdir()
+        sysd = lambda i, page, **kw: {"id": i, "staves": 2, "map": ["A", "B"], "clefs": ["G2", "F4"],  # noqa: E731
+                                      "bars": 4, "widths": [20.0] * 4, "geom": {"page": page}, **kw}
+        pt.save_item(item, {"id": f"2026-{n:03d}", "slug": "t", "parts": ["A", "B"],
+                            "systems": [sysd("p1.s1", 1, **top), sysd("p1.s2", 1), sysd("p1.s3", 1, title_above=True),
+                                        sysd("p2.s1", 2)]})
+        return item
+
+    def test_systems_above_title(self):
+        data = pt.load_item(self.title_item())
+        self.assertEqual(pt.systems_above_title(data), ("p1.s3", ["p1.s1", "p1.s2"]))
+        data["systems"][0]["restart"] = True              # a movement starts above: not another piece
+        self.assertEqual(pt.systems_above_title(data), ("", []))
+        data["systems"][0].pop("restart")
+        data["systems"][2]["geom"]["page"] = 2            # the title on another page than the first system
+        self.assertEqual(pt.systems_above_title(data), ("", []))
+        data["systems"][2]["geom"]["page"] = 1
+        data["systems"][2].pop("title_above")
+        self.assertEqual(pt.systems_above_title(data), ("", []))
+        data["systems"][2]["title_above"] = True
+        data["systems"][0]["map"] = ["-", "-"]            # dropped already: only the other one is asked
+        self.assertEqual(pt.systems_above_title(data), ("p1.s3", ["p1.s2"]))
+        data["systems"][2]["title_above"] = False
+        data["systems"][0]["title_above"] = True          # a title on the first system: nothing above
+        self.assertEqual(pt.systems_above_title(data), ("", []))
+
+    def ask_title(self, item, answer):
+        real = builtins.input
+        builtins.input = lambda prompt="": answer
+        try:
+            with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
+                pt.offer_title_drop(item)
+        finally:
+            builtins.input = real
+        return pt.load_item(item)
+
+    def test_title_drop_is_asked_and_dropped_only_on_yes(self):
+        item = self.title_item()
+        data = self.ask_title(item, "")                   # Enter = no
+        self.assertNotIn("systems_drop", data)
+        self.assertEqual(data["title_asked"], ["p1.s3"])
+        item = self.title_item(9)
+        data = self.ask_title(item, "y")
+        self.assertEqual(data["systems_drop"], ["p1.s1", "p1.s2"])
+        self.assertEqual(data["systems"][2]["bar"], 1)
+        self.assertEqual(self.ask_title(item, "y")["systems_drop"], ["p1.s1", "p1.s2"])   # asked once: no change
+
+    def test_title_asked_once_and_note_for_runs_without_questions(self):
+        item = self.title_item()
+        data = pt.load_item(item)
+        note = pt.title_drop_note(data)
+        self.assertIn("--drop p1.s1 --drop p1.s2", note)
+        self.assertIn("look at the proof", note)
+        self.ask_title(item, "")
+        self.assertEqual(pt.title_drop_note(pt.load_item(item)), "")
+
+    def test_choose_maps_asks_about_the_title_first(self):
+        item = self.title_item()
+        answers = iter(["y"])
+        real = builtins.input
+        builtins.input = lambda prompt="": next(answers)
+        try:
+            with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
+                self.assertTrue(pt.choose_maps(item))
+        finally:
+            builtins.input = real
+        self.assertEqual(pt.load_item(item)["systems_drop"], ["p1.s1", "p1.s2"])
+
     def test_choose_maps_j_joins_and_asks_again(self):
         item = self.share / "library" / "2026-005-k"
         item.mkdir()

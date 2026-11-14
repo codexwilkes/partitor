@@ -90,6 +90,7 @@ def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: boo
         for t in nt:
             _warn(f"bars:  {t}")
     recs = []
+    titled = ownership.header_titles(res)        # a title above a system low on the page
     for j, grp in enumerate(res.systems):
         recs.append({"id": f"p{pno + 1}.s{j + 1}", "page": pno,
                      "staves": [s.idx for s in grp],
@@ -101,6 +102,7 @@ def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: boo
                      "anchors": [(sum(1 for b in res.barlines.get(grp[0].system, []) if b < x), n, st)
                                  for x, n, st in res.anchors.get(grp[0].system, [])],
                      "restart": grp[0].system in res.restart,
+                     "title_above": grp[0].system in titled,
                      "widths": bar_widths(res, grp),
                      "geom": {"h": int(res.shape[0]),
                               "staves": [[int(st.x0), int(st.top), int(st.bottom)]

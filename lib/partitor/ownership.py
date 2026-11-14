@@ -1095,6 +1095,48 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
     return res
 
 
+TITLE_MIN_W_SP = 12.0    # a title over a system: at least this wide, centred (header_titles)
+TITLE_MIN_H_SP = 1.8     # and this high (a title line, not a tempo mark or a cue)
+TITLE_CENTRE = 0.15      # the middle of the text within this fraction of the page width of the page's
+
+
+def header_titles(res: PageResult) -> set[int]:
+    """header_titles -> the system numbers of a page whose header holds a title:
+    a wide (TITLE_MIN_W_SP), high (TITLE_MIN_H_SP) text line, centred on the
+    page, above a system that is not the first of the page. A piece that
+    begins low on a page has its title there; the systems above it can be
+    the end of the piece before (0.8.64). The first system of a page has the
+    page title (`res.title`), found by analyse_page. Only a hint: the CLI
+    asks, it drops nothing."""
+    if len(res.systems) < 2:
+        return set()
+    own = res.owner
+    mask = own >= OWN_HEADER_BASE
+    if not mask.any():
+        return set()
+    sp = res.sp
+    k = cv2.getStructuringElement(cv2.MORPH_RECT, (max(3, int(2.5 * sp)), max(3, int(0.6 * sp))))
+    n, lab, st, _ = cv2.connectedComponentsWithStats(cv2.dilate(mask.astype(np.uint8), k))
+    first = res.systems[0][0].system
+    top = {g[0].system: min(s.top for s in g) for g in res.systems}
+    out: set[int] = set()
+    w = own.shape[1]
+    for i in range(1, n):
+        x, y, cw, ch, _a = st[i]
+        sub_ = mask[y:y + ch, x:x + cw]
+        if int(sub_.sum()) < 4 * sp * sp:
+            continue
+        ys, xs = np.nonzero(sub_)
+        x0, x1, y0, y1 = x + xs.min(), x + xs.max() + 1, y + ys.min(), y + ys.max() + 1
+        sysc = int(np.bincount(own[y:y + ch, x:x + cw][sub_] - OWN_HEADER_BASE).argmax())
+        if sysc == first or sysc not in top or y1 >= top[sysc]:
+            continue
+        if x1 - x0 >= TITLE_MIN_W_SP * sp and y1 - y0 >= TITLE_MIN_H_SP * sp \
+                and abs((x0 + x1) / 2 - w / 2) <= TITLE_CENTRE * w:
+            out.add(sysc)
+    return out
+
+
 OTHER_SIZE = 1.15     # a staff with a pitch above this x sp belongs to the other size (_size_bands)
 
 

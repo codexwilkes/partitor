@@ -386,8 +386,12 @@ def analyse_item(item: Path, interactive: bool = True) -> int:
         choose_maps(item)
         confirm_bar_rules(item)
         confirm_ambitus(item)
-    elif open_:
-        _note(f"choices left open: partitor rebuild {new['id']}")
+    else:
+        note = cli_parts.title_drop_note(new)
+        if note:
+            _note(f"analyse:  {note}")
+        if open_:
+            _note(f"choices left open: partitor rebuild {new['id']}")
     return 0
 
 

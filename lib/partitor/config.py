@@ -172,6 +172,10 @@ LAYOUT_HELP = """\
 #   "dropped". Set in the choices (answer d, or 0 for every staff) or with
 #   partitor analyse <id> --drop p1.s1 (--undrop p1.s1 puts it back); kept by
 #   every analysis again, by the ids of the new analysis.
+#   title_above: true on a system whose header has a centred title line (the
+#   analysis found it); when it stands low on the first page with systems
+#   above it, the CLI asks whether those are another piece (title_asked: the
+#   system it asked about) and drops nothing without a yes.
 # bar_rules: pickup (movement-first system ids: first bar is bar 0), incipit
 #   (the same, for a first bar that shows the original notation: kept in the
 #   part, no number; the next bar is 1), split
