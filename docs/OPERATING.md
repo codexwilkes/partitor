@@ -20,6 +20,8 @@ sandbox (`SANDBOX.md`).
 | `partitor set ID key=value ...` | Change settings (saved, not built). `Part:key=value` for one part; `"Part:short=A. Tbn."` sets the short form of a group staff label (`auto` = the rule). |
 | `partitor expand ID [part]`, `contract ID [part]` | One step larger or smaller. |
 | `partitor analyse ID [--yes]`, `analyse --all` | Read the score again. |
+| `partitor analyse ID --join p5:4`, `--unjoin p5:4` | Two systems the analysis took apart are one (no system ends after staff 4 of source page 5); saved, kept by every analysis. |
+| `partitor analyse ID --drop p1.s1`, `--undrop p1.s1` | Leave a system out (the end of another piece above the music), or put it back. It counts no bars. No analysis is run; every later analysis keeps it. |
 | `partitor bars`, `parts`, `groups`, `meta`, `proof ID` | Edit bar numbers, part names, groups, title; redraw the proof. |
 | `partitor plan ID [part [N]]` | Which paper and staff size give the best page turns? Read-only until you pick an option `N`; then `rebuild`. Guide: `PLAN-AND-FOLDOUTS.md`. |
 | `partitor pages ID part [--move PAGE=N] [--dry-run]` | The pages of a built part with the turn after each; move a system to the next page. Guide: `PLAN-AND-FOLDOUTS.md`. |

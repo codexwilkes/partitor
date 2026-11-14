@@ -26,6 +26,7 @@ result. The proof PDF (`<id>-proof.pdf`) is the place to look first.
 | Clefs | about 97 % on real scans | A rare clef (G1, C2, C5, F3, F5) can be read for a common one. G8 is sometimes missed; part mapping treats G2 and G8 as the same clef. |
 | Part mapping | good | Systems with only unlabelled staves after a change in staff count ask the operator. A stray "Continuo" label read by OCR on an upper staff can make a system ask. |
 | Lyrics, text ownership | good | A single word can land on the wrong staff. |
+| Title below the top of the page | asks, never drops | The question about systems above a title (another piece) is asked only for the first page of the score, and only for a title that is centred, at least 12 sp wide and 1.8 sp high. A title that is left-aligned, small or on a later page is not found; use `analyse ID --drop p1.s1`. |
 | Rests | good | Whole-bar rests inside printed staves stay as engraved. "Tacet" is not built. |
 | Ambitus | weak: about half of the extremes right in early tests | See below. |
 | Page turns | good on groups | Lines that end in rests and final double barlines are not used as turn points when `turns=any`. A one-bar rest is too short to turn on. |

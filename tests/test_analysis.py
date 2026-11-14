@@ -157,9 +157,15 @@ class TestStaffTracking(unittest.TestCase):
 
     def test_gaps_fit_bounds(self):
         self.assertTrue(pt.gaps_fit([16, 19, 17.5, 17], 23.0, 0.3))
-        self.assertFalse(pt.gaps_fit([14, 19, 17.5, 17], 23.0, 0.3))      # under 0.65 sp
+        self.assertFalse(pt.gaps_fit([13.5, 19, 17.5, 17], 23.0, 0.3))    # under 0.65 sp and the single-gap margin
         self.assertFalse(pt.gaps_fit([18, 18, 18, 24], 18.0, 0.3))        # over 1.3 sp
         self.assertTrue(pt.gaps_fit([18, 18, 18, 23], 18.0, 0.3))
+
+    def test_one_gap_a_little_under_the_bound_is_fit_when_the_mean_is_not(self):
+        # Riccio Canzon La Savoldi p4: gaps 16.5 16 18.5 14.5 on a page of 23 (bound 14.95)
+        self.assertTrue(pt.gaps_fit([16.5, 16, 18.5, 14.5], 23.0, 0.3))
+        self.assertFalse(pt.gaps_fit([16.5, 16, 18.5, 13.5], 23.0, 0.3))     # too far under
+        self.assertFalse(pt.gaps_fit([14.5, 14.5, 14.5, 14.5], 23.0, 0.3))   # mean under the bound
 
     def test_irregular_five_lines_are_not_a_staff(self):
         img = np.zeros((900, 2000), bool)

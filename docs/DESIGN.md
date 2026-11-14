@@ -487,8 +487,9 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
       light print bolder.
     The safety gate (item 1) also covers this step: ink removed as noise is
     counted and reported.
-    A staff is five lines whose gaps each lie between 0.65 sp and 1.3 sp of the
-    page's sp (0.8.60; the lower bound was 0.7 sp). The bounds are not equal: a
+    A staff is five lines whose gaps each lie below 1.3 sp of the page's sp, and
+    whose mean gap lies above 0.65 sp; one gap may stand 0.05 sp below that
+    bound (0.8.65; 0.8.60: each gap above 0.65 sp, the bound was 0.7 sp). The bounds are not equal: a
     staff 1.3 x larger than the page size (an organ realization) stays outside,
     so that the page is read as two sizes (item 12 of section 12); a smaller
     staff is found even when the centre of one line is measured 1 px off.

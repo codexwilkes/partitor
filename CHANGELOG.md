@@ -7,6 +7,19 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.65 — 2026-11-14
+
+### Fixed
+- A staff with one bowed line is found. On a page of two staff sizes (Riccio, Canzon La Savoldi, page 4)
+  the top staff of the first system was not found: one line gap was 14.5 px, the bound 14.95 px, so
+  the system had 3 staves and the choices asked for it. The lower bound now holds for the mean gap;
+  one gap may stand 0.05 sp below it.
+
+### Changed
+- Docs: `OPERATING.md` lists `analyse --join`, `--unjoin`, `--drop` and `--undrop`; `KNOWN-LIMITS.md`
+  states the limits of the title question.
+
+
 ## 0.8.64 — 2026-11-14
 
 ### Added

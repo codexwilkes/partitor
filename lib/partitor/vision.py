@@ -221,6 +221,7 @@ def dewarp(grey: np.ndarray, tracks: list, w: int, h: int
 # =============================================================================
 # Staff and system detection
 # =============================================================================
+LOW_SINGLE = 0.05    # one gap may be this fraction of sp below the lower bound if the mean is above it
 LOW_GAP = 0.35       # a line gap may be this fraction of sp below sp (see gaps_fit)
 
 
@@ -234,7 +235,12 @@ def gaps_fit(gaps, sp: float, up: float) -> bool:
     measured to about 1 px, so its first gap stood 0.1 px outside the old
     bound (0.8.57, 0.8.60)."""
     g = np.asarray(gaps, float)
-    return bool(np.all((g > sp - LOW_GAP * sp) & (g < sp + up * sp)))
+    low = sp - LOW_GAP * sp
+    # the lower bound holds for the mean gap; a single gap may stand
+    # LOW_SINGLE below it (a bowed line near the page edge: 14.5 px against
+    # 14.95, Riccio Canzon La Savoldi p4, 0.8.65)
+    return bool(np.all(g < sp + up * sp) and np.all(g > low - LOW_SINGLE * sp)
+                and g.mean() > low)
 
 
 def detect_staves(ink: np.ndarray, thick: int, gap: int, page: int
