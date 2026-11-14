@@ -585,12 +585,37 @@ def mismatch_text(m: dict) -> str:
             f"numbers of the source say bar {m['printed']}")
 
 
+def system_dropped(e: dict) -> bool:
+    """system_dropped -> True for a system that no part reads: its map is '-'
+    for every staff (a title or a piece of another work above the music, 0.8.63)."""
+    m = e.get("map") or []
+    return bool(m) and all(x == "-" for x in m)
+
+
+def _without_dropped(eff: list[dict]) -> list[dict]:
+    """The systems for the bar count: a dropped system holds no bars. A
+    movement start (`restart`) on a dropped system passes to the next system."""
+    out, carry = [], False
+    for e in eff:
+        if system_dropped(e):
+            carry = carry or bool(e.get("restart"))
+            out.append({**e, "bars": 0, "nbars": 0, "widths": [], "anchors": [],
+                        "repeats": [], "restart": False})
+        elif carry:
+            out.append({**e, "restart": True})
+            carry = False
+        else:
+            out.append(e)
+    return out
+
+
 def renumber(lay: dict) -> str:
     """Set `bar` and `marks` of every system in a layout from its stored
     widths, repeats, anchors and `bar_rules` (with the bar edits applied).
-    Returns the anchor scheme."""
+    A dropped system (system_dropped) counts no bars: the next system
+    starts the count. Returns the anchor scheme."""
     systems = lay.get("systems") or []
-    eff = effective_systems(systems, lay.get("bar_rules"))
+    eff = _without_dropped(effective_systems(systems, lay.get("bar_rules")))
     starts, marks, scheme = number_bars(eff, lay.get("bar_rules"))
     nums = bar_numbers(eff, starts, lay.get("bar_rules"))
     marks = apply_mark_rules(eff, marks, nums, lay.get("bar_rules"))

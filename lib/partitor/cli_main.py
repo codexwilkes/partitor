@@ -358,6 +358,12 @@ def _main() -> int:
                          "took apart are one (p5:4); saved, kept by every analysis; then analyse")
     an.add_argument("--unjoin", action="append", default=[], metavar="pP:N",
                     help="take a join back")
+    an.add_argument("--drop", action="append", default=[], metavar="pP.sN",
+                    help="leave a whole system out (a title, a piece of another work above the "
+                         "music): p1.s1; no part reads it, it counts no bars, every analysis "
+                         "keeps it; not analysed, not built")
+    an.add_argument("--undrop", action="append", default=[], metavar="pP.sN",
+                    help="put a dropped system back (choices ask for its parts)")
     st = sub.add_parser("set", help="change settings; saved, not built (--build: build too)")
     st.add_argument("id", help="12 or 2026-10-0012")
     st.add_argument("pairs", nargs="*", metavar="key=value",

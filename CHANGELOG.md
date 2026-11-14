@@ -7,6 +7,20 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.63 — 2026-11-14
+
+### Added
+- Drop a system. A scan can begin with the end of another piece above the music (Riccio, Canzon La
+  Finetta: two systems of the piece before it on page 1). `partitor analyse ID --drop p1.s1` leaves a
+  system out; `--undrop p1.s1` puts it back (the choices then ask for its parts). In the choices,
+  `d` (or `0` for every staff) does the same for the system asked about. A dropped system has `-`
+  for every staff, so no part reads it, and it counts no bars: the next system starts at bar 1 and
+  a movement start on it passes on. The proof marks it "dropped". The drop is saved as
+  `systems_drop` and kept by every later analysis. A map of `0 0 0 0` no longer becomes the
+  suggestion for the systems after it. Before this, a drop needed the map by hand and
+  `bar_rules: fix`, and an analysis again lost it.
+
+
 ## 0.8.62 — 2026-11-14
 
 ### Fixed

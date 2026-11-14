@@ -12,7 +12,10 @@ from .clef import ambitus_report, part_clefs
 from .cli_common import _item_or_die, cmd_set, locks_item, saved
 from .config import PART_LAYOUT_KEY, SKIP_KEY
 from .console import Abort, DIM, RST, YLW, _die, _fail, _head, _ok, _reset_counts, _warn, ask
-from .library import item_file, load_item, mark_pending, merge_item_keys, part_names, save_item
+from .bars import system_dropped
+from .library import (
+    drop_systems, item_file, load_item, mark_pending, merge_item_keys, part_names, save_item,
+)
 from .mapping import clefs_compatible
 from .proof import _proof_pages, annotate_proof, proof_from_preview
 
@@ -93,6 +96,25 @@ def set_join(item: Path, cut: str, on: bool = True) -> str:
     else:
         data.pop("system_joins", None)
     save_item(item, data)
+    return ""
+
+
+def set_drop(item: Path, ids: list[str], on: bool = True) -> str:
+    """set_drop -> '' or an error: leave systems out (on) or put them back
+    (off). A dropped system has '-' for every staff, counts no bars, and
+    stays dropped through every analysis (`systems_drop`). Not analysed, not
+    built; the proof is drawn again."""
+    data = load_item(item)
+    have = set(data.get("systems_drop") or [])
+    same = [i for i in ids if (i in have) == on and i in {e["id"] for e in data.get("systems") or []}]
+    if same:
+        return f"{', '.join(same)} {'is dropped already' if on else 'is not dropped'}"
+    bad = drop_systems(data, ids, on)
+    if bad:
+        return f"no such system: {', '.join(bad)} (the ids are on the proof, e.g. p1.s2)"
+    mark_pending(data, "systems left out" if on else "systems put back")
+    save_item(item, data)
+    annotate_proof(item)
     return ""
 
 
@@ -196,7 +218,13 @@ def _choose_maps(item: Path) -> bool | None:
             ans = ask(f"part number for each of the {n} staves, top first "
                       "(Enter = suggestion; 0 = leave out; same number twice = "
                       "one part on two staves; j = join with the system below; "
+                      "d = leave the whole system out; "
                       "q = stop, continue later with rebuild)")
+            words_ = ans.replace(",", " ").split()
+            if ans.strip().lower() == "d" or (len(words_) == n and set(words_) == {"0"}):
+                drop_systems(data, [s_["id"]])      # no part reads it: dropped, kept by every analysis
+                _ok(f"drop:  {s_['id']} is left out (undo: partitor analyse <id> --undrop {s_['id']})")
+                break
             if ans.strip().lower() == "j":
                 cut = system_cut(data, s_["id"])
                 if not cut:
@@ -226,7 +254,7 @@ def _choose_maps(item: Path) -> bool | None:
         # the answer becomes the suggestion for the systems still to come
         # with the same staff count and clefs (operator request 2026-10-24: they kept
         # the wrong suggestion)
-        if s_["map"] != sug:
+        if s_["map"] != sug and not system_dropped(s_):
             for later in todo[k:]:
                 if later["staves"] == n and clefs_compatible(later.get("clefs") or [], clefs):
                     later["suggest"] = list(s_["map"])

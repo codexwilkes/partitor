@@ -17,7 +17,7 @@ from .clef import ambitus_report, part_clefs
 from .cli_bars import confirm_bar_rules
 from .cli_common import _cmd_step, _item_or_die, _lib_or_die, bar_summary, locks_item, saved
 from . import cli_parts
-from .cli_parts import choose_maps, confirm_ambitus, rename_parts, set_join
+from .cli_parts import choose_maps, confirm_ambitus, rename_parts, set_drop, set_join
 from .config import (
     LAYOUT_DEFAULTS, PART_LAYOUT_KEY, SCORE_FILE, SKIP_KEY, composer_surname, make_slug,
 )
@@ -426,6 +426,15 @@ def cmd_analyse(a: argparse.Namespace) -> int:
         if err:
             _die(f"analyse: {err}")
         _ok(f"join:  {cut} {'joined' if on else 'taken back'}")
+    drops = [(i, True) for i in getattr(a, "drop", None) or []] + \
+            [(i, False) for i in getattr(a, "undrop", None) or []]
+    for sid, on in drops:           # no analysis: the saved systems change
+        err = set_drop(item, [sid], on)
+        if err:
+            _die(f"analyse: {err}")
+        _ok(f"drop:  {sid} {'left out' if on else 'put back (choices ask for its parts)'}")
+    if drops and not edits:
+        return saved(item, a, start)
     data = load_item(item)
     try:
         if data.get("systems") and not quiet and not edits and not yes(

@@ -8,7 +8,7 @@ import re
 import shutil
 from pathlib import Path
 
-from .bars import effective_systems, renumber
+from .bars import effective_systems, renumber, system_dropped
 from .clef import extreme_bar, part_extremes, pitch_name
 from .config import SCORE_FILE
 from .library import item_file, load_item, natural_key
@@ -175,7 +175,8 @@ def annotate_proof(item: Path, data: dict | None = None) -> None:
                                             page.rect.width - 4, sts[-1][2] + 0.5 * hgt),
                                color=col, width=2)
             page.insert_text((max(2.0, sts[0][0] - 3.2 * hgt), sts[0][1] - 0.5 * hgt),
-                             e["id"], fontsize=ID_FS, fontname="hebo", color=col)
+                             e["id"] + (" dropped" if system_dropped(e) else ""),
+                             fontsize=ID_FS, fontname="hebo", color=col)
             maps = e.get("map") or []
             sug = e.get("suggest") or []
             proof_bars(page, e, eff_.get(e["id"], e), rules_, f, sts)

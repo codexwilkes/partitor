@@ -1114,7 +1114,7 @@ partitor repage <id> [part ...]           page breaks again from the saved lines
 partitor plan <id> [part] [N]             options of a part; with N: set option N
 partitor plan <id> --group Name=A,B       try a group of parts in a temporary copy (read-only)
 partitor pages <id> <part> [--move PAGE=N]  pages and turns (§5.9)
-partitor analyse <id> [--yes] [--join pP:N] [--unjoin pP:N] | analyse --all
+partitor analyse <id> [--yes] [--join pP:N] [--unjoin pP:N] [--drop pP.sN] [--undrop pP.sN] | analyse --all
 partitor bars | parts | groups | meta | proof <id>
 ```
 
@@ -1207,6 +1207,16 @@ Details:
      as `system_joins`, kept by every later analysis, then the analysis runs
      again. In the choices, `j` does the same for the system asked about and
      the one below it, and the questions start over;
+     `analyse ID --drop p1.s1` leaves a system out (a title, the end of another
+     piece above the music): every staff of its map is `-`, `bars.system_dropped`
+     is true, `bars.renumber` counts no bars for it (a movement start on it
+     passes to the next system), the proof labels it "dropped". Saved as
+     `systems_drop` and applied again by `merge_item_keys` after every analysis
+     (by id; an id the new analysis does not have is forgotten). No analysis is
+     run. `--undrop` sets `?` for every staff, suggests the map of the nearest
+     system with the same staves and clefs. In the choices `d`, or `0` for every
+     staff, drops the system asked about, and its map is no suggestion for the
+     systems after it (0.8.63);
      `analyse --all` analyses every library item that way (after an engine
      update); one failure does not stop the rest. The proof rings each part's
      lowest and highest note in green, named with bar, page and system, and page

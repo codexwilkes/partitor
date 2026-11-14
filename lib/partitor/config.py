@@ -166,6 +166,12 @@ LAYOUT_HELP = """\
 #   on source page 5: two systems that the analysis took apart are one. Set in
 #   the choices of the analysis (answer j) or with partitor analyse <id> --join
 #   p5:4 (--unjoin p5:4 takes it back); kept by every analysis again.
+# systems_drop: ['p1.s1', ...]: systems no part reads (a title or the end of
+#   another piece above the music). Every staff is '-' in the map, the system
+#   counts no bars (the next one starts the count), the proof marks it
+#   "dropped". Set in the choices (answer d, or 0 for every staff) or with
+#   partitor analyse <id> --drop p1.s1 (--undrop p1.s1 puts it back); kept by
+#   every analysis again, by the ids of the new analysis.
 # bar_rules: pickup (movement-first system ids: first bar is bar 0), incipit
 #   (the same, for a first bar that shows the original notation: kept in the
 #   part, no number; the next bar is 1), split

@@ -88,6 +88,11 @@ class TestCommands(unittest.TestCase):
         self.assertIn("--join pP:N", out)
         self.assertIn("--unjoin pP:N", out)
 
+    def test_analyse_help_names_the_drop_options(self):
+        out = self.run_cli("analyse", "--help").stdout
+        self.assertIn("--drop pP.sN", out)
+        self.assertIn("--undrop pP.sN", out)
+
     def test_detect_and_build_end_to_end(self):
         with tempfile.TemporaryDirectory() as d:
             pdf = os.path.join(d, "s.pdf")

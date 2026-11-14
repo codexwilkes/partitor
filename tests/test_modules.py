@@ -373,7 +373,7 @@ class TestRealRepo(unittest.TestCase):
     def test_m5_library_sits_on_level_4_and_imports_only_lower_ones(self):
         """library (4): imports go to strictly lower levels; it has no `global` and no render import."""
         import ast
-        level = {"console": 0, "config": 0, "bars": 0, "clef": 1, "render": 3, "library": 4}
+        level = {"console": 0, "config": 0, "bars": 0, "mapping": 0, "clef": 1, "render": 3, "library": 4}
         with open(os.path.join(ROOT, "lib", "partitor", "library.py"), encoding="utf-8") as fh:
             tree = ast.parse(fh.read())
         got_all = set()
@@ -384,7 +384,7 @@ class TestRealRepo(unittest.TestCase):
                 for g in got:
                     self.assertLess(level[g], level["library"], f"library imports {g}")
             self.assertNotIsInstance(node, ast.Global)   # the module keeps no state of its own
-        self.assertEqual(got_all, {"bars", "clef", "config", "console"})
+        self.assertEqual(got_all, {"bars", "clef", "config", "console", "mapping"})
 
     def test_m5_library_imports_no_patched_name_by_name(self):
         """No name tests replace (patchable.txt) is imported by name by library, and none has a shim."""

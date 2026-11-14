@@ -730,6 +730,71 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(pt.set_join(item, "p2:3", False), "")
         self.assertNotIn("system_joins", pt.load_item(item))
 
+    def drop_item(self):
+        item = self.share / "library" / "2026-006-d"
+        item.mkdir()
+        sysd = lambda i, m, **kw: {"id": i, "staves": 2, "map": m, "clefs": ["G2", "F4"],   # noqa: E731
+                                   "bars": 4, "widths": [20.0] * 4, **kw}
+        pt.save_item(item, {"id": "2026-006", "slug": "d", "parts": ["A", "B"],
+                            "systems": [sysd("p1.s1", ["A", "B"]), sysd("p1.s2", ["A", "B"]),
+                                        sysd("p1.s3", ["A", "B"])]})
+        return item
+
+    def test_set_drop_and_undrop(self):
+        item = self.drop_item()
+        self.assertEqual(pt.set_drop(item, ["p1.s1", "p1.s2"]), "")
+        data = pt.load_item(item)
+        self.assertEqual(data["systems_drop"], ["p1.s1", "p1.s2"])
+        self.assertEqual(data["systems"][0]["map"], ["-", "-"])
+        self.assertEqual(data["systems"][2]["bar"], 1)               # the count starts here
+        self.assertIn("systems left out", data["pending"])
+        self.assertIn("dropped already", pt.set_drop(item, ["p1.s1"]))
+        self.assertIn("no such system", pt.set_drop(item, ["p9.s1"]))
+        self.assertEqual(pt.set_drop(item, ["p1.s2"], False), "")
+        data = pt.load_item(item)
+        self.assertEqual(data["systems_drop"], ["p1.s1"])
+        self.assertEqual(data["systems"][1]["map"], ["?", "?"])
+        self.assertEqual(data["systems"][1]["suggest"], ["A", "B"])   # the map of a like system
+        self.assertEqual(data["systems"][2]["bar"], 5)
+        self.assertIn("is not dropped", pt.set_drop(item, ["p1.s2"], False))
+        self.assertEqual(pt.set_drop(item, ["p1.s1"], False), "")
+        self.assertNotIn("systems_drop", pt.load_item(item))
+
+    def test_dropped_systems_survive_a_new_analysis(self):
+        item = self.drop_item()
+        self.assertEqual(pt.set_drop(item, ["p1.s1"]), "")
+        keep = pt.load_item(item)
+        fresh = {"id": "2026-006", "slug": "d", "parts": ["A", "B"],
+                 "systems": [{"id": "p1.s1", "staves": 2, "map": ["A", "B"], "clefs": ["G2", "F4"],
+                              "bars": 4, "widths": [20.0] * 4},
+                             {"id": "p1.s2", "staves": 2, "map": ["A", "B"], "clefs": ["G2", "F4"],
+                              "bars": 4, "widths": [20.0] * 4}]}
+        pt.save_item(item, fresh)
+        data = pt.merge_item_keys(item, keep, again=True)
+        self.assertEqual(data["systems_drop"], ["p1.s1"])
+        self.assertEqual(data["systems"][0]["map"], ["-", "-"])
+        self.assertEqual(data["systems"][1]["bar"], 1)
+
+    def test_choose_maps_d_and_all_zeros_drop_without_a_suggestion(self):
+        item = self.share / "library" / "2026-007-e"
+        item.mkdir()
+        q = lambda i: {"id": i, "staves": 2, "map": ["?", "?"], "clefs": ["G2", "F4"],  # noqa: E731
+                       "bars": 4, "widths": [20.0] * 4}
+        pt.save_item(item, {"id": "2026-007", "slug": "e", "parts": ["A", "B"],
+                            "systems": [q("p1.s1"), q("p1.s2"), q("p1.s3")]})
+        answers = iter(["d", "0 0", "1 2"])
+        real = builtins.input
+        builtins.input = lambda prompt="": next(answers)
+        try:
+            with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
+                self.assertTrue(pt.choose_maps(item))
+        finally:
+            builtins.input = real
+        data = pt.load_item(item)
+        self.assertEqual([s["map"] for s in data["systems"]], [["-", "-"], ["-", "-"], ["A", "B"]])
+        self.assertEqual(data["systems_drop"], ["p1.s1", "p1.s2"])
+        self.assertEqual(data["systems"][2]["bar"], 1)
+
     def test_choose_maps_j_joins_and_asks_again(self):
         item = self.share / "library" / "2026-005-k"
         item.mkdir()
@@ -1085,6 +1150,37 @@ class TestLibrary(unittest.TestCase):
         data = pt.load_item(item)
         self.assertEqual([s["staves"] for s in data["systems"]], [3, 3])
         self.assertNotIn("system_joins", data)
+
+    def test_analyse_drop_and_undrop_end_to_end(self):
+        # `analyse --drop p1.s1` leaves the system out without an analysis, every later
+        # analysis keeps it, the next system starts at bar 1; `--undrop` puts it back
+        make_score_pdf(str(self.share / "inbox" / "chorale.pdf"))
+        r = self.run_cli("new", stdin="1\n\nTest Chorale\nJ. H. Schein\n\nA,T,B\n\n\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        item = next((self.share / "library").iterdir())
+        r = self.run_cli("analyse", "1", "--drop", "p1.s1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("drop:  p1.s1 left out", r.stdout)
+        data = pt.load_item(item)
+        self.assertEqual(data["systems_drop"], ["p1.s1"])
+        self.assertEqual(data["systems"][0]["map"], ["-", "-", "-"])
+        self.assertEqual(data["systems"][1]["bar"], 1)
+        r = self.run_cli("analyse", "1", "--yes", stdin="\n")          # kept by a later analysis
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        data = pt.load_item(item)
+        self.assertEqual(data["systems_drop"], ["p1.s1"])
+        self.assertEqual(data["systems"][0]["map"], ["-", "-", "-"])
+        r = self.run_cli("analyse", "1", "--drop", "p1.s1")             # twice: refused
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("dropped already", r.stdout + r.stderr)
+        r = self.run_cli("analyse", "1", "--drop", "p9.s1")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("no such system", r.stdout + r.stderr)
+        r = self.run_cli("analyse", "1", "--undrop", "p1.s1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        data = pt.load_item(item)
+        self.assertNotIn("systems_drop", data)
+        self.assertNotIn("-", data["systems"][0]["map"])
 
     def test_bars_menu_marks_by_bar_number(self):
         make_score_pdf(str(self.share / "inbox" / "chorale.pdf"))

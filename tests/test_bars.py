@@ -209,6 +209,35 @@ class TestBarEdits(unittest.TestCase):
         pt.renumber(lay)
         self.assertEqual(lay["systems"][2]["marks"], [[0, "A"]])             # first bar of p4.s2
 
+    def test_dropped_systems_count_no_bars(self):
+        """A system with '-' for every staff holds no bars; the next one starts the count (0.8.63)."""
+        def sysrec(i, m, bars, **kw):
+            return {"id": f"p1.s{i}", "staves": 2, "map": m, "bars": bars,
+                    "widths": [20.0] * bars, **kw}
+        lay = {"systems": [sysrec(1, ["-", "-"], 5), sysrec(2, ["-", "-"], 7),
+                           sysrec(3, ["A", "B"], 4), sysrec(4, ["A", "B"], 3)],
+               "bar_rules": {"pickup": [], "split": [], "fix": {}}}
+        pt.renumber(lay)
+        self.assertEqual([e["bar"] for e in lay["systems"]][2:], [1, 5])
+        self.assertEqual(lay["systems"][2]["bar_nums"], [1, 2, 3, 4])
+        self.assertEqual(lay["systems"][0]["bar_nums"], [])
+        lay["systems"][0]["map"] = ["A", "B"]                        # not dropped: the count runs on
+        pt.renumber(lay)
+        self.assertEqual(lay["systems"][2]["bar"], 6)
+        self.assertTrue(pt.system_dropped({"map": ["-", "-"]}))
+        self.assertFalse(pt.system_dropped({"map": ["-", "A"]}))
+        self.assertFalse(pt.system_dropped({"map": []}))
+
+    def test_movement_start_of_a_dropped_system_passes_on(self):
+        def sysrec(i, m, bars, **kw):
+            return {"id": f"p1.s{i}", "staves": 1, "map": m, "bars": bars,
+                    "widths": [20.0] * bars, **kw}
+        lay = {"systems": [sysrec(1, ["A"], 4), sysrec(2, ["-"], 5, restart=True),
+                           sysrec(3, ["A"], 3), sysrec(4, ["A"], 3)],
+               "bar_rules": {"pickup": [], "split": [], "fix": {}}}
+        pt.renumber(lay)
+        self.assertEqual([e["bar"] for e in lay["systems"]], [1, lay["systems"][1]["bar"], 1, 4])
+
     def test_mismatch_found_reported_once_and_cleared(self):
         sy, rules = self.systems(), {"pickup": [], "split": [], "fix": {}}
         ms = pt.bar_mismatches(pt.effective_systems(sy, rules), rules)

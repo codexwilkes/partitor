@@ -15,13 +15,14 @@ from pathlib import Path
 import yaml
 
 from . import config
-from .bars import renumber
+from .bars import renumber, system_dropped
 from .clef import order_pitches, parse_pitch, pitch_str, refresh_ambitus
 from .config import (
     LAYOUT_DEFAULTS, LAYOUT_HELP, LINES_NEW, PART_LAYOUT_KEY, SCORE_FILE, SKIP_KEY,
     check_margins, composer_surname, make_slug, part_file_name,
 )
 from .console import _warn
+from .mapping import clefs_compatible
 
 
 # =============================================================================
@@ -595,6 +596,42 @@ def keep_other_parts(item: Path, data: dict, stage: Path, names: list[str]) -> l
     return keep
 
 
+def drop_systems(data: dict, ids: list[str], on: bool = True) -> list[str]:
+    """drop_systems -> the ids that are no system of the item. on: leave the
+    systems out (every staff '-', the id in `systems_drop`); off: put them
+    back ('?' for every staff; the map of the nearest other system with the
+    same staves and clefs is the suggestion). Bar numbers follow."""
+    systems = data.get("systems") or []
+    by = {e["id"]: e for e in systems}
+    cur = list(data.get("systems_drop") or [])
+    bad = [i for i in ids if i not in by]
+    for i in (x for x in ids if x in by):
+        e = by[i]
+        n = int(e.get("staves") or len(e.get("map") or []))
+        if on:
+            e["map"] = ["-"] * n
+            e.pop("suggest", None)
+            if i not in cur:
+                cur.append(i)
+            continue
+        e["map"] = ["?"] * n
+        e.pop("suggest", None)
+        near = [x for x in systems if x is not e and int(x.get("staves") or 0) == n
+                and not system_dropped(x) and "?" not in (x.get("map") or ["?"])
+                and clefs_compatible(x.get("clefs") or [], e.get("clefs") or [])]
+        if near:
+            pos = systems.index(e)
+            e["suggest"] = list(min(near, key=lambda x: abs(systems.index(x) - pos))["map"])
+        if i in cur:
+            cur.remove(i)
+    if cur:
+        data["systems_drop"] = sorted(cur, key=lambda t: tuple(int(x) for x in re.findall(r"\d+", t)))
+    else:
+        data.pop("systems_drop", None)
+    renumber(data)
+    return bad
+
+
 def merge_item_keys(item: Path, keep: dict, again: bool = False) -> dict:
     """After detect rewrote score.yaml: put back the item keys and settings.
     again (an analysis again): also the operator's part list, groups, skip
@@ -630,6 +667,8 @@ def merge_item_keys(item: Path, keep: dict, again: bool = False) -> dict:
                 e["suggest"] = list(o["map"])        # Enter takes the previous answer
         if keep.get("ambitus"):
             data["ambitus"] = {p: dict(v) for p, v in keep["ambitus"].items()}
+    if keep.get("systems_drop"):         # dropped systems stay dropped (the ids of the new analysis)
+        drop_systems(data, list(keep["systems_drop"]))
     if keep.get("parts") == data.get("parts"):
         for k in ("groups", SKIP_KEY):
             if keep.get(k):
