@@ -34,7 +34,7 @@ If you write your own publishing, use the documented, stable file layout
 ```bash
 sudo apt install git python3-venv tesseract-ocr
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.8.61
+cd /opt/partitor && sudo git checkout --detach 0.8.62
 sudo bin/partitor-init                      # guided; --yes takes the defaults
 sudo usermod -aG partitor "$USER"          # log in again afterwards
 cp score.pdf /var/lib/partitor/library/inbox/

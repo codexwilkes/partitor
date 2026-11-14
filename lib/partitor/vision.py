@@ -259,7 +259,8 @@ def detect_staves(ink: np.ndarray, thick: int, gap: int, page: int
     starts, ends = np.flatnonzero(d == 1), np.flatnonzero(d == -1)
     runs: list[list[int]] = []
     for s0, e0 in zip(starts, ends):            # merge runs split by a
-        if runs and s0 - runs[-1][1] <= thick:  # residual bend
+        if runs and s0 - runs[-1][1] <= thick \
+                and e0 - runs[-1][0] <= 3 * thick + 4:   # residual bend; not two lines
             runs[-1][1] = int(e0)
         else:
             runs.append([int(s0), int(e0)])

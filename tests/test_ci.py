@@ -23,7 +23,7 @@ WF = os.path.join(ROOT, ".github", "workflows", "ci.yml")
 
 # Discovered tests (skipped ones count) at the last step. Raise it with every step that adds
 # tests; never lower it (CONTRIBUTING.md: the number of tests must not fall).
-MIN_TESTS = 905
+MIN_TESTS = 906
 
 
 def text(*parts):

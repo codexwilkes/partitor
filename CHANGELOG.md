@@ -7,6 +7,17 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.62 — 2026-11-14
+
+### Fixed
+- Riccio, Canzon La Finetta p5: the Violin staff of the first system was not found. Its lines are
+  smeared (9 to 12 px thick, 5 px apart). Row runs closer than one line thickness are merged for a
+  bent line; here this joined three neighbouring lines into one run too thick for a line, so two
+  lines were left and the staff was lost. The system had three staves and no part could be mapped.
+  Runs are no longer merged when the result would be thicker than one line. The system has four
+  staves.
+
+
 ## 0.8.61 — 2026-11-14
 
 ### Fixed

@@ -492,6 +492,10 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
     staff 1.3 x larger than the page size (an organ realization) stays outside,
     so that the page is read as two sizes (item 12 of section 12); a smaller
     staff is found even when the centre of one line is measured 1 px off.
+    Row runs closer than one line thickness are merged (a bent line), but not
+    when the merged run would be thicker than one line (3 x thickness + 4 px):
+    a scan with smeared lines, 9 to 12 px thick and 5 px apart, kept only two
+    of its five lines and lost the staff (0.8.62).
     The staves of one system start together. A staff that starts more than
     4 sp right of its system is an indent, unless a barline or bracket runs
     solid through the gap between it and its neighbour at the system start;

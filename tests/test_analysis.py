@@ -131,6 +131,20 @@ class TestStaffTracking(unittest.TestCase):
         self.assertEqual(len(staves), 2)
         self.assertLess(staves[0].top, 340)
 
+    def test_staff_of_smeared_thick_lines_is_found(self):
+        # a scan whose staff lines are 9 to 12 px thick with white gaps of 5 px (pitch
+        # 16.5, page sp 23): runs closer than one line thickness are merged for a
+        # bend, which joined three neighbouring lines into one run too thick for a
+        # line; two lines were left and the staff (a Violin staff) was lost (0.8.62).
+        img = np.zeros((900, 2000), bool)
+        for a, b in ((323, 335), (340, 352), (357, 368), (374, 385), (391, 400)):
+            img[a:b, 300:1900] = True
+        for y in (507, 530, 553, 576, 599):                  # a staff of the page size
+            img[y - 2:y + 3, 300:1900] = True
+        staves, _ = pt.detect_staves(img, 5, 18, 0)
+        self.assertEqual(len(staves), 2)
+        self.assertLess(staves[0].top, 340)
+
     def test_staff_one_third_larger_than_the_page_is_not_found(self):
         # gaps of 23-24 px on a page of sp 18: an organ-size staff. It stays
         # unseen so that the page is read as two sizes (0.8.57 let it in and
