@@ -16,6 +16,7 @@
 1 clef        test_clef.py
 1 parallel    test_parallel.py
 1 reflow      test_layout.py
+1 runlog      test_runlog.py
 1 strips      test_layout.py
 1 turnplan    test_turnplan.py
 1 vision      test_analysis.py

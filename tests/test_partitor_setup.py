@@ -185,6 +185,29 @@ class TestWrapper(unittest.TestCase):
         self.run_w("list", cwd=self.tmp)
         self.assertIn("--setenv=PARTITOR_LIST_PAGE=20", self.args())
 
+    def test_log_dir_is_writable_and_passed_only_when_set(self):
+        # wrapper 1.0.12: the run log folder of the engine
+        self.make_share()
+        self.run_w("list", cwd=self.tmp)
+        self.assertFalse([x for x in self.args() if "PARTITOR_LOG_DIR" in x])
+        logs = os.path.join(self.tmp, "logs")
+        os.makedirs(logs)
+        self.run_w("list", cwd=self.tmp, extra={"PARTITOR_LOG_DIR": logs})
+        a = self.args()
+        self.assertIn(f"ReadWritePaths={self.state} {self.share} {logs}", a)
+        self.assertIn(f"--setenv=PARTITOR_LOG_DIR={logs}", a)
+        d = os.path.join(self.tmp, "defaults")
+        write(d, f"PARTITOR_LOG_DIR={logs}\n", 0o644)
+        self.run_w("--version", cwd=self.tmp, extra={"PARTITOR_DEFAULTS": d})
+        self.assertIn(f"--setenv=PARTITOR_LOG_DIR={logs}", self.args())
+
+    def test_log_dir_must_be_an_existing_absolute_folder(self):
+        for bad in ("relative/dir", os.path.join(self.tmp, "missing")):
+            with self.subTest(bad=bad):
+                r = self.run_w("--version", cwd=self.tmp, extra={"PARTITOR_LOG_DIR": bad})
+                self.assertEqual(r.returncode, 2)
+                self.assertIn("PARTITOR_LOG_DIR", r.stderr)
+
     def test_jobs_and_memory_cap_passed_to_the_engine(self):
         # wrapper 1.0.9: workers of a build; a bad value falls back to auto
         self.make_share()

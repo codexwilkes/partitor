@@ -12,7 +12,7 @@ from pathlib import Path
 
 import yaml
 
-from . import VERSION, cli_items
+from . import VERSION, cli_items, runlog
 from .cli_bars import cmd_bars
 from .cli_common import _lib_or_die, cmd_set
 from .cli_items import (
@@ -274,7 +274,24 @@ STOPPED_EXIT = 130          # Ctrl-C: the shell code of SIGINT (128 + 2)
 
 def main() -> int:
     """main -> exit code of the command. Ctrl-C prints one line, not a traceback (0.8.45): a
-    build that stops leaves parts/ as it was (it builds into parts.new/)."""
+    build that stops leaves parts/ as it was (it builds into parts.new/). With PARTITOR_LOG_DIR
+    set, the run is also written to a log file (runlog.py, 0.8.66)."""
+    runlog.start(sys.argv[1:])
+    status: object = "exception"
+    try:
+        status = _guarded()
+        return status
+    except SystemExit as e:
+        status = 0 if e.code is None else e.code
+        raise
+    except Exception:
+        runlog.crash()
+        raise
+    finally:
+        runlog.finish(status)
+
+
+def _guarded() -> int:
     try:
         return _main()
     except KeyboardInterrupt:

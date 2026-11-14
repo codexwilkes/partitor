@@ -7,6 +7,17 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.66 — 2026-11-14
+
+### Added
+- A run log for diagnosis, off by default. With `PARTITOR_LOG_DIR=<folder>` each run writes
+  `run-<date>-<time>-<pid>.log` there: the arguments, every line the program printed (no colour,
+  with the seconds since the start), the answers to the prompts, a traceback if the run crashes,
+  and the exit code. The screen output does not change. A folder that cannot be written gives one
+  line on stderr and the run goes on. The wrapper (1.0.12) checks the folder, lets the sandbox write
+  there and passes the variable on. `DESIGN.md` §12.5, `OPERATING.md`, `SANDBOX.md`, `INSTALL.md`.
+
+
 ## 0.8.65 — 2026-11-14
 
 ### Fixed

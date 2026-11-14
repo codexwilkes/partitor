@@ -20,6 +20,7 @@ RED, GRN, YLW, BLU, DIM, BOLD, RST = (
 _counts = {"pass": 0, "fail": 0, "warn": 0}
 _FAILURES: list[str] = []
 _WARNINGS: list[str] = []
+_ANSWER_LOG: list = []      # callbacks (prompt, answer) of the run log (runlog.py), changed in place
 
 
 def _ok(msg: str) -> None:
@@ -118,6 +119,8 @@ def ask(prompt: str, default: str = "") -> str:
     except (EOFError, KeyboardInterrupt):
         print()
         raise Abort()
+    for log in _ANSWER_LOG:
+        log(prompt, ans)
     if ans.lower() == "q":
         raise Abort()
     return ans or default

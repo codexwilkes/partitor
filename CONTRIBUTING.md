@@ -95,6 +95,7 @@ name. The 24 modules and their import levels:
 | 1 | `reflow` | Re-flow of strips |
 | 1 | `strips` | Strip build, bar marks, rehearsal boxes |
 | 1 | `turnplan` | Page-turn planner: spreads, fold-outs, turn classes |
+| 1 | `runlog` | Run log of one CLI run (off by default) |
 | 2 | `ownership` | Ink ownership, safety gate |
 | 2 | `lines` | Line fitting, multi-bar rests, saved lines |
 | 2 | `stagecache` | Stage cache of the page analysis |

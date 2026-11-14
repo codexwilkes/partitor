@@ -33,6 +33,8 @@
 #           of the memory of the machine, at least 1G); --sandbox-check
 #           --share is now --sandbox-check --library.
 #   Private line (1.0.x):
+#   1.0.12 - PARTITOR_LOG_DIR (default none): a folder for the run log of the engine (one
+#           text file per run). The folder is writable in the sandbox and passed on.
 #   1.0.11 - PYTHONUNBUFFERED=1 for the engine: stdout is a pipe since 1.0.10, so
 #           Python would hold the output of a long build back in blocks.
 #   1.0.10 - fix(run): always `systemd-run --pipe`, never `--pty`. With --pty,
@@ -77,6 +79,9 @@
 #   PARTITOR_CACHE        (default on)    0 = do not keep or use the page-analysis cache
 #                                         (cache/ in the item folder)
 #                                         (unset: logo.png in the library, if any)
+#   PARTITOR_LOG_DIR      (default none)  absolute folder (not below /home: ProtectHome) that user
+#                                         partitor can write; each run writes run-<date>-<time>-<pid>.log
+#                                         there (what was printed, the answers, the exit code), for diagnosis
 #   PARTITOR_SMB_HOST     (default none)  host of an SMB library (installer, hints)
 #   (PARTITOR_COLOR is not a setting: the wrapper sets it, 1 when its stdout is a
 #   terminal. The engine runs through a pipe, never a pty, see 1.0.10; the wrapper
@@ -115,6 +120,8 @@ PARTITOR_LIBRARY="/var/lib/partitor/library"
 PARTITOR_SMB_HOST=""
 PARTITOR_LOGO="${PARTITOR_LOGO:-}"
 PARTITOR_CACHE="${PARTITOR_CACHE:-}"
+LOG_DIR_ENV="${PARTITOR_LOG_DIR:-}"
+PARTITOR_LOG_DIR=""
 LIBRARY_TIMEOUT=20
 MEMINFO="${PARTITOR_MEMINFO:-/proc/meminfo}"
 
@@ -130,6 +137,7 @@ if [[ -r "$DEFAULTS" ]]; then
 fi
 [[ -n "$LIBRARY_ENV" ]] && PARTITOR_LIBRARY="$LIBRARY_ENV"
 LIBRARY="$PARTITOR_LIBRARY"
+[[ -n "$LOG_DIR_ENV" ]] && PARTITOR_LOG_DIR="$LOG_DIR_ENV"
 
 die() {
   echo "partitor: $1" >&2
@@ -207,6 +215,13 @@ if (( needs_lib )); then
   rw_paths="$STATE $LIBRARY"
 fi
 
+# Run log folder (optional): must exist; the sandbox may write there.
+if [[ -n "$PARTITOR_LOG_DIR" ]]; then
+  [[ "$PARTITOR_LOG_DIR" == /* && -d "$PARTITOR_LOG_DIR" ]] \
+    || die "PARTITOR_LOG_DIR must be an existing absolute folder: $PARTITOR_LOG_DIR"
+  rw_paths="$rw_paths $PARTITOR_LOG_DIR"
+fi
+
 # Every argument that names a path must stay in the work folder: absolute
 # paths, --opt=/path forms, and relative paths that exist (../ escapes).
 # Library commands take ids and key=value pairs, not paths.
@@ -235,6 +250,7 @@ exec "$RUN" --quiet --collect --wait "$mode" \
   --setenv=PARTITOR_COLOR="$color" --setenv=PYTHONUNBUFFERED=1 \
   ${PARTITOR_LOGO:+--setenv=PARTITOR_LOGO="$PARTITOR_LOGO"} \
   ${PARTITOR_CACHE:+--setenv=PARTITOR_CACHE="$PARTITOR_CACHE"} \
+  ${PARTITOR_LOG_DIR:+--setenv=PARTITOR_LOG_DIR="$PARTITOR_LOG_DIR"} \
   -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes \
   -p PrivateDevices=yes -p PrivateNetwork=yes -p NoNewPrivileges=yes \
   -p ReadWritePaths="$rw_paths" -p CapabilityBoundingSet= \

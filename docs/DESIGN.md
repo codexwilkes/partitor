@@ -1387,6 +1387,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 1 | `reflow` | Re-flow of strips |
 | 1 | `strips` | Strip build, group strips, bar marks, rehearsal boxes |
 | 1 | `turnplan` | Page-turn planner: spreads, fold-outs, turn classes (§5.7) |
+| 1 | `runlog` | Run log of one CLI run, off by default (§12.5) |
 | 2 | `ownership` | Ink ownership, safety gate, barline detect |
 | 2 | `lines` | Line fitting, labels, multi-bar rests, saved lines |
 | 2 | `stagecache` | Stage cache of the page analysis (§12.4) |
@@ -1419,6 +1420,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | §4.3 items 7, 11 (multi-work, group outputs) | `build`, `strips` |
 | §4.4 parallel | `parallel` |
 | §12.4 stage cache | `stagecache`, `analysis` |
+| §12.5 run log | `runlog`, `console`, `cli_main` |
 | §5.1 to 5.4, 5.6 layout | `render` |
 | §5.7 page-turn planner | `turnplan`; print of fold-outs: `render`, assembly text `typography` |
 | §5.8 part planning | `partplan` |
@@ -1540,3 +1542,26 @@ applies those edits to every result, read or new.
   page (`owner_boxes`) gives the box of every owner code, and each strip reads its box, not the
   whole page. Before, each strip read the whole page (a 70-page score with 17 parts: 1 138 full-page
   reads, about 200 s of a build whose pages were all in the cache). The strips are the same.
+
+### 12.5 Run log
+
+A diagnostic record of one CLI run, for the operator who wants to hand over what happened
+(text, not screenshots). It is for diagnosis of the output and the prompts; it is off by default.
+
+- **Switch.** `PARTITOR_LOG_DIR=<folder>`. Unset: nothing changes, nothing is written. The wrapper
+  (1.0.12) checks that the folder is absolute and exists, adds it to `ReadWritePaths` and passes the
+  variable into the sandbox; user `partitor` must be able to write there (not below `/home`).
+- **File.** One file per run, `run-<date>-<time>-<pid>.log`, mode 0644 before the umask of the
+  sandbox (0027, so 0640). It holds the full paths and score names of the run: keep it local.
+- **Content.** A header (version, arguments, folder, Python, every `PARTITOR_*` variable), then every
+  line printed to stdout (`out`) or stderr (`err`), colour removed, each with the seconds since the
+  start; the answer to every prompt (`in`, from `console.ask`, so also `yes`); a traceback when the
+  run crashes; the exit code (`exit: <code>`). A progress line keeps only its last state. The screen
+  shows exactly what it showed before.
+- **Mechanism.** `cli_main.main` calls `runlog.start` and `runlog.finish`. `start` replaces
+  `sys.stdout` and `sys.stderr` by a tee that passes every write on and logs whole lines; the
+  workers of `fork_map` inherit it and write whole lines with one `os.write` on an `O_APPEND`
+  file. `console.ask` calls the callbacks in `console._ANSWER_LOG` (a list changed in place, R1);
+  `runlog` is on level 1 and adds its callback, so `console` imports nothing.
+- **Failure.** A folder that cannot be written gives one line on stderr (`run log off: ...`); the run
+  goes on.

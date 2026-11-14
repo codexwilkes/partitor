@@ -50,6 +50,16 @@ The wrapper refuses paths outside `/var/lib/partitor/work`.
 See `INSTALL.md` (settings file) and `SANDBOX.md` (limits). Piece settings are
 the `set` keys (`DESIGN.md` §3 and §6.2).
 
+## Run log (diagnosis)
+
+To hand over what a run did, as text instead of screenshots: set `PARTITOR_LOG_DIR` to an
+existing folder that user `partitor` can write, outside `/home` (for example
+`/var/lib/partitor/logs`: `sudo install -d -o partitor -m 0750 /var/lib/partitor/logs`), in
+`/etc/default/partitor`. Every run then writes `run-<date>-<time>-<pid>.log` there: the
+arguments, every line shown (no colour, with seconds since the start), your answers to the
+prompts, a traceback if it crashes, and the exit code. The log holds full paths and score names.
+Unset (the default) writes nothing. Details: `DESIGN.md` §12.5.
+
 ## Normal work
 
 - **Copy PDFs into `inbox/`** without root, if you are in the group `partitor`
