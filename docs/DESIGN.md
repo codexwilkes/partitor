@@ -1342,9 +1342,12 @@ lists what a run would change (exit 0).
   counts. They need your own PDFs and skip per missing file (`TestCorpus.need()`
   in `tests/test_analysis.py`; the file list is the `CORPUS` table there).
 - `tools/g0_golden.py` records and checks "golden" renders: page images at 100
-  dpi and normalised text of 50 cases. Use it for a refactor: record before,
+  dpi and normalised text of 52 cases. Use it for a refactor: record before,
   check after (`--tests tests/support.py`, the default). Goldens depend on the
   package versions, so record and check in the same environment.
+  It runs 4 cases at once (`--workers N`), the slow ones first. `--timings` prints the time of
+  each case and the sum against the wall time. Measured on 8 cores (0.8.67): 597 s with 2
+  workers, 347 s with 4; five long-score builds are over half of the summed time.
 - `tools/m0_depmap.py` maps the dependencies between functions of the engine
   (one file, or a folder such as `lib/partitor`).
 - `tools/check-modules.py` checks the module structure of `lib/partitor` (§12.3).

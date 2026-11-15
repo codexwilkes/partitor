@@ -7,6 +7,20 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.68 — 2026-11-15
+
+### Changed
+- `tools/g0_golden.py` (the golden check) is faster: it runs 4 cases at once (was 2) and starts the
+  slow cases first (the long scores and the library sessions). On 8 cores a full check took 597 s
+  with 2 workers and 347 s with 4; the result is the same (52 cases, 0 differences).
+- New option `--timings`: prints the time of each case, slowest first, and the sum against the wall
+  time ("3.9 at once"), to choose `--workers`. `DESIGN.md` §10, `CONTRIBUTING.md`.
+
+### Added
+- `tests/test_g0.py`: tests of the timing table, the start order of the cases and the default number
+  of workers.
+
+
 ## 0.8.67 — 2026-11-14
 
 ### Added

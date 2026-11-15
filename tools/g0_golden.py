@@ -13,7 +13,9 @@ Usage (use the engine's venv python):
   g0_golden.py check     --engine ENGINE --tests tests/support.py --golden golden.json
   g0_golden.py selfcheck --engine ENGINE --tests tests/support.py --golden golden.json
   options: --only a,b      run cases whose name starts with one of these
-           --workers N     cases run in parallel (default 2)
+           --workers N     cases run in parallel (default 4)
+           --timings       print the time of each case, slowest first, and the
+                           sum against the wall time (to choose --workers)
            --corpus DIR    optional local corpus (see below)
            --fixtures DIR  stored input PDFs (default <golden>-fixtures)
 ENGINE is a file (run as `python ENGINE ...`) or a command string such as
@@ -62,12 +64,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import pymupdf
 import yaml
 
 DPI = 100
+DEFAULT_WORKERS = 4      # measured on 8 cores: 2 workers 597 s, 4 workers (slow cases first) 347 s
 STEP_TIMEOUT = 1800
 
 # name -> (make_score_pdf kwargs, extra detect args, build options)
@@ -391,7 +395,38 @@ def build_cases(args, fx, engine_cmd):
     return cases
 
 
-def run_all(args):
+# Prefixes of the slow cases (measured with --timings: a long score builds in 100 to 250 s,
+# the library session in about 60 s, the rest in under 40 s). They start first, so that the
+# slowest case does not start at the end and set the wall time.
+SLOW_FIRST = ("build:long", "lib:")
+
+
+def order_cases(cases):
+    """Cases with a slow prefix first; the order inside each group stays as it was.
+    The order does not change a result: every case runs in its own folder."""
+    return sorted(cases, key=lambda c: not c[0].startswith(SLOW_FIRST))
+
+
+def timed(name, fn, sink):
+    """Run fn; store the seconds in sink[name] (also when fn raises)."""
+    t0 = time.monotonic()
+    try:
+        return fn()
+    finally:
+        sink[name] = time.monotonic() - t0
+
+
+def format_timings(times, wall):
+    """Lines of the timing table: slowest case first, then the sum and the wall time.
+    sum / wall is the mean number of cases that ran at once."""
+    lines = [f"{sec:8.1f} s  {name}" for name, sec in sorted(times.items(), key=lambda kv: (-kv[1], kv[0]))]
+    total = sum(times.values())
+    ratio = total / wall if wall > 0 else 0.0
+    lines.append(f"{total:8.1f} s  sum of {len(times)} cases; wall {wall:.1f} s; {ratio:.1f} at once")
+    return lines
+
+
+def run_all(args, times=None):
     tests = load_tests(args.tests)
     engine_cmd = shlex.split(args.engine)
     if len(engine_cmd) == 1:                      # a file: run with this python
@@ -403,8 +438,9 @@ def run_all(args):
         make_fixtures(tests, fx)
     cases = build_cases(args, fx, engine_cmd)
     results = {}
+    sink = times if times is not None else {}
     with cf.ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = {ex.submit(fn): name for name, fn in cases}
+        futs = {ex.submit(timed, name, fn, sink): name for name, fn in order_cases(cases)}
         for f in cf.as_completed(futs):
             name = futs[f]
             try:
@@ -476,7 +512,8 @@ def main():
     ap.add_argument("--golden", default="golden.json")
     ap.add_argument("--fixtures")
     ap.add_argument("--only")
-    ap.add_argument("--workers", type=int, default=2)
+    ap.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
+    ap.add_argument("--timings", action="store_true")
     a = ap.parse_args()
     try:
         if a.mode == "selfcheck":
@@ -489,7 +526,11 @@ def main():
             for x in d:
                 print("  ", x)
             return 1 if d else 0
-        res = run_all(a)
+        times = {}
+        t0 = time.monotonic()
+        res = run_all(a, times)
+        if a.timings:
+            print("\n".join(format_timings(times, time.monotonic() - t0)))
         errs = [k for k, c in res["cases"].items() if "error" in c]
         if a.mode == "record":
             Path(a.golden).write_text(json.dumps(res, indent=1, sort_keys=True))

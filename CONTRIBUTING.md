@@ -73,7 +73,7 @@ unittest -v tests/test_analysis.py`. The folder holds your own PDFs with the
 names in the `CORPUS` table of `tests/test_analysis.py`.
 
 For a refactor of the engine, record and check golden renders with
-`tools/g0_golden.py` (`DESIGN.md` §10).
+`tools/g0_golden.py` (`DESIGN.md` §10; `--timings` shows where the time goes).
 
 ## Where does my change go
 
