@@ -102,6 +102,64 @@ def start(argv: list[str]) -> None:
     console._ANSWER_LOG.append(_answer)
 
 
+def _logs(folder: str) -> list[str]:
+    """The log files of a folder, newest first (the names sort by date and time)."""
+    try:
+        names = [n for n in os.listdir(folder) if n.startswith("run-") and n.endswith(".log")]
+    except OSError as e:
+        console._die(f"cannot read the run log folder: {e.strerror}: {folder}")
+    return sorted(names, reverse=True)
+
+
+def _read(folder: str, name: str) -> str:
+    try:
+        with open(os.path.join(folder, name), encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError as e:
+        console._die(f"cannot read the run log: {e.strerror}: {name}")
+    return ""
+
+
+def _log_summary(text: str) -> tuple[str, str]:
+    """(arguments, exit code) of a log: its header line `args:` and its last line `exit:`."""
+    args = status = "?"
+    for line in text.splitlines():
+        if " log args: " in line and args == "?":
+            args = line.split(" log args: ", 1)[1] or "(none)"
+        if " log exit: " in line:
+            status = line.split(" log exit: ", 1)[1]
+    return args, status
+
+
+def show_log(which: str = "1", tail: int = 0, listing: bool = False, count: int = 20) -> int:
+    """`partitor log`: print a run log of the folder PARTITOR_LOG_DIR. which: a number (1 = the
+    newest, 2 = the one before) or a file name of the folder; tail: only the last N lines;
+    listing: one line per log (the newest `count`) instead. The command writes no log itself."""
+    folder = os.environ.get(LOG_ENV, "")
+    if not folder:
+        console._die("the run log is off", f"Set {LOG_ENV}=<folder> (docs/OPERATING.md), then run again.")
+    names = _logs(folder)
+    if not names:
+        console._die(f"no run log in {folder}", "A run writes one when it starts; run a command first.")
+    if listing:
+        for i, n in enumerate(names[:count], 1):
+            args, status = _log_summary(_read(folder, n))
+            print(f"{i:>3}  {n}  exit {status}  {args}")
+        return 0
+    if which.isdigit():
+        if not 1 <= int(which) <= len(names):
+            console._die(f"no run log number {which}: the folder has {len(names)}", "partitor log --list")
+        name = names[int(which) - 1]
+    elif "/" not in which and which in names:
+        name = which
+    else:
+        console._die(f"no run log {which!r} in the folder", "partitor log --list")
+    lines = _read(folder, name).splitlines()
+    for line in lines[-tail:] if tail > 0 else lines:
+        print(line)
+    return 0
+
+
 def crash() -> None:
     """The traceback of the exception being handled, as log lines."""
     for line in traceback.format_exc().splitlines():

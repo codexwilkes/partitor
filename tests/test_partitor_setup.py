@@ -201,6 +201,16 @@ class TestWrapper(unittest.TestCase):
         self.run_w("--version", cwd=self.tmp, extra={"PARTITOR_DEFAULTS": d})
         self.assertIn(f"--setenv=PARTITOR_LOG_DIR={logs}", self.args())
 
+    def test_log_command_runs_in_the_sandbox_like_any_engine_command(self):
+        # 0.8.67: `partitor log 2` needs no library and no work-folder path
+        logs = os.path.join(self.tmp, "logs")
+        os.makedirs(logs)
+        r = self.run_w("log", "2", "--tail", "5", cwd=self.tmp, extra={"PARTITOR_LOG_DIR": logs})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        a = self.args()
+        self.assertEqual(a[a.index("--"):], ["--", self.engine, "log", "2", "--tail", "5"])
+        self.assertIn(f"ReadWritePaths={self.state} {logs}", a)
+
     def test_log_dir_must_be_an_existing_absolute_folder(self):
         for bad in ("relative/dir", os.path.join(self.tmp, "missing")):
             with self.subTest(bad=bad):

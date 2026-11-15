@@ -56,6 +56,7 @@
 #   partitor rebuild <id> [part ...]       build all parts, or only the parts / groups named
 #                                          (numbers, 2-4, names: partitor rebuild 12 Trombones)
 #   partitor <pieces|detect|build> ...     engine commands in the work folder
+#   partitor log [N|FILE] [--tail N|--list]  print a run log (PARTITOR_LOG_DIR; 1 = newest)
 #   partitor --version | --help
 #   partitor --sandbox-check [--library]   (installer self-test)
 #   partitor --wrapper-version

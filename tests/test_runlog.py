@@ -162,3 +162,93 @@ class TestRunLogProgram(unittest.TestCase):
         r = self.run_engine("")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertTrue(r.stdout.startswith("partitor "))
+
+
+class TestLogCommand(unittest.TestCase):
+    """`partitor log`: print, pick, tail, list; it writes no log itself."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="pt-runlog-show-")
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.dir, ignore_errors=True))
+        for i, (args, code) in enumerate((("detect a.pdf", 0), ("build a.pdf", 1), ("list", 0)), 1):
+            with open(os.path.join(self.dir, f"run-20261114-10000{i}-{i}.log"), "w",
+                      encoding="utf-8") as fh:
+                fh.write(f"     0.0s log partitor 0.8.67\n     0.0s log args: {args}\n"
+                         f"     0.1s out line one of {i}\n     0.2s out line two of {i}\n"
+                         f"     0.3s log exit: {code}\n")
+        env = mock.patch.dict(os.environ, {runlog.LOG_ENV: self.dir})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def show(self, *args, **kw):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = runlog.show_log(*args, **kw)
+        self.assertEqual(rc, 0)
+        return out.getvalue()
+
+    def dies(self, *args, **kw):
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as cm:
+            runlog.show_log(*args, **kw)
+        self.assertEqual(cm.exception.code, 1)
+        return err.getvalue()
+
+    def test_default_is_the_newest(self):
+        text = self.show()
+        self.assertIn("line one of 3", text)
+        self.assertNotIn("of 2", text)
+
+    def test_number_counts_back_from_the_newest(self):
+        self.assertIn("line one of 2", self.show("2"))
+        self.assertIn("line one of 1", self.show("3"))
+
+    def test_a_file_name_is_taken(self):
+        self.assertIn("line one of 1", self.show("run-20261114-100001-1.log"))
+
+    def test_tail_keeps_the_last_lines(self):
+        text = self.show("1", tail=2)
+        self.assertEqual(text.count("\n"), 2)
+        self.assertIn("exit: 0", text)
+        self.assertNotIn("line one", text)
+
+    def test_list_has_number_file_exit_and_arguments(self):
+        lines = self.show(listing=True).splitlines()
+        self.assertEqual(len(lines), 3)
+        self.assertRegex(lines[0], r"^\s+1  run-20261114-100003-3\.log  exit 0  list$")
+        self.assertRegex(lines[1], r"exit 1  build a\.pdf$")
+        self.assertEqual(len(self.show(listing=True, count=2).splitlines()), 2)
+
+    def test_bad_requests_say_what_is_wrong(self):
+        self.assertIn("no run log number 4", self.dies("4"))
+        self.assertIn("no run log number 0", self.dies("0"))
+        self.assertIn("no run log", self.dies("../etc/passwd"))
+        self.assertIn("no run log", self.dies("run-nothing.log"))
+
+    def test_off_and_empty_folder(self):
+        with mock.patch.dict(os.environ):
+            os.environ.pop(runlog.LOG_ENV)
+            self.assertIn("the run log is off", self.dies())
+        with tempfile.TemporaryDirectory() as empty, mock.patch.dict(os.environ, {runlog.LOG_ENV: empty}):
+            self.assertIn("no run log in", self.dies())
+        with mock.patch.dict(os.environ, {runlog.LOG_ENV: os.path.join(self.dir, "none")}):
+            self.assertIn("cannot read the run log folder", self.dies())
+
+    def test_the_program_prints_and_adds_no_log(self):
+        env = dict(os.environ, PARTITOR_ALLOW_ROOT="1")
+        r = subprocess.run([sys.executable, SRC, "log", "2", "--tail", "1"], capture_output=True,
+                           text=True, env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("exit: 1", r.stdout)
+        r = subprocess.run([sys.executable, SRC, "log", "--list"], capture_output=True, text=True,
+                           env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(len(os.listdir(self.dir)), 3)          # the two runs wrote no file
+        self.assertEqual(len(r.stdout.splitlines()), 3)
+
+    def test_the_program_says_when_the_log_is_off(self):
+        env = {k: v for k, v in os.environ.items() if k != runlog.LOG_ENV}
+        env["PARTITOR_ALLOW_ROOT"] = "1"
+        r = subprocess.run([sys.executable, SRC, "log"], capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("the run log is off", r.stderr)

@@ -276,7 +276,8 @@ def main() -> int:
     """main -> exit code of the command. Ctrl-C prints one line, not a traceback (0.8.45): a
     build that stops leaves parts/ as it was (it builds into parts.new/). With PARTITOR_LOG_DIR
     set, the run is also written to a log file (runlog.py, 0.8.66)."""
-    runlog.start(sys.argv[1:])
+    if sys.argv[1:2] != ["log"]:               # reading a log adds no log
+        runlog.start(sys.argv[1:])
     status: object = "exception"
     try:
         status = _guarded()
@@ -387,6 +388,11 @@ def _main() -> int:
                     help="title=..., gap=11, pages=3, ...; one part: \"Continuo:pages=4\"; "
                          "none: list every key with its value and default")
     st.add_argument("--build", action="store_true", help="build after the change")
+    lg = sub.add_parser("log", help="print a run log (needs PARTITOR_LOG_DIR; docs/OPERATING.md)")
+    lg.add_argument("which", nargs="?", default="1",
+                    help="1 = the newest log (default), 2 = the one before, or a file name")
+    lg.add_argument("--tail", type=int, default=0, metavar="N", help="only the last N lines")
+    lg.add_argument("--list", action="store_true", help="one line per run (the newest 20)")
     pc = sub.add_parser("pieces", help="list the pieces of a PDF: runs of music pages "
                         "(no library, no files written)")
     pc.add_argument("pdf", help="the score PDF")
@@ -464,5 +470,6 @@ def _main() -> int:
             "rebuild": cli_items.cmd_rebuild, "pages": cmd_pages, "repage": cmd_repage, "bars": cmd_bars, "parts": cmd_parts,
             "proof": cmd_proof,
             "groups": cmd_groups, "meta": cmd_meta, "analyse": cmd_analyse,
-            "reid": cmd_reid, "rename": cmd_rename}
+            "reid": cmd_reid, "rename": cmd_rename,
+            "log": lambda a: runlog.show_log(a.which, a.tail, a.list)}
     return cmds[a.cmd or "menu"](a)

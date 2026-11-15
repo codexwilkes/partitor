@@ -1117,6 +1117,7 @@ partitor plan <id> --group Name=A,B       try a group of parts in a temporary co
 partitor pages <id> <part> [--move PAGE=N]  pages and turns (§5.9)
 partitor analyse <id> [--yes] [--join pP:N] [--unjoin pP:N] [--drop pP.sN] [--undrop pP.sN] | analyse --all
 partitor bars | parts | groups | meta | proof <id>
+partitor log [N|FILE] [--tail N] [--list]  print a run log of PARTITOR_LOG_DIR (§12.5; 0.8.67)
 ```
 
 Engine commands that work on a single PDF in the work folder (no library):
@@ -1563,5 +1564,8 @@ A diagnostic record of one CLI run, for the operator who wants to hand over what
   workers of `fork_map` inherit it and write whole lines with one `os.write` on an `O_APPEND`
   file. `console.ask` calls the callbacks in `console._ANSWER_LOG` (a list changed in place, R1);
   `runlog` is on level 1 and adds its callback, so `console` imports nothing.
+- **Reading.** `partitor log [N|FILE] [--tail N] [--list]` (`runlog.show_log`) prints a log of the
+  folder: N counts from the newest (1); a file name is a bare name in the folder, no path. The
+  command starts no log of its own, so reading logs adds none.
 - **Failure.** A folder that cannot be written gives one line on stderr (`run log off: ...`); the run
   goes on.

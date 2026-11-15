@@ -29,6 +29,7 @@ sandbox (`SANDBOX.md`).
 | `partitor repage ID [part ...]` | New page breaks from the saved lines. |
 | `partitor rename ID`, `reid ID` | Folder name follows title and composer; old id to new format. |
 | `partitor pieces`, `detect`, `build` `FILE` | Work on one PDF in the work folder, without a library. |
+| `partitor log [N\|FILE] [--tail N] [--list]` | Print a run log (`PARTITOR_LOG_DIR`, see "Run log"): `1` the newest (default), `2` the one before, or a file name; `--list` one line per run. It writes no log itself. |
 | `partitor --version`, `--wrapper-version`, `--help` | Versions and help. |
 | `partitor-init`, `partitor-install` | Guided setup; installer (`INSTALL.md`). |
 | `partitor --sandbox-check [--library]` | Self-test. |
@@ -58,7 +59,8 @@ existing folder that user `partitor` can write, outside `/home` (for example
 `/etc/default/partitor`. Every run then writes `run-<date>-<time>-<pid>.log` there: the
 arguments, every line shown (no colour, with seconds since the start), your answers to the
 prompts, a traceback if it crashes, and the exit code. The log holds full paths and score names.
-Unset (the default) writes nothing. Details: `DESIGN.md` §12.5.
+Print one with `partitor log` (the newest), `partitor log 2`, `partitor log --tail 40` or
+`partitor log --list`; the `log` command writes no log. Unset (the default) writes nothing. Details: `DESIGN.md` §12.5.
 
 ## Normal work
 

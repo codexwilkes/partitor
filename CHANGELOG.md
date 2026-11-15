@@ -7,6 +7,16 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.67 — 2026-11-14
+
+### Added
+- `partitor log [N|FILE] [--tail N] [--list]` prints a run log from `PARTITOR_LOG_DIR`: `1` (default)
+  the newest, `2` the one before, or a file name of the folder; `--tail N` the last N lines;
+  `--list` one line per run (number, file, exit code, arguments; the newest 20). The command writes
+  no log itself, so reading logs adds none. Without `PARTITOR_LOG_DIR` it says the run log is off.
+  `DESIGN.md` §12.5, `OPERATING.md`.
+
+
 ## 0.8.66 — 2026-11-14
 
 ### Added
