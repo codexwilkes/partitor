@@ -25,8 +25,10 @@ def reference_names(data: dict) -> str:
     fullest system, from its map ('-' for a staff left out, a name twice
     for a two-staff part). The parts list alone has fewer names when a
     staff is left out or joined, and detect then fell back to the printed
-    labels (Maria: "Canto I Yoce"; the operator's names, groups lost)."""
-    systems = data.get("systems") or []
+    labels (Maria: "Canto I Yoce"; the operator's names, groups lost). A dropped
+    system (`system_dropped`) is never the reference: its '-' for every staff
+    would name every staff '-' and an analysis again would leave all systems out (0.8.69)."""
+    systems = [e for e in data.get("systems") or [] if not system_dropped(e)]
     if systems:
         ref = max(systems, key=lambda e: (len(e.get("map") or []), -systems.index(e)))
         m = ref.get("map") or []

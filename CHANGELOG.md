@@ -7,6 +7,20 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.69 — 2026-11-15
+
+### Fixed
+- Analyse again (`y`, `analyse ID`) left every system out after a drop. The names given to detect
+  came from the fullest system, and when systems tied the first one won: a dropped system, so
+  every staff was named `-`, all maps became `-`, no question was asked and no part had a staff.
+  A dropped system is now never taken. Repair a piece hit by this: set every `map` of its
+  `score.yaml` to `'?'` for each staff, then `analyse ID` (the drops are kept).
+
+### Added
+- Two tests of the names given to detect (dropped systems skipped; the parts list when no
+  system can serve).
+
+
 ## 0.8.68 — 2026-11-15
 
 ### Changed

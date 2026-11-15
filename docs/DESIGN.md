@@ -1218,7 +1218,9 @@ Details:
      run. `--undrop` sets `?` for every staff, suggests the map of the nearest
      system with the same staves and clefs. In the choices `d`, or `0` for every
      staff, drops the system asked about, and its map is no suggestion for the
-     systems after it (0.8.63). The analysis marks a system `title_above` when
+     systems after it (0.8.63). A dropped system is never the reference of
+     `reference_names` (the names given to detect by an analysis again): with
+     it, every staff was named `-` and every system was left out (0.8.69). The analysis marks a system `title_above` when
      its header holds a wide (12 sp), high (1.8 sp) text line centred on the page
      and the system is not the first of its page (`ownership.header_titles`).
      When the first such system has systems above it on the first page, and no

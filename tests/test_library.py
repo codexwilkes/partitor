@@ -775,6 +775,26 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(data["systems"][0]["map"], ["-", "-"])
         self.assertEqual(data["systems"][1]["bar"], 1)
 
+    def test_reference_names_skips_dropped_systems(self):
+        """0.8.69: the first systems were dropped (map '-' for every staff) and tied with the
+        others on the staff count: the names for detect were '-,-,-,-' and an analysis
+        again left every system out."""
+        parts = ["Violin", "Trombone", "Staff 3", "Continuo"]
+        sysd = lambda i, m: {"id": i, "staves": 4, "map": m}                 # noqa: E731
+        data = {"parts": parts, "systems": [sysd("p1.s1", ["-"] * 4), sysd("p1.s2", ["-"] * 4),
+                                            sysd("p1.s3", parts), sysd("p1.s4", parts)]}
+        self.assertEqual(cli_parts.reference_names(data), ",".join(parts))
+        data["systems"][2]["map"] = ["Violin", "Trombone", "-", "Continuo"]   # a staff left out
+        self.assertEqual(cli_parts.reference_names(data), "Violin,Trombone,-,Continuo")
+
+    def test_reference_names_falls_back_to_the_parts_when_all_are_dropped_or_unsure(self):
+        parts = ["A", "B"]
+        sysd = lambda i, m: {"id": i, "staves": 2, "map": m}                 # noqa: E731
+        self.assertEqual(cli_parts.reference_names(
+            {"parts": parts, "systems": [sysd("p1.s1", ["-", "-"])]}), "A,B")
+        self.assertEqual(cli_parts.reference_names(
+            {"parts": parts, "systems": [sysd("p1.s1", ["?", "?"])]}), "A,B")
+
     def test_choose_maps_d_and_all_zeros_drop_without_a_suggestion(self):
         item = self.share / "library" / "2026-007-e"
         item.mkdir()
