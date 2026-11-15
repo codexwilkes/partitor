@@ -7,13 +7,18 @@ import os
 from pathlib import Path
 
 
-# ── Typography (DESIGN.md §5.5): EB Garamond (OFL), embedded ──────────────
+# ── Typography (DESIGN.md §5.5): EB Garamond and Source Sans 3 (OFL), embedded ──
 FONT_FILES = {"regular": ("EBGaramond-Regular.ttf", "tiro"),
               "italic": ("EBGaramond-Italic.ttf", "tiit"),
               "bold": ("EBGaramond-SemiBold.ttf", "tibo"),
               # Bravura (SMuFL, OFL): time-signature digits for multi-bar
               # rest counts, as engravers set them
-              "music": ("Bravura.otf", "tibo")}
+              "music": ("Bravura.otf", "tibo"),
+              # Source Sans 3 (OFL), upright: the bar numbers (Medium) and the boxed
+              # rehearsal letters (Semibold), plain shapes that survive a copy of a copy.
+              # Fallback: the built-in Helvetica.
+              "sans": ("SourceSans3-Medium.ttf", "helv"),
+              "sansbold": ("SourceSans3-Semibold.ttf", "hebo")}
 _FONTS: dict[str, tuple[str, str | None, object]] = {}
 
 
@@ -31,7 +36,7 @@ def font_dirs() -> list[Path]:
 
 def _font(kind: str) -> tuple[str, str | None, object]:
     """_font -> (fontname for insert_text, fontfile or None, measurer).
-    Falls back to the built-in Times when the TTF is not found."""
+    Falls back to the built-in Times (Helvetica for the sans kinds) when the file is not found."""
     import pymupdf
     if kind not in _FONTS:
         fname, base = FONT_FILES[kind]
@@ -45,7 +50,8 @@ def _font(kind: str) -> tuple[str, str | None, object]:
 
 def missing_fonts() -> list[str]:
     """missing_fonts -> the font files that are not found (the text then uses the built-in
-    Times, which has no music glyphs: no clef in an ambitus, no digits in a multi-bar rest)."""
+    Times, which has no music glyphs: no clef in an ambitus, no digits in a multi-bar rest;
+    Helvetica for the sans kinds)."""
     return [FONT_FILES[k][0] for k in FONT_FILES if _font(k)[1] is None]
 
 

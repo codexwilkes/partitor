@@ -20,6 +20,9 @@ Programs run as separate processes (not linked):
 Fonts (shipped in share/fonts/, unmodified, with their licence texts):
   EB Garamond (Regular, Italic, SemiBold)   SIL Open Font License 1.1
                                             (share/fonts/OFL.txt)
+  Source Sans 3 (Medium, Semibold)          SIL Open Font License 1.1
+                                            (share/fonts/SourceSans3-OFL.txt)
+                                            Copyright 2010-2022 Adobe, Reserved Font Name 'Source'
   Bravura (music font, SMuFL)               SIL Open Font License 1.1
                                             (share/fonts/Bravura-OFL.txt)
   Reserved Font Names stay with their owners. A PDF made by partitor embeds a

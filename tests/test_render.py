@@ -529,6 +529,22 @@ class TestBatchExtras(unittest.TestCase):
             names = {f[3] for f in pymupdf.open(out)[0].get_fonts()}
         self.assertTrue(any("Garamond" in n for n in names), names)
 
+    def test_bar_number_and_rehearsal_letter_are_set_in_source_sans(self):
+        # 0.8.73: an upright sans, not Garamond italic / SemiBold, for the two small marks
+        if pt.missing_fonts():
+            self.skipTest("fonts not installed")
+        s = dataclasses.replace(self.strips(1)[0], bar_no=12, marks=[(0, "A")])
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d, "p.pdf")
+            pt.render_part("Alto", [s], {"title": "T", "composer": "C"}, 400,
+                           {**pt.LAYOUT_DEFAULTS}, out)
+            spans = [(sp["text"].strip(), sp["font"])
+                     for pg in pymupdf.open(out) for b in pg.get_text("dict")["blocks"]
+                     for ln in b.get("lines", []) for sp in ln["spans"]]
+        font_of = dict(spans)
+        self.assertIn("SourceSans3-Medium", font_of.get("12", ""), spans)
+        self.assertIn("SourceSans3-Semibold", font_of.get("A", ""), spans)
+
     def test_default_staff_ceiling(self):
         opts = {**pt.LAYOUT_DEFAULTS}
         self.assertIsNone(opts["scale"])
@@ -1424,6 +1440,43 @@ class TestFonts(unittest.TestCase):
         finally:
             pt._FONTS.clear()
             pt._FONTS.update(saved)
+
+    def test_sans_kinds_are_in_the_repo_with_their_licence(self):
+        fonts = Path(HERE).parent / "share" / "fonts"
+        self.assertEqual(pt.FONT_FILES["sans"][0], "SourceSans3-Medium.ttf")
+        self.assertEqual(pt.FONT_FILES["sansbold"][0], "SourceSans3-Semibold.ttf")
+        licence = (fonts / "SourceSans3-OFL.txt").read_text(encoding="utf-8")
+        self.assertIn("SIL OPEN FONT LICENSE Version 1.1", licence)
+        self.assertIn("Reserved Font Name 'Source'", licence)
+
+    def test_sans_kinds_fall_back_to_helvetica_and_are_listed_as_missing(self):
+        self.assertEqual(pt.FONT_FILES["sans"][1], "helv")              # the built-in sans
+        self.assertEqual(pt.FONT_FILES["sansbold"][1], "hebo")
+        saved = dict(pt._FONTS)
+        try:
+            for kind in ("sans", "sansbold"):
+                pt._FONTS[kind] = (pt.FONT_FILES[kind][1], None, pt._font(kind)[2])
+            self.assertEqual(pt.missing_fonts(), ["SourceSans3-Medium.ttf",
+                                                  "SourceSans3-Semibold.ttf"])
+        finally:
+            pt._FONTS.clear()
+            pt._FONTS.update(saved)
+
+    def test_sans_digits_and_capitals_stay_under_the_clearance_height(self):
+        # bar_mark and reh_boxes reserve 0.72 em above the baseline: the fonts must fit in it
+        for kind in ("sans", "sansbold"):
+            _, path, _ = pt._font(kind)
+            self.assertIsNotNone(path)
+            doc = pymupdf.open()
+            page = doc.new_page(width=900, height=400)
+            page.insert_text((20, 250), "0123456789ABCDEFGH", fontsize=200,
+                             fontname="x", fontfile=path)
+            pm = page.get_pixmap(dpi=72)
+            ink = np.frombuffer(pm.samples, np.uint8).reshape(pm.h, pm.w, pm.n)[:, :, 0] < 128
+            top = 250 - np.flatnonzero(ink.any(axis=1)).min()
+            with self.subTest(kind=kind):
+                self.assertLess(top / 200, 0.72)
+                self.assertGreater(top / 200, 0.60)
 
     def test_environment_folder_comes_first(self):
         old = os.environ.get("PARTITOR_FONTS")

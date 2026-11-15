@@ -884,13 +884,13 @@ def draw_face(page: pymupdf.Page, pg: list, strips: list[Strip], name: str, meta
             # bar number above the staff start, clear of the clef
             base, _, _ = bar_mark(s)
             put_text(page, (x + bar_x(s) * k, top + y + base * k), str(s.bar_no),
-                     "italic", s.bar_size * s.sp * k)
+                     "sans", s.bar_size * s.sp * k)
         for bx0, btop, bx1, bbot, letter, fs, bl in reh_boxes(s):
             r = pymupdf.Rect(x + bx0 * k, top + y + btop * k,
                              x + bx1 * k, top + y + bbot * k)
             page.draw_rect(r, color=(0, 0, 0), width=max(0.6, 0.12 * s.sp * k))
             put_text(page, (x + (bx0 + REH_PAD * s.sp) * k, top + y + bl * k),
-                     letter, "bold", fs * k)
+                     letter, "sansbold", fs * k)
         for rb in rest_boxes(s):
             put_text(page, (x + rb[0] * k, top + y + rb[3] * k), rb[5], rb[6], rb[4] * k)
         for xl_, bot_, clef_, lo_, hi_, *alt_ in s.ambitus_marks:

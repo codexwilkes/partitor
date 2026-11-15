@@ -361,13 +361,13 @@ REH_PAD = 0.3         # box padding, staff spaces
 
 def reh_boxes(s: Strip) -> list[tuple[float, float, float, float, str, float, float]]:
     """reh_boxes -> [(x0, top, x1, bottom, letter, font size, baseline)] in
-    strip px: a boxed bold letter at the start of its bar, above the staff
+    strip px: a boxed Source Sans 3 Semibold letter at the start of its bar, above the staff
     and clear of the ink below it (like a bar number)."""
     out = []
     pad = REH_PAD * s.sp
     for mx, t in s.marks:
         fs = REH_SIZE * s.sp
-        tw = text_len(t, "bold", fs)
+        tw = text_len(t, "sansbold", fs)
         x0 = float(mx) + (0.0 if mx <= s.staff_x0 + 2 else 0.3 * s.sp)
         x1 = x0 + tw + 2 * pad
         cols = s.img[:, max(0, int(x0)):int(x1) + 1]
@@ -398,7 +398,7 @@ def bar_mark(s: Strip) -> tuple[float, float, float]:
     engravers set it). Baseline at least bar_raise sp above the top line and
     BAR_CLEAR_SP above any ink in the number's columns (clef, header text)."""
     size = s.bar_size * s.sp
-    wpx = text_len(str(s.bar_no), "italic", size)
+    wpx = text_len(str(s.bar_no), "sans", size)
     c0 = int(bar_x(s))
     cols = s.img[:, c0:int(c0 + wpx) + 2]
     rows = np.flatnonzero(cols.any(axis=1))

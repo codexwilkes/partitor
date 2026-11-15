@@ -7,6 +7,23 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.73 — 2026-11-15
+
+### Changed
+- Bar numbers are set in Source Sans 3 Medium (upright) and the boxed rehearsal letters in Source
+  Sans 3 Semibold, in place of EB Garamond Italic and SemiBold. A plain sans keeps its shape on a
+  printed part that is copied again. The size and the place are unchanged: digits and capitals of
+  both families are about 0.65 em high, inside the 0.72 em that the layout reserves. Title,
+  composer, part name, running head and folio stay in EB Garamond. `DESIGN.md` §4.2 items 5 and 8,
+  §5.5.
+
+### Added
+- `share/fonts/SourceSans3-Medium.ttf`, `SourceSans3-Semibold.ttf` (official release 3.052R of
+  Adobe, unmodified) and `SourceSans3-OFL.txt`; `NOTICE` lists them. Without the files the two
+  marks use the built-in Helvetica, and the missing-font warning names them.
+- 4 tests: the fonts of the two marks in a built PDF, the licence and file names, the fallback, and the
+  height of the digits and capitals against the reserved 0.72 em.
+
 ## 0.8.72 — 2026-11-15
 
 ### Added

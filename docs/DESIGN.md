@@ -232,7 +232,7 @@ notehead, slur or word goes whole to one owner.
 4. **Header copy.** Rehearsal letters and movement titles are copied into
    every part. A header that starts left of the staves moves right; the
    staves keep the left margin.
-5. **Bar number placement.** Above the staff start, italic, `bar_size` sp
+5. **Bar number placement.** Above the staff start, upright (Source Sans 3 Medium), `bar_size` sp
    high (default 2). Baseline at least `bar_raise` sp above the top line
    (default 1) and 0.5 sp above any ink in the number's columns (a C clef
    reaches above the staff). The leading reserves the number's box like
@@ -270,7 +270,7 @@ notehead, slur or word goes whole to one owner.
      (`i`) or neither (`n`), and Y/n for a split bar. `partitor bars ID`
      corrects by hand: pickup on/off (`p N`), incipit on/off (`i N`), split on/off, line start fixed (`f 3=16`); the
      lines after it follow.
-8. **Rehearsal letters.** A boxed bold letter at the first full bar after
+8. **Rehearsal letters.** A boxed letter (Source Sans 3 Semibold) at the first full bar after
    each repeat (after the completing half of a split bar), A, B, ...
    restarting at A in each movement. Letters printed in the source are copied
    with the header.
@@ -807,12 +807,17 @@ as a rest to turn in; a group line counts as rest only when every staff rests.
 - Size targets: large noteheads. Floor `min_staff_mm` (5 mm), ceiling
   `max_staff_mm` (8 mm), staff height from top line to bottom line. The re-flow
   offer uses `small_mm` (6.5 mm). Estimates, not measured preferences.
-- Font: EB Garamond (OFL), embedded. Title page / title band: title centred,
-  subtitle below, composer right, part name in SemiBold. Running head on later
-  pages: composer (short) — title — part. Folio: n/N. Files: EB Garamond
-  Regular, Italic and SemiBold with `OFL.txt`, in `share/fonts/`. Lookup:
-  `PARTITOR_FONTS`, then `share/fonts` next to the engine. Missing files:
-  Times (built-in PDF font), no failure.
+- Fonts (OFL, embedded as subsets): EB Garamond for the text, Source Sans 3 for the
+  two small marks. Title page / title band: title centred, subtitle below, composer
+  right, part name in SemiBold. Running head on later pages: composer (short) —
+  title — part. Folio: n/N. Bar numbers: Source Sans 3 Medium, upright; rehearsal
+  letters: Source Sans 3 Semibold. A plain sans keeps its shape when a part is copied
+  again and again; the digits and capitals are 0.65 em high, inside the 0.72 em that
+  `bar_mark` and `reh_boxes` reserve. Files: EB Garamond Regular, Italic and SemiBold
+  with `OFL.txt`; Source Sans 3 Medium and Semibold (release 3.052R, unmodified) with
+  `SourceSans3-OFL.txt`; all in `share/fonts/`. Lookup: `PARTITOR_FONTS`, then
+  `share/fonts` next to the engine. Missing files: Times (built-in PDF font), for the
+  two sans kinds Helvetica; no failure, a warning names the files.
 - Look and feel target: modern Bärenreiter / Breitkopf parts.
 - Line width: the longest staff of a part sets the width. Shorter lines are
   justified: space is added only in blank gaps between glyphs (columns with
