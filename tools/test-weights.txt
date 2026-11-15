@@ -85,6 +85,7 @@ test_ci.TestTestCount 0.1
 test_depmap.TestDepmapInputs 0.1
 test_g0.TestG0RunControl 0.1
 test_g0.TestG0PageImages 0.1
+test_real_pages.TestRealPagesHelpers 8.0
 test_partitor_setup.TestVersion 0.1
 test_library.TestCliModules 0.1
 test_analysis.TestSafetyGate 0.1

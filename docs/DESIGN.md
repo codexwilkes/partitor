@@ -1359,6 +1359,17 @@ lists what a run would change (exit 0).
   `record` also keeps each page as a PNG named by its hash (`<golden>-pages/`); `check` writes
   one image per changed page (golden | run | changed pixels in red) to `<golden>-diffs/` and prints
   the pixel count and box. `pages` fills the folder for an older golden (no re-record).
+- Real pages (0.8.72). `PARTITOR_REAL_PAGES=<folder>` names a folder of the operator with one-page
+  scan PDFs (each once showed a defect) and a `corpus.yaml` of expected values: the staves of each
+  system (`systems`), the systems with a title above them (`title_above`) and optionally the largest
+  difference of staff starts in a system (`x0_spread_max`). `tests/test_real_pages.py` checks them
+  (skipped without the variable); `tools/real-pages.py` cuts the pages from the library (`extract`)
+  and shows the measured values (`probe`). The folder is also a G0 corpus (`--corpus`), best kept
+  in its own golden: record and check with `--only corpus:`. The pages and the manifest stay outside
+  the repo (copyright, and the manifest names the scores); a name in the repo is a neutral slug.
+  **The values record what the engine gives now, after a person looked at the page. They do not
+  prove that the engine is right: it can still be wrong on these pages and on others, and that is
+  expected. When a fix changes a value, change it in the same release and say so in the CHANGELOG.**
 - `tools/m0_depmap.py` maps the dependencies between functions of the engine
   (one file, or a folder such as `lib/partitor`).
 - `tools/check-modules.py` checks the module structure of `lib/partitor` (§12.3).

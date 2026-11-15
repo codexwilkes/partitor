@@ -83,6 +83,11 @@ For a refactor of the engine, record and check golden renders with
 `tools/g0_golden.py` (`DESIGN.md` §10; `--timings` shows where the time goes; a changed page
 is written as an image next to the golden).
 
+Real pages: a scan page that showed a defect can join a folder outside the repo (`PARTITOR_REAL_PAGES`,
+`DESIGN.md` §10). Add an entry to its `corpus.yaml` (`item`, `page`, a neutral `name`), run
+`tools/real-pages.py extract`, then `probe --png DIR`, look at the picture, and write the `expect`
+only for what you checked by eye. The values say what the engine does now, not that it is right.
+
 ## Where does my change go
 
 The engine is the package `lib/partitor/` (`DESIGN.md` §12); `lib/partitor-engine` is only the

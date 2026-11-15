@@ -46,6 +46,8 @@ Case groups
             skipped, never a failure:
               items:
                 - {name: komm, pdf: komm.pdf, pages: "1-2", build: ["--paper","a4"]}
+            `pdf` defaults to <name>.pdf. Other keys of an item are ignored, so the folder of
+            real pages (tools/real-pages.py, 0.8.72) is a corpus as it is.
 
 Page images (0.8.71): `record` also stores each page as a grey PNG named by its hash in
 <golden>-pages/ (identical pages are stored once). When `check` finds a page whose hash
@@ -409,7 +411,7 @@ def build_cases(args, fx, engine_cmd):
         man = Path(args.corpus) / "corpus.yaml"
         if man.is_file():
             for it in (yaml.safe_load(man.read_text()) or {}).get("items", []):
-                pdf = Path(args.corpus) / it["pdf"]
+                pdf = Path(args.corpus) / it.get("pdf", f"{it['name']}.pdf")
                 if pdf.is_file():
                     cases.append((f"corpus:{it['name']}", lambda p=pdf, i=it:
                                   case_build(engine_cmd, p, (), i.get("build", []), None, i.get("pages"))))

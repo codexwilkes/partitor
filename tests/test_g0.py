@@ -175,6 +175,21 @@ class TestG0PageImages(unittest.TestCase):
         self.assertEqual((kept, missing), (2, 1))
         self.assertEqual(sorted(f.stem for f in self.ref.glob("*.png")), ["a", "b"])
 
+    def test_corpus_item_without_pdf_key_uses_the_name(self):
+        from types import SimpleNamespace
+        from unittest import mock
+        corpus = Path(self.tmp, "corpus")
+        corpus.mkdir()
+        (corpus / "corpus.yaml").write_text(
+            "items:\n  - {name: scan-a}\n  - {name: scan-b, note: x, expect: {systems: [3]}}\n")
+        (corpus / "scan-b.pdf").write_bytes(b"%PDF-1.4\n")
+        args = SimpleNamespace(corpus=str(corpus), only=None)
+        cases = dict(self.g0.build_cases(args, Path("fx"), ["engine"]))
+        self.assertEqual(cases["corpus:scan-a"](), {"skipped": "pdf not present"})
+        with mock.patch.object(self.g0, "case_build", return_value={"ran": 1}) as cb:
+            self.assertEqual(cases["corpus:scan-b"](), {"ran": 1})
+        self.assertEqual(Path(cb.call_args.args[1]).name, "scan-b.pdf")
+
     def test_the_new_options_are_in_the_help_text(self):
         self.assertIn("--diff-dir", self.g0.__doc__)
         self.assertIn("pages     --engine", self.g0.__doc__)

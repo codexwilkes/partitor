@@ -7,6 +7,30 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.72 — 2026-11-15
+
+### Added
+- Real pages: tests on single scan pages that once showed a defect. The repo ships no score
+  (copyright), so the pages live in a folder of the operator and `PARTITOR_REAL_PAGES=<folder>`
+  names it; without it the tests skip. The folder holds one-page PDFs and a `corpus.yaml` with
+  the values the engine must give: the staves of each system, the systems that have a title above
+  them (the title question of 0.8.64), and, where a fix concerned the staff start (0.8.60), the
+  largest difference of the staff starts inside a system. `tools/real-pages.py extract` cuts the
+  pages from the library; `probe` analyses them as the engine does, shows the values next to the
+  expected ones and can write a picture of each page to look at before a value is written.
+  `DESIGN.md` §10, `CONTRIBUTING.md`.
+- The same folder is a corpus for the golden check: `g0_golden.py --corpus <folder>` builds each
+  page and compares pixels and text like every other case. An item of `corpus.yaml` may leave
+  out `pdf` (default `<name>.pdf`) and may carry other keys, which G0 ignores.
+- `tests/test_real_pages.py`: 9 tests of the helpers on synthetic pages (and the folder check,
+  skipped without `PARTITOR_REAL_PAGES`); `tests/test_g0.py`: 1 more.
+
+### Note
+The expected values record what the engine gives now, after a person looked at each page and found
+it right. They are not a proof that the engine is right: it can still be wrong, on these pages
+and on others. When a fix changes a value, the value is changed in the same release.
+
+
 ## 0.8.71 — 2026-11-15
 
 ### Added
