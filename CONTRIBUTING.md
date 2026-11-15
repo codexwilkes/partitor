@@ -68,6 +68,13 @@ While you work, run only the tests of the files you touch, for example
 `venv/bin/python3 -m unittest -v tests/test_clef.py`. Run the full suite before
 you open the pull request.
 
+To run the full suite faster on your machine, use `tools/test-parallel.py`. It finds the
+tests as CI does, runs them in 4 processes (`--jobs N`) and fails when a test fails, a process
+dies or the number of tests that ran differs from the number found. It splits by test class,
+using the seconds in `tools/test-weights.txt` (a class not listed counts 0.05 s per test; the
+numbers only balance the load). It needs about 2 GB more memory than a serial run. More than 4
+processes was slower on 8 cores. CI stays serial (`unittest discover -s tests`).
+
 Corpus tests (slow): `PARTITOR_CORPUS=/path/to/folder venv/bin/python3 -m
 unittest -v tests/test_analysis.py`. The folder holds your own PDFs with the
 names in the `CORPUS` table of `tests/test_analysis.py`.

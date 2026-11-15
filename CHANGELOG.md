@@ -7,6 +7,33 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.70 — 2026-11-15
+
+### Added
+- `tools/test-parallel.py`: a local runner for the full unit tests. Same discovery as CI, split by
+  test class over 4 processes (`--jobs N`), balanced by the new `tools/test-weights.txt`. It fails
+  when a test fails, a process dies, a test file does not import, or the number of tests that ran
+  differs from the number found. CI is unchanged (serial). `CONTRIBUTING.md`, `DESIGN.md` §10.
+- `tests/test_parallel_runner.py`: 18 tests (the split, the weights file, the discovery, and runs on
+  small synthetic test folders: a pass, a failure, a dying process, a file that does not import, a lost
+  class).
+
+### Measured
+Same machine (8 cores, 7 GB, WSL2), idle, runs back to back, 955 tests, 0 failures, 9 skipped:
+
+| Run | Wall time | Peak memory above start |
+|---|---|---|
+| serial (`unittest discover -s tests`) | 811 s | 1.0 GB |
+| `tools/test-parallel.py` (4 processes) | 491 s | 1.7 GB |
+
+The same run with 6 processes took 818 s, and with 4 processes and `OPENCV_NUM_THREADS=2` 587 s, so
+4 processes without a limit is the default. Where the serial time went: 20 tests take 52 %, 50 tests
+76 %. `TestDetectParallel` (15 tests on one 4-page score) takes about 8 % and `TestRepage` about 12 %.
+The time is the analysis of synthetic pages (about 1.6 s per page) and engine runs in subprocesses.
+Timings of one machine vary with its load (the serial run took 811 to 1991 s on the same tree while
+a background program used the machine): compare only runs made back to back.
+
+
 ## 0.8.69 — 2026-11-15
 
 ### Fixed

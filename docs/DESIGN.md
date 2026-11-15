@@ -1343,6 +1343,12 @@ lists what a run would change (exit 0).
 - Corpus tests run the engine on real scores and compare staff, system and bar
   counts. They need your own PDFs and skip per missing file (`TestCorpus.need()`
   in `tests/test_analysis.py`; the file list is the `CORPUS` table there).
+- `tools/test-parallel.py` is the local runner of the full suite: the same discovery as CI,
+  split by test class over 4 processes (`--jobs N`), balanced by `tools/test-weights.txt`.
+  It fails when a test fails, a process dies, a test file does not import, or the number of tests
+  that ran differs from the number found, so the split cannot lose a test. It is not a CI step:
+  CI runs `unittest discover -s tests` in one process. The tests of different classes make their
+  own temp and library folders, so they can run side by side; keep it so.
 - `tools/g0_golden.py` records and checks "golden" renders: page images at 100
   dpi and normalised text of 52 cases. Use it for a refactor: record before,
   check after (`--tests tests/support.py`, the default). Goldens depend on the
