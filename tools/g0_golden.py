@@ -12,12 +12,15 @@ Usage (use the engine's venv python):
   g0_golden.py record    --engine ENGINE --tests tests/support.py --golden golden.json
   g0_golden.py check     --engine ENGINE --tests tests/support.py --golden golden.json
   g0_golden.py selfcheck --engine ENGINE --tests tests/support.py --golden golden.json
+  g0_golden.py pages     --engine ENGINE --tests tests/support.py --golden golden.json
   options: --only a,b      run cases whose name starts with one of these
            --workers N     cases run in parallel (default 4)
            --timings       print the time of each case, slowest first, and the
                            sum against the wall time (to choose --workers)
            --corpus DIR    optional local corpus (see below)
            --fixtures DIR  stored input PDFs (default <golden>-fixtures)
+           --diff-dir DIR  where `check` writes images of the changed pages
+                           (default <golden>-diffs)
 ENGINE is a file (run as `python ENGINE ...`) or a command string such as
 "python -m partitor" for the later modular layout.
 
@@ -44,6 +47,13 @@ Case groups
               items:
                 - {name: komm, pdf: komm.pdf, pages: "1-2", build: ["--paper","a4"]}
 
+Page images (0.8.71): `record` also stores each page as a grey PNG named by its hash in
+<golden>-pages/ (identical pages are stored once). When `check` finds a page whose hash
+differs, it writes one image to the diff folder: golden | run | changed pixels in red, and
+prints the number of changed pixels and their box. `pages` fills <golden>-pages/ for a golden
+that was recorded before (it runs the cases and keeps the pages whose hash is in the golden;
+a page that has changed since cannot be kept). The golden file does not change.
+
 Fixtures: built once at `record` (generator output embeds a timestamp) and
 stored; `check` reuses them. Golden values depend on pymupdf, OpenCV, numpy,
 tesseract and fonts: record and check in the same environment.
@@ -58,6 +68,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import threading
 import re
 import shlex
 import shutil
@@ -182,13 +193,30 @@ def in_cache(rel):
 
 
 # ------------------------------------------------------------------- hashing
+PAGE_STORE = None        # Path: every page that is hashed is also kept there as <hash>.png
+
+
+def keep_page(digest, pix):
+    """Store a page image under its hash (once; written aside and renamed, so two threads
+    that write the same page do not meet)."""
+    if PAGE_STORE is None:
+        return
+    f = Path(PAGE_STORE) / f"{digest}.png"
+    if f.exists():
+        return
+    tmp = f.with_name(f"{digest}.{os.getpid()}.{threading.get_ident()}.tmp")
+    pix.save(str(tmp), output="png")
+    os.replace(tmp, f)
+
+
 def pdf_hash(path):
     doc = pymupdf.open(path)
     pages = []
     for p in doc:
         pix = p.get_pixmap(dpi=DPI, colorspace=pymupdf.csGRAY, alpha=False)
-        pages.append([round(p.rect.width, 1), round(p.rect.height, 1),
-                      hashlib.sha256(pix.samples).hexdigest()])
+        digest = hashlib.sha256(pix.samples).hexdigest()
+        keep_page(digest, pix)
+        pages.append([round(p.rect.width, 1), round(p.rect.height, 1), digest])
     return {"pdf": pages}
 
 
@@ -503,9 +531,88 @@ def compare(old, new):
     return diffs
 
 
+# -------------------------------------------------------------- page images
+def page_changes(old, new):
+    """Pages whose hash differs, in cases and files that both runs have with the same page
+    count: a list of (case, file, page number from 1, old hash, new hash)."""
+    out = []
+    for k in sorted(set(old["cases"]) & set(new["cases"])):
+        a, b = old["cases"][k], new["cases"][k]
+        if "artifacts" not in a or "artifacts" not in b:
+            continue
+        for f in sorted(set(a["artifacts"]) & set(b["artifacts"])):
+            x, y = a["artifacts"][f], b["artifacts"][f]
+            if "pdf" in x and "pdf" in y and len(x["pdf"]) == len(y["pdf"]):
+                for i, (p, q) in enumerate(zip(x["pdf"], y["pdf"])):
+                    if p[2] != q[2]:
+                        out.append((k, f, i + 1, p[2], q[2]))
+    return out
+
+
+def _load_grey(path):
+    import numpy as np
+    pix = pymupdf.Pixmap(str(path))
+    return np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)[:, :, 0]
+
+
+def diff_image(old_png, new_png, out_png):
+    """Write golden | run | changed pixels in red. Returns a one-line description."""
+    import numpy as np
+    a, b = _load_grey(old_png), _load_grey(new_png)
+    gap = np.full((max(a.shape[0], b.shape[0]), 4, 3), 128, dtype=np.uint8)
+
+    def rgb(g, h):
+        out = np.full((h, g.shape[1], 3), 255, dtype=np.uint8)
+        out[:g.shape[0]] = g[:, :, None]
+        return out
+    h = max(a.shape[0], b.shape[0])
+    if a.shape == b.shape:
+        mask = a != b
+        over = rgb(b, h)
+        over[mask] = (255, 0, 0)
+        ys, xs = np.nonzero(mask)
+        info = (f"{int(mask.sum())} px differ, box x {int(xs.min())}-{int(xs.max())}, "
+                f"y {int(ys.min())}-{int(ys.max())}")
+        panels = [rgb(a, h), gap, rgb(b, h), gap, over]
+    else:
+        info = f"size {a.shape[1]}x{a.shape[0]} -> {b.shape[1]}x{b.shape[0]}"
+        panels = [rgb(a, h), gap, rgb(b, h)]
+    img = np.concatenate(panels, axis=1)
+    pymupdf.Pixmap(pymupdf.csRGB, img.shape[1], img.shape[0], img.tobytes(), False).save(str(out_png))
+    return info
+
+
+def write_diff_images(changes, ref_store, run_store, out_dir):
+    """One image per changed page. -> (lines to print, number of images)."""
+    lines, n = [], 0
+    out_dir = Path(out_dir)
+    for k, f, page, h_old, h_new in changes:
+        a, b = Path(ref_store) / f"{h_old}.png", Path(run_store) / f"{h_new}.png"
+        label = f"{k} {f} page {page}"
+        if not a.is_file() or not b.is_file():
+            lines.append(f"{label}: no image ({'golden' if not a.is_file() else 'run'} page not stored)")
+            continue
+        out_dir.mkdir(parents=True, exist_ok=True)
+        name = re.sub(r"[^A-Za-z0-9._-]+", "_", f"{k}-{f}-p{page}") + ".png"
+        lines.append(f"{label}: {diff_image(a, b, out_dir / name)} -> {name}")
+        n += 1
+    return lines, n
+
+
+def prune_store(store, golden):
+    """Remove stored pages whose hash is not in the golden. -> (kept, golden pages not stored)."""
+    want = {pg[2] for c in golden["cases"].values() for v in c.get("artifacts", {}).values()
+            if "pdf" in v for pg in v["pdf"]}
+    have = {f.stem for f in Path(store).glob("*.png")}
+    for h in have - want:
+        (Path(store) / f"{h}.png").unlink()
+    return len(have & want), len(want - have)
+
+
 def main():
+    global PAGE_STORE
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("mode", choices=["record", "check", "selfcheck"])
+    ap.add_argument("mode", choices=["record", "check", "selfcheck", "pages"])
     ap.add_argument("--engine", required=True)
     ap.add_argument("--tests", default="tests/support.py")
     ap.add_argument("--corpus")
@@ -514,9 +621,13 @@ def main():
     ap.add_argument("--only")
     ap.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
     ap.add_argument("--timings", action="store_true")
+    ap.add_argument("--diff-dir")
     a = ap.parse_args()
+    mode = a.mode
+    stem = Path(a.golden).with_suffix("").as_posix()
+    ref_store, run_store = Path(stem + "-pages"), None
     try:
-        if a.mode == "selfcheck":
+        if mode == "selfcheck":
             a.mode = "record"
             r1 = run_all(a)
             a.mode = "check"
@@ -526,32 +637,59 @@ def main():
             for x in d:
                 print("  ", x)
             return 1 if d else 0
+        if mode in ("record", "pages"):
+            ref_store.mkdir(parents=True, exist_ok=True)
+            PAGE_STORE = ref_store
+        elif ref_store.is_dir():
+            run_store = Path(tempfile.mkdtemp(prefix="g0-run-"))
+            PAGE_STORE = run_store
+        a.mode = "record" if mode == "record" else "check"   # `pages` needs the fixtures, as check
         times = {}
         t0 = time.monotonic()
         res = run_all(a, times)
         if a.timings:
             print("\n".join(format_timings(times, time.monotonic() - t0)))
         errs = [k for k, c in res["cases"].items() if "error" in c]
-        if a.mode == "record":
+        if mode == "record":
             Path(a.golden).write_text(json.dumps(res, indent=1, sort_keys=True))
             n = sum(1 for c in res["cases"].values() if "artifacts" in c)
             print(f"recorded {n} cases to {a.golden}; errors: {errs or 'none'}; "
-                  f"invariants: {res['invariants'] or 'ok'}")
+                  f"invariants: {res['invariants'] or 'ok'}; page images: {len(list(ref_store.glob('*.png')))}")
             return 1 if res["invariants"] else 0
         old = json.loads(Path(a.golden).read_text())
         if a.only:
             old["cases"] = {k: v for k, v in old["cases"].items()
                             if any(k.startswith(p) for p in a.only.split(","))}
+        if mode == "pages":
+            kept, missing = prune_store(ref_store, old)
+            print(f"pages: {kept} page images kept in {ref_store}; {missing} golden pages not stored"
+                  + (" (the run differs from the golden there)" if missing else ""))
+            return 1 if missing else 0
         d = compare(old, res) + res["invariants"]
         print(f"g0 check: {len(res['cases'])} cases, {len(d)} difference(s)")
         for x in d:
             print("  ", x)
+        if d and run_store is None:
+            print(f"g0: no page images for this golden: run `pages` once to get them ({ref_store})")
+        elif d:
+            out = Path(a.diff_dir or stem + "-diffs")
+            if out.is_dir():
+                shutil.rmtree(out)                 # the images of an older check are not wanted
+            lines, n = write_diff_images(page_changes(old, res), ref_store, run_store, out)
+            for x in lines:
+                print("  ", x)
+            if n:
+                print(f"g0: {n} diff image(s) in {out}")
         return 1 if d else 0
     except SystemExit:
         raise
     except Exception as e:                        # noqa: BLE001
         print(f"g0: error: {e}", file=sys.stderr)
         return 2
+    finally:
+        PAGE_STORE = None
+        if run_store:
+            shutil.rmtree(run_store, ignore_errors=True)
 
 
 if __name__ == "__main__":

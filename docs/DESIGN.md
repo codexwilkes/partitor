@@ -1356,6 +1356,9 @@ lists what a run would change (exit 0).
   It runs 4 cases at once (`--workers N`), the slow ones first. `--timings` prints the time of
   each case and the sum against the wall time. Measured on 8 cores (0.8.67): 597 s with 2
   workers, 347 s with 4; five long-score builds are over half of the summed time.
+  `record` also keeps each page as a PNG named by its hash (`<golden>-pages/`); `check` writes
+  one image per changed page (golden | run | changed pixels in red) to `<golden>-diffs/` and prints
+  the pixel count and box. `pages` fills the folder for an older golden (no re-record).
 - `tools/m0_depmap.py` maps the dependencies between functions of the engine
   (one file, or a folder such as `lib/partitor`).
 - `tools/check-modules.py` checks the module structure of `lib/partitor` (§12.3).

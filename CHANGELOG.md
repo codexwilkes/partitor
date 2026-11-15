@@ -7,6 +7,23 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.71 — 2026-11-15
+
+### Added
+- `tools/g0_golden.py` shows what changed. `record` also stores every page as a grey PNG named by
+  its hash in `<golden>-pages/` (a page that occurs twice is stored once; about 4 MB for the 52
+  cases). When `check` finds a page whose hash differs, it writes one image per page to
+  `<golden>-diffs/` (`--diff-dir DIR`): golden, run, and the changed pixels in red, and it prints the
+  number of changed pixels and their box. A page of another size gives the two pages and both sizes.
+  The golden file is unchanged.
+- New mode `g0_golden.py pages`: fills `<golden>-pages/` for a golden recorded before this release. It
+  runs the cases and keeps the pages whose hash is in the golden; it says how many golden pages it
+  could not store (the run differs there). `check` without the folder says to run `pages` first.
+  `DESIGN.md` §10, `CONTRIBUTING.md`.
+- `tests/test_g0.py`: 9 more tests (the changed pages, the image and its pixel count, the store by
+  hash, the pruning).
+
+
 ## 0.8.70 — 2026-11-15
 
 ### Added
