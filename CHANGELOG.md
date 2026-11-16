@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.79 — 2026-11-16
+
+### Fixed
+- `repage` and `pages` used ink profiles that the build had saved with the lines. After a release that changes
+  what a profile holds (0.8.73: the font of the bar numbers) the page breaks were planned with old values.
+  The profiles are no longer saved, and those in older files are not used.
+
+
 ## 0.8.78 — 2026-11-16
 
 ### Fixed

@@ -1575,6 +1575,39 @@ class TestLinesFileCompatibility(unittest.TestCase):
                     continue                                # refused: the wanted result
                 self.assertTrue(all(np.array_equal(x.img, img) for x in d["strips"]), trial)
 
+    def _two_strips(self):
+        img = np.zeros((40, 300), bool)
+        return [pt.Strip(img, 5, 20, 30, 5.0, np.zeros_like(img), bar_no=n) for n in (12, 17)]
+
+    def test_saved_lines_hold_no_profile_cache(self):
+        st = self._two_strips()
+        pt.pitch_terms(st, {"clearance": 1.0})
+        self.assertTrue(all(hasattr(s, "_prof") for s in st))
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp, "x.lines")
+            pt.save_lines(f, "Alto", 400, {}, {"paper": "letter"}, st)
+            back = pt.load_lines(f)["strips"]
+        self.assertEqual(len(back), 2)
+        self.assertFalse(any(hasattr(s, "_prof") for s in back))
+        self.assertTrue(all(hasattr(s, "_prof") for s in st))      # the caller's strips keep theirs
+
+    def test_old_lines_file_with_profile_cache_is_cleaned(self):
+        import gzip
+        import pickle
+        st = self._two_strips()
+        for s in st:
+            s._prof = ("old", "old", "old")
+        payload = {"format": pt.LINES_FORMAT, "fields": pt.strip_fields(), "version": "0.8.73",
+                   "name": "Alto", "dpi": 400, "meta": {}, "opts": {}, "strips": st}
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp, "old.lines")
+            with gzip.open(f, "wb") as fh:
+                pickle.dump(payload, fh)
+            with gzip.open(f, "rb") as fh:
+                self.assertIn(b"_prof", fh.read())               # the file holds the cache
+            back = pt.load_lines(f)["strips"]
+        self.assertFalse(any(hasattr(s, "_prof") for s in back))
+
     def test_a_new_file_names_the_model_module_and_loads(self):
         import gzip
         st = [pt.Strip(np.zeros((10, 30), bool), 0, 2, 6, 2.0, np.zeros((10, 30), bool))]

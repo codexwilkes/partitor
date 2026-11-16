@@ -805,9 +805,11 @@ def save_lines(path: Path, name: str, dpi: int, meta: dict, opts: dict,
                strips: list[Strip], plan: dict | None = None) -> None:
     """save_lines: write the finished lines of one part (atomic). The source
     image of a rest line is dropped (the line is not drawn again). plan: the
-    lines before re-flow as `partitor plan` needs them (partplan.Source.to_dict)."""
-    slim = [dc_replace(s, rest_src=(None, 0, s.rest_src[2])) if s.rest_src is not None else s
-            for s in strips]
+    lines before re-flow as `partitor plan` needs them (partplan.Source.to_dict).
+    A copy holds the fields only: the cached ink profile (`_prof`, set by
+    `strips.pitch_terms`) depends on fonts and code and is computed again."""
+    slim = [dc_replace(s, rest_src=(None, 0, s.rest_src[2])) if s.rest_src is not None
+            else dc_replace(s) for s in strips]
     payload = {"format": LINES_FORMAT, "fields": strip_fields(), "version": VERSION,
                "name": name, "dpi": dpi, "meta": dict(meta),
                "opts": {k: v for k, v in opts.items() if not k.startswith("_")},
@@ -840,6 +842,7 @@ def load_lines(path: Path) -> dict:
         raise ValueError(f"saved lines are from another partitor ({d.get('version', '?') if isinstance(d, dict) else '?'} "
                          f"{path.name}): rebuild the part")
     for s in d.get("strips", []):                  # a file from before the field: the default
+        s.__dict__.pop("_prof", None)              # files of earlier releases hold a profile cache
         for f in missing:
             s.__dict__.setdefault(f, _FIELD_DEFAULTS[f]())
     return d

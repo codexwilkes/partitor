@@ -751,7 +751,8 @@ is chosen automatically; there is no `turn` key.
 Repage and turns while resting. A build saves the finished lines of each part
 (`lines/<part>.lines`). `partitor repage ID [part ...]` loads them and runs
 the page planner and `render_part` only; nothing is analysed again. It sets
-`turns=rest` for the parts. With `turns=rest` a turn (after each recto) is
+`turns=rest` for the parts. The lines file holds the fields of a line only: the ink profiles are
+computed again by `repage` and `pages` (0.8.79). With `turns=rest` a turn (after each recto) is
 allowed only where a multi-bar rest line of 2+ bars is the last line of the
 page or the first of the next (`rest_turn`). Order of choice: a rest (cost 0),
 a movement start with no rest (150, listed as "check attacca"), anything else
