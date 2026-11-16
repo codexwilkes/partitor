@@ -163,6 +163,15 @@ class TestMapping(unittest.TestCase):
                 r = self.rec("p1.s1", labels, clefs, braces)
                 self.assertEqual(pt.map_system(r, s, c, prev, b), want)
 
+    def test_flute_is_no_continuo(self):
+        for name in ("Flute", "Flute II", "Flauto"):
+            self.assertIsNone(pt.CONTINUO_RE.search(name), name)
+        for name in ("Lute", "Archlute", "Theorbo", "Organo", "B.C."):
+            self.assertIsNotNone(pt.CONTINUO_RE.search(name), name)
+
+    def test_flute_numbers_are_compared(self):
+        self.assertEqual(pt.label_match("Flute I", "Flute II"), 0.0)
+
     def test_reference_numbers_duplicate_labels(self):
         r = self.rec("p1.s1", ["Tenore", "Basso Trombone", "Basso Trombone", "Organo"],
                      ["G", "F", "F", "F"])

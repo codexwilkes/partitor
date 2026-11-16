@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.75 — 2026-11-16
+
+### Fixed
+- A part named "Flute" was taken for a continuo part, because "lute" is in the word: it got no ambitus, and the
+  labels "Flute I" and "Flute II" counted as the same part. "Flute" is no longer such a name.
+  An item with such a part: `partitor set ID "Flute:ambitus=auto"`.
+
+
 ## 0.8.74 — 2026-11-16
 
 ### Changed

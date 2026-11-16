@@ -139,6 +139,11 @@ class TestClefsAndSpacing(unittest.TestCase):
         self.assertEqual([pt.pitch_name(pt.CLEF_BOTTOM[c]) for c in ("G2", "G8", "C3", "C4", "F4")],
                          ["E4", "E3", "F3", "D3", "G2"])
 
+    def test_flute_gets_an_ambitus(self):
+        data = {"parts": ["Flute"], "systems": [
+            {"id": "p1.s1", "map": ["Flute"], "clefs": ["G2"], "steps": [[0, 8]]}]}
+        self.assertEqual(pt.refresh_ambitus(data)["Flute"]["from"], "auto")
+
     def test_ambitus_from_staves_and_overrides(self):
         data = {"parts": ["Canto", "Alto", "Continuo", "Org"], "skip": ["Org"],
                 "systems": [

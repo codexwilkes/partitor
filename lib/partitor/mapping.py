@@ -78,7 +78,7 @@ def _subseq(a: str, b: str) -> bool:
 
 
 CONTINUO_RE = re.compile(r"continuo|\bb\.?\s*c\.?\b|organ|cembalo|harpsichord|"
-                         r"theorb|lute|basso\s+generale", re.IGNORECASE)
+                         r"theorb|(?<!f)lute|basso\s+generale", re.IGNORECASE)
 
 
 # =============================================================================
