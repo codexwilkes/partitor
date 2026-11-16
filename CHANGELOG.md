@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.78 — 2026-11-16
+
+### Fixed
+- A damaged file in `cache/` or `lines/` (a changed bit, a short write) could be read as good data, or stop
+  the command with a Python error. The checksum of the file is now checked: a damaged cache entry is analysed
+  again, damaged saved lines ask for a rebuild of the part.
+
+
 ## 0.8.77 — 2026-11-16
 
 ### Fixed

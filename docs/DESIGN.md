@@ -1558,6 +1558,8 @@ applies those edits to every result, read or new.
   font (file name and size; without it the clefs are read by shape rules, 0.8.77). The
   analysis reads no other setting (`PARTITOR_*` variables do not reach it). The release number
   is not in the key: a release that leaves the analysis code alone keeps the entries (0.7.1).
+  The reader reads an entry to its end, so the checksum of gzip is checked; a damaged entry is a
+  miss (0.8.78).
 - **Format.** `ANALYSIS_CACHE_FORMAT` (1) is part of the key and of the file. The reader
   (`_CacheUnpickler`) accepts `Staff`, `PageResult`, numpy array reconstruction and a few
   builtins, and nothing else.

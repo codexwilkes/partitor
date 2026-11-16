@@ -7,6 +7,7 @@ import dataclasses
 import gzip
 import os
 import pickle
+import zlib
 from dataclasses import replace as dc_replace
 from pathlib import Path
 
@@ -826,7 +827,10 @@ def load_lines(path: Path) -> dict:
     try:
         with gzip.open(path, "rb") as f:
             d = _LinesUnpickler(f).load()
-    except (OSError, EOFError, pickle.UnpicklingError, AttributeError, ValueError) as e:
+            while f.read(1 << 20):          # to the end of the stream: gzip checks its CRC there
+                pass
+    except (OSError, EOFError, zlib.error, MemoryError, pickle.UnpicklingError, AttributeError,
+            ValueError, ImportError, IndexError, TypeError, KeyError) as e:
         raise ValueError(f"saved lines cannot be read ({path.name}: {e}): rebuild the part")
     cur = strip_fields()
     fields = d.get("fields") if isinstance(d, dict) else None

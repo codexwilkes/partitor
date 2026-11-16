@@ -152,6 +152,22 @@ class TestStageCache(unittest.TestCase):
         self.assertIn("music=none", env2)
         self.assertNotEqual(env, env2)
 
+    def test_one_changed_bit_is_a_miss_never_other_data(self):
+        import random
+        rng = np.random.default_rng(3)
+        owner = rng.integers(-1, 6, (300, 400)).astype(np.int32)
+        res = pt.PageResult(0, owner.shape, 20.0, 2, 0.0, 0.0, [], [], owner)
+        random.seed(7)
+        for trial in range(200):
+            self.cache.put(0, 0, res)
+            p = self.cache.path(0, 0)
+            b = bytearray(p.read_bytes())
+            i = random.randrange(120, len(b) - 8)          # past the gzip header and its file name
+            b[i] ^= 1 << random.randrange(8)
+            p.write_bytes(bytes(b))
+            got = self.cache.get(0, 0)                      # must not raise
+            self.assertTrue(got is None or np.array_equal(got.owner, owner), trial)
+
     def test_a_new_program_version_alone_keeps_the_key(self):
         # 0.7.1: the analysis source hash decides, not the release number
         env = stagecache.environment_id()

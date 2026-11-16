@@ -1556,6 +1556,25 @@ class TestLinesFileCompatibility(unittest.TestCase):
             self.assertIs(type(st), pt.Strip)
             self.assertEqual(st.__class__.__module__, "partitor.model")
 
+    def test_one_changed_bit_is_refused(self):
+        import random
+        img = np.random.default_rng(3).integers(0, 2, (80, 900)).astype(bool)
+        st = pt.Strip(img, 5, 20, 40, 5.0, np.zeros_like(img))
+        random.seed(7)
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp, "a.lines")
+            for trial in range(200):
+                pt.save_lines(f, "A", 400, {}, {"gap": 10.0}, [st, st])
+                b = bytearray(f.read_bytes())
+                i = random.randrange(40, len(b) - 8)
+                b[i] ^= 1 << random.randrange(8)
+                f.write_bytes(bytes(b))
+                try:
+                    d = pt.load_lines(f)
+                except ValueError:
+                    continue                                # refused: the wanted result
+                self.assertTrue(all(np.array_equal(x.img, img) for x in d["strips"]), trial)
+
     def test_a_new_file_names_the_model_module_and_loads(self):
         import gzip
         st = [pt.Strip(np.zeros((10, 30), bool), 0, 2, 6, 2.0, np.zeros((10, 30), bool))]
