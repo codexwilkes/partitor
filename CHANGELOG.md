@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.76 — 2026-11-16
+
+### Changed
+- Faster page analysis: the clef templates were drawn in a new PDF document each, and the music font was read
+  again for each one (9 times for each page). They now share one document. About 1.5 s less for each page that
+  is analysed. The templates are the same, pixel for pixel.
+
+
 ## 0.8.75 — 2026-11-16
 
 ### Fixed

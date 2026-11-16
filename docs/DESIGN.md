@@ -1485,8 +1485,8 @@ This map comes from function names and headings. Check it when a module exists.
   path of the tesseract program; nothing rebinds it, but the plan names the owner, so the
   script reads `vision._TESS["path"]`). An object that is changed in place and never
   rebound (`console._counts`, `_FAILURES`, `_WARNINGS`, `clef.CLEF_LAST`, `clef._CLEF_TPL`,
-  `render.LAST_RENDER`, `render._LOGO_WARNED`, `build.LAST_BUILD`) may be imported by name: both names are the
-  same object. `console._reset_counts` keeps it so; the two clef caches are private to
+  `clef._TPL_DOC`, `render.LAST_RENDER`, `render._LOGO_WARNED`, `build.LAST_BUILD`) may be imported by name: both names are the
+  same object. `console._reset_counts` keeps it so; the three clef objects are private to
   `clef`, and `render` fills `LAST_RENDER` with `.update` and item assignment only;
   `build` fills `LAST_BUILD` with `.clear` and `.append` only. The
   page-turn costs (`TURN_BAD`, `PAGE_COST`, `FILL_COST` and the like) stay constants of

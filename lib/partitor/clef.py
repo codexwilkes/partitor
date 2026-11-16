@@ -65,6 +65,7 @@ CLEF_GLYPHS = {"G": 0xE050, "C": 0xE05C, "F": 0xE062}   # SMuFL gClef, cClef, fC
 CLEF_CANDIDATES = [("G", 2), ("G", 1), ("C", 1), ("C", 2), ("C", 3), ("C", 4), ("C", 5),
                    ("F", 3), ("F", 4), ("F", 5)]
 _CLEF_TPL: dict = {}
+_TPL_DOC: dict = {}         # "doc" -> one kept PDF document: the music font is read once
 CLEF_MIN_NCC = 0.55         # Maria (scan): right reads 0.66-0.98
 CLEF_COMMON = {"G2", "G8", "C1", "C3", "C4", "F4"}
 CLEF_RARE_LEAD = 0.05       # a rare clef (G1, C2, C5, F3, F5) must lead the best common one
@@ -85,12 +86,19 @@ def _clef_template(kind: str, sp: float, scale: float) -> tuple[np.ndarray, int]
         _CLEF_TPL[key] = None
         return None
     fs = 4.0 * sp * scale                      # px at 72 dpi = pt
-    doc = pymupdf.open()
+    # one document for all templates: a new document read the width of every
+    # character of the font again for each template (about 0.2 s each)
+    if "doc" not in _TPL_DOC:
+        _TPL_DOC["doc"] = pymupdf.open()
+    doc = _TPL_DOC["doc"]
     page = doc.new_page(width=fs * 2, height=fs * 3)
-    base = fs * 1.6
-    page.insert_text((fs * 0.2, base), chr(CLEF_GLYPHS[kind]), fontsize=fs,
-                     fontname="pt-music", fontfile=file)
-    pix = page.get_pixmap(dpi=72, colorspace=pymupdf.csGRAY)
+    try:
+        base = fs * 1.6
+        page.insert_text((fs * 0.2, base), chr(CLEF_GLYPHS[kind]), fontsize=fs,
+                         fontname="pt-music", fontfile=file)
+        pix = page.get_pixmap(dpi=72, colorspace=pymupdf.csGRAY)
+    finally:
+        doc.delete_page(page.number)
     g = np.frombuffer(pix.samples, np.uint8).reshape(pix.h, pix.w)
     m = g < 128
     rows, cols = np.flatnonzero(m.any(axis=1)), np.flatnonzero(m.any(axis=0))

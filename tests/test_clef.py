@@ -139,6 +139,17 @@ class TestClefsAndSpacing(unittest.TestCase):
         self.assertEqual([pt.pitch_name(pt.CLEF_BOTTOM[c]) for c in ("G2", "G8", "C3", "C4", "F4")],
                          ["E4", "E3", "F3", "D3", "G2"])
 
+    def test_template_bitmaps_are_unchanged(self):
+        import hashlib
+        # values recorded from the code before 0.8.76 (one new document for each template)
+        want = {"G": ("5caac028a23901df1f4a26e60e1a88332a2191c8", 101),
+                "C": ("5c0ab76a073e681452a59ec6f2205a7d543948c5", 47),
+                "F": ("e19dc06633f98635deb36b6d0e15342ba5f3c740", 24)}
+        clef._CLEF_TPL.clear()
+        for kind, (sha, row) in want.items():
+            tpl, ref = clef._clef_template(kind, 23.0, 1.0)
+            self.assertEqual((hashlib.sha1(tpl.tobytes()).hexdigest(), ref), (sha, row), kind)
+
     def test_flute_gets_an_ambitus(self):
         data = {"parts": ["Flute"], "systems": [
             {"id": "p1.s1", "map": ["Flute"], "clefs": ["G2"], "steps": [[0, 8]]}]}
@@ -389,6 +400,29 @@ class TestClefModuleState(unittest.TestCase):
         for name in ("CLEF_LAST", "_CLEF_TPL"):          # no rebinding anywhere in the module
             self.assertIsNone(re.search(rf"(?m)^\s+global {name}\b|^\s*{name}\s*=(?!=)", src.split(
                 "\n\n\n", 1)[1].replace(f"{name}: dict = {{}}", "")), name)
+
+    def test_templates_share_one_document(self):
+        import pymupdf
+        clef._CLEF_TPL.clear()
+        clef._TPL_DOC.clear()
+        calls = []
+        real = pymupdf.open
+
+        def counting(*a, **k):
+            calls.append(1)
+            return real(*a, **k)
+
+        try:
+            pymupdf.open = counting
+            for kind in "GCF":
+                for sp in (7.0, 8.0, 9.0):
+                    self.assertIsNotNone(clef._clef_template(kind, sp, 1.0))
+        finally:
+            pymupdf.open = real
+            clef._CLEF_TPL.clear()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(clef._TPL_DOC), 1)
+        self.assertEqual(clef._TPL_DOC["doc"].page_count, 0)
 
     def test_refresh_ambitus_has_no_cli_code(self):
         # It stays pure: the menu part (confirm_ambitus) is for cli_parts (step M7).
