@@ -18,6 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from support import (  # noqa: E402,F401
+    mock_attr,
     needs_deps,
     pt,
     setUpModule,
@@ -126,6 +127,41 @@ class TestMapping(unittest.TestCase):
         n = len(labels)
         return {"id": rid, "page": 0, "staves": list(range(n)), "labels": labels,
                 "clefs": clefs, "braces": braces or [-1] * n}
+
+    def test_map_system_matches_each_label_once(self):
+        slots = [f"Part {chr(65 + i)}" for i in range(16)] + ["Continuo"]
+        rec = self.rec("p1.s1", [f"Part {chr(65 + 2 * i)}" for i in range(7)] + ["Continuo"],
+                       ["G2"] * 7 + ["F4"])
+        calls = []
+        real = pt.label_match
+
+        def counting(label, name):
+            calls.append((label, name))
+            return real(label, name)
+
+        with mock_attr(pt, "label_match", counting):
+            pt.map_system(rec, slots, ["G2"] * 16 + ["F4"], None, [-1] * 17)
+        self.assertLessEqual(len(calls), 8 * 17)
+
+    def test_map_system_table_gives_the_same_map(self):
+        # values recorded from the code before 0.8.74 (a label match per combination)
+        s = ["Flute", "Oboe", "Violin I", "Violin II", "Viola", "Cello", "Continuo"]
+        c = ["G2", "G2", "G2", "G2", "C3", "F4", "F4"]
+        b = [-1, -1, -1, -1, -1, 5, 5]
+        cases = [
+            (["Flute", "Violin I", "Viola", "Continuo"], ["G2", "G2", "C3", "F4"], [-1] * 4,
+             None, ([0, 2, 4, 6], 0.0, 0.8)),
+            (["", "", ""], ["G2", "C3", "F4"], [-1] * 3, [0, 4, 6],
+             ([0, 4, 6], 0.29999999999999993, 0.29999999999999993)),
+            (["Oboe", "", "", ""], ["G2", "G2", "F4", "F4"], [-1, -1, 7, 7], None,
+             ([1, 3, 5, 6], 1.2, 1.5)),
+            (["Violin II", "Org."], ["G2", "F4"], [-1, -1], [2, 6],
+             ([3, 6], 1.4, 2.1999999999999997)),
+        ]
+        for labels, clefs, braces, prev, want in cases:
+            with self.subTest(labels=labels):
+                r = self.rec("p1.s1", labels, clefs, braces)
+                self.assertEqual(pt.map_system(r, s, c, prev, b), want)
 
     def test_reference_numbers_duplicate_labels(self):
         r = self.rec("p1.s1", ["Tenore", "Basso Trombone", "Basso Trombone", "Organo"],

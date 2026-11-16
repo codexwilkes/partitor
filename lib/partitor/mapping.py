@@ -147,6 +147,10 @@ def map_system(rec: dict, slots: list[str], slot_clefs: list[str],
     # staff of a system (operator request 2026-10-25): the bottom staff takes it,
     # no other staff does
     cont = m - 1 if CONTINUO_RE.search(slots[-1] or "") else None
+    # each printed label is compared with each part name once, not again for
+    # every combination (24310 for 8 staves in 17 slots)
+    ok = [[label_match(lbl, slots[j]) >= 0.7 for j in range(m)] if lbl else None
+          for lbl in rec["labels"][:n]]
     costs = []
     for combo in itertools.combinations(range(m), n):
         c = 0.0
@@ -156,9 +160,8 @@ def map_system(rec: dict, slots: list[str], slot_clefs: list[str],
             if cont in combo[:-1]:
                 c += 1.0
         for k, j in enumerate(combo):
-            lbl = rec["labels"][k]
-            if lbl:
-                c += 0.0 if label_match(lbl, slots[j]) >= 0.7 else 2.0
+            if ok[k] is not None:
+                c += 0.0 if ok[k][j] else 2.0
             else:
                 # bottom alignment, capped: in a short system it outweighed
                 # the labels below (Biber p46: violins above "Vla I")

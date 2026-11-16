@@ -387,7 +387,7 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
    three trombones). Each system gets its own map, suggested from (a) printed
    labels at the staff start read by OCR, (b) the clef and key of each staff,
    matched as an ordered subset of the full system, and (c) continuity with
-   the previous system. The CLI asks only about systems whose suggestion is
+   the previous system. Each label is compared with each part name once. The CLI asks only about systems whose suggestion is
    uncertain. The label text is cleaned (`clean_label`): words of 2 or more
    letters and numerals stay, one letter repeated ("eee") is OCR debris, and
    a bare numeral in brackets stays a name with its brackets, "[I]", "[II]",

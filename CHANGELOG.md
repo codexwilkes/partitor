@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.74 — 2026-11-16
+
+### Changed
+- Faster analysis of large scores: the part mapping of a system compared every printed label with
+  every part name again for each combination it tried. It now compares each pair once. A system of
+  8 labelled staves in a score of 17 parts took about 12 s and now takes about 0.2 s. The maps are the same.
+
+
 ## 0.8.73 — 2026-11-15
 
 ### Changed
