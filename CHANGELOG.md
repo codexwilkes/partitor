@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.80 — 2026-11-16
+
+### Fixed
+- `partitor parts ID`: a renamed part (`N=name`) or a part joined into another (`N+M`) stayed in its groups
+  under the old name. The build then left that staff out of the group score and said nothing. Groups now
+  follow the rename. Repair an item hit by this: `partitor groups ID`, set the group again.
+
+
 ## 0.8.79 — 2026-11-16
 
 ### Fixed

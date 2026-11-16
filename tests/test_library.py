@@ -1119,6 +1119,19 @@ class TestLibrary(unittest.TestCase):
                 self.assertNotEqual(pt.apply_part_ops(d3, bad), "")
                 self.assertEqual(d3, data)
 
+    def test_rename_keeps_the_part_in_its_groups(self):
+        data = {"parts": ["A", "B", "C"], "groups": {"G": ["A", "B"]},
+                "systems": [{"map": ["A", "B", "C"]}]}
+        self.assertEqual(pt.apply_part_ops(data, "1=Alpha"), "")
+        self.assertEqual(data["groups"], {"G": ["Alpha", "B"]})
+
+    def test_join_moves_the_group_member_to_the_target(self):
+        data = {"parts": ["A", "B", "C"], "groups": {"G": ["A", "B"], "H": ["A"]},
+                "systems": [{"map": ["A", "B", "C"]}]}
+        self.assertEqual(pt.apply_part_ops(data, "1+2"), "")
+        self.assertEqual(data["groups"], {"G": ["B"], "H": ["B"]})
+        self.assertEqual(data["parts"], ["B", "C"])
+
     def test_keep_one_staff_of_a_two_staff_part(self):
         # Riccio La Pichi: Violin, Trombone and the organ twice (right and left hand);
         # only the left hand (the continuo line) is wanted

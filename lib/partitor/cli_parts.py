@@ -385,6 +385,21 @@ def apply_part_ops(data: dict, line: str) -> str:
     data[SKIP_KEY] = [new_name[k] for k in keep if k in skipped]
     if not data[SKIP_KEY]:
         data.pop(SKIP_KEY)
+    groups = data.get("groups")
+    if groups:                              # a group follows a rename or a join
+        moved = {}
+        for g, members in groups.items():
+            seen: list[str] = []
+            for x in members:
+                x = target.get(x, x)
+                if x not in seen:
+                    seen.append(x)
+            if seen:
+                moved[g] = seen
+        if moved:
+            data["groups"] = moved
+        else:
+            data.pop("groups")
     pick = {new_name[k]: v for k, v in only.items()}
     for s_ in data.get("systems") or []:
         for key in ("map", "suggest"):
