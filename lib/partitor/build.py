@@ -115,6 +115,14 @@ def _cache_note(cache: "stagecache.StageCache | None", pages: list[int],
               f"(switch off: {stagecache.CACHE_ENV}=0)")
 
 
+def _font_warning(effect: str = "the parts use a fallback: an ambitus has no clef, rest counts "
+                  "and noteheads may be wrong") -> None:
+    """_font_warning: one `fonts:` warning when a font file is not found (build, detect, repage)."""
+    gone = missing_fonts()
+    if gone:
+        _warn("fonts:  not found: " + ", ".join(gone) + "  (PARTITOR_FONTS, share/fonts); " + effect)
+
+
 def cmd_detect(a: argparse.Namespace) -> int:
     """detect: analyse the pages, write layout.yaml and the preview.
 
@@ -139,6 +147,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
     if vision._TESS["path"] is None:
         _warn("ocr:  tesseract not found; staff labels are not read")
         _note("Fix: apt install tesseract-ocr")
+    _font_warning("the clefs are read by shape rules: fewer clefs, less sure")
     config.TUNE["page_header_sp"] = a.page_header_sp
     _head(f"Analysis: {pdf.name}  (dpi {a.dpi}, pages {pages[0] + 1}-{pages[-1] + 1})")
     sysrecs: list[dict] = []
@@ -780,10 +789,7 @@ def cmd_build(a: argparse.Namespace) -> int:
     # the steps in part order: messages, and the parts to render (one worker
     # each when jobs > 1; the numbers NN are those of all parts, also when only
     # some are built)
-    gone = missing_fonts()
-    if gone:
-        _warn("fonts:  not found: " + ", ".join(gone) + "  (PARTITOR_FONTS, share/fonts); the parts "
-              "use a fallback: an ambitus has no clef, rest counts and noteheads may be wrong")
+    _font_warning()
     steps: list[tuple] = []
     for num, (part, strips) in enumerate(part_strips.items(), 1):
         if only and part not in only:

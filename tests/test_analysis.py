@@ -681,6 +681,32 @@ class TestOcrState(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("tesseract not found", buf.getvalue())
 
+    def test_detect_warns_when_the_music_font_is_missing(self):
+        tmp = tempfile.mkdtemp(prefix="fonts-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        pdf = os.path.join(tmp, "one.pdf")
+        make_score_pdf(pdf, systems=1, staves=2, labels=("Alto", "Bass"), title="")
+        ns = argparse.Namespace(pdf=pdf, pages=None, parts="", title="", subtitle="", composer="",
+                                dpi=200, out=os.path.join(tmp, "out"), page_header_sp=pt.PAGE_HEADER_SP,
+                                force=True, jobs="1")
+        empty = os.path.join(tmp, "no-fonts")
+        os.mkdir(empty)
+        saved = dict(pt._FONTS)
+        pt._FONTS.clear()
+        buf = io.StringIO()
+        pt._reset_counts()
+        try:
+            with mock_attr(pt, "font_dirs", lambda: [Path(empty)]), contextlib.redirect_stdout(buf):
+                rc = pt.cmd_detect(ns)
+            warned = [w for w in pt._WARNINGS if w.startswith("fonts:")]
+        finally:
+            pt._FONTS.clear()
+            pt._FONTS.update(saved)
+            pt._reset_counts()
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(warned), 1)
+        self.assertIn("shape rules", buf.getvalue())
+
 
 @needs_deps
 class TestDetectParallel(unittest.TestCase):

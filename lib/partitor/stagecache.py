@@ -15,7 +15,7 @@ import pickle
 import subprocess
 from pathlib import Path
 
-from . import VERSION, config, vision
+from . import VERSION, config, typography, vision
 from .console import _note
 from .model import PageResult, Staff
 
@@ -90,14 +90,17 @@ def tesseract_id() -> str:
 
 def environment_id() -> str:
     """environment_id -> what can change pixels or text: the format, the analysis
-    source and the versions of the libraries and of tesseract. Not the release
+    source, the versions of the libraries and of tesseract, and the music font
+    (a page analysed without it reads its clefs by shape rules). Not the release
     number: a release that leaves the analysis code alone keeps the cache."""
     import cv2
     import numpy
     import pymupdf
+    mf = typography._font("music")[1]       # the clef templates come from this file
+    music = f"{Path(mf).name}:{Path(mf).stat().st_size}" if mf else "none"
     return "|".join([f"format={ANALYSIS_CACHE_FORMAT}", f"src={source_hash()}",
                      f"cv2={cv2.__version__}", f"numpy={numpy.__version__}",
-                     f"pymupdf={pymupdf.version[0]}", f"tesseract={tesseract_id()}"])
+                     f"pymupdf={pymupdf.version[0]}", f"tesseract={tesseract_id()}", f"music={music}"])
 
 
 class StageCache:

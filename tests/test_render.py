@@ -1154,6 +1154,44 @@ class TestRepage(unittest.TestCase):
             with self.assertRaises(ValueError):
                 pt.load_lines(Path(tmp, "old.lines"))
 
+    def test_repage_warns_when_a_font_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            one = Path(tmp, "page.pdf")
+            make_score_pdf(str(one), systems=2, staves=2, labels=("Alto", "Bass"), title="")
+            doc = pymupdf.open()
+            for _ in range(2):
+                doc.insert_pdf(pymupdf.open(str(one)))
+            share = Path(tmp, "share")
+            (share / "inbox").mkdir(parents=True)
+            item = share / "library" / "2026-10-0001-c-t"
+            item.mkdir(parents=True)
+            doc.save(str(item / "2026-10-0001-source.pdf"))
+            pt.save_item(item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-27"})
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
+                self.assertEqual(build.run_build(item), 0)
+            empty = Path(tmp, "no-fonts")
+            empty.mkdir()
+            buf = io.StringIO()
+            old_share = os.environ.get("PARTITOR_LIBRARY")
+            os.environ["PARTITOR_LIBRARY"] = str(share)
+            saved = dict(pt._FONTS)
+            pt._FONTS.clear()
+            try:
+                with mock_attr(pt, "font_dirs", lambda: [empty]), contextlib.redirect_stdout(buf):
+                    rc = pt._engine_step(pt.cmd_repage,
+                                         argparse.Namespace(id="2026-10-0001", parts=["Alto"]))
+                warned = [w for w in pt._WARNINGS if w.startswith("fonts:")]
+            finally:
+                pt._FONTS.clear()
+                pt._FONTS.update(saved)
+                if old_share is None:
+                    os.environ.pop("PARTITOR_LIBRARY", None)
+                else:
+                    os.environ["PARTITOR_LIBRARY"] = old_share
+            self.assertEqual(rc, 0, buf.getvalue())
+            self.assertEqual(len(warned), 1)
+
     def test_build_saves_lines_and_repage_replans(self):
         with tempfile.TemporaryDirectory() as tmp:
             one = Path(tmp, "page.pdf")

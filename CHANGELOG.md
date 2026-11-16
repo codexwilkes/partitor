@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.77 — 2026-11-16
+
+### Fixed
+- `detect` and `repage` said nothing when a font file was not found: the clefs were then read by shape rules, and the
+  pages drawn with built-in fonts. Both now warn as the build does. The analysis cache now also depends on the music
+  font, so each item analyses its pages again once.
+
+
 ## 0.8.76 — 2026-11-16
 
 ### Changed

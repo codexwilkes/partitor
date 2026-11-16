@@ -1029,6 +1029,7 @@ def cmd_repage(a: argparse.Namespace) -> int:
     saved by the last build (no analysis, no build). Sets turns=rest for the
     parts (kept by later builds); breaks, duplex and title_page are taken
     from the layout. Writes through parts.new/ like a build."""
+    from .build import _font_warning
     from .lines import count_bad_turns, lines_path, load_lines, turn_text
     from .render import LAST_RENDER, large_copies, lines_sig, render_part, sheet_text, turns
     start = time.monotonic()
@@ -1047,6 +1048,7 @@ def cmd_repage(a: argparse.Namespace) -> int:
     if not names:
         _die("repage: none of those parts is built")
     print(f"{BOLD}partitor {VERSION} — repage{RST}\n{time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+    _font_warning()
     stage = item / PARTS_NEW
     shutil.rmtree(stage, ignore_errors=True)
     stage.mkdir()

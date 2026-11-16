@@ -820,7 +820,8 @@ as a rest to turn in; a group line counts as rest only when every staff rests.
   with `OFL.txt`; Source Sans 3 Medium and Semibold (release 3.052R, unmodified) with
   `SourceSans3-OFL.txt`; all in `share/fonts/`. Lookup: `PARTITOR_FONTS`, then
   `share/fonts` next to the engine. Missing files: Times (built-in PDF font), for the
-  two sans kinds Helvetica; no failure, a warning names the files.
+  two sans kinds Helvetica; no failure, a warning names the files (`detect`, `build` and
+  `repage` warn; 0.8.77).
 - Look and feel target: modern Bärenreiter / Breitkopf parts.
 - Line width: the longest staff of a part sets the width. Shorter lines are
   justified: space is added only in blank gaps between glyphs (columns with
@@ -1553,7 +1554,8 @@ applies those edits to every result, read or new.
   hash of the source of every module that `ownership` reaches by relative imports
   (so a code change cannot give a stale hit, with or without a new release number), the
   versions of cv2,
-  numpy and pymupdf, and the tesseract path, its version line and `TESSDATA_PREFIX`. The
+  numpy and pymupdf, the tesseract path, its version line and `TESSDATA_PREFIX`, and the music
+  font (file name and size; without it the clefs are read by shape rules, 0.8.77). The
   analysis reads no other setting (`PARTITOR_*` variables do not reach it). The release number
   is not in the key: a release that leaves the analysis code alone keeps the entries (0.7.1).
 - **Format.** `ANALYSIS_CACHE_FORMAT` (1) is part of the key and of the file. The reader

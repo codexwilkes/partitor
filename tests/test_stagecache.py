@@ -138,6 +138,20 @@ class TestStageCache(unittest.TestCase):
         with mock_attr(stagecache, "ANALYSIS_CACHE_FORMAT", 99):
             self.assertNotEqual(env, stagecache.environment_id())
 
+    def test_key_holds_the_music_font(self):
+        env = stagecache.environment_id()
+        self.assertRegex(env, r"music=Bravura\.otf:\d+")
+        saved = dict(pt._FONTS)
+        pt._FONTS.clear()
+        try:
+            with mock_attr(pt, "font_dirs", lambda: []):
+                env2 = stagecache.environment_id()
+        finally:
+            pt._FONTS.clear()
+            pt._FONTS.update(saved)
+        self.assertIn("music=none", env2)
+        self.assertNotEqual(env, env2)
+
     def test_a_new_program_version_alone_keeps_the_key(self):
         # 0.7.1: the analysis source hash decides, not the release number
         env = stagecache.environment_id()
