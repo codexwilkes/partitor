@@ -123,6 +123,22 @@ class TestVersionInDocs(unittest.TestCase):
         self.assertIn(f"## {v}", read("CHANGELOG.md"))
 
 
+class TestNumbersInDocs(unittest.TestCase):
+    """A number that a document gives for the code is the number of the code (0.8.92)."""
+
+    def test_analyse_page_line_count(self):
+        tree = ast.parse(read("lib", "partitor", "ownership.py"))
+        fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "analyse_page")
+        n = fn.end_lineno - fn.lineno + 1
+        self.assertIn(f"one {n}-line function", read("tools", "modules.txt"))
+        self.assertIn(f"one function of {n} lines", DESIGN)
+
+    def test_preview_height_is_written_once(self):
+        tree = ast.parse(read("lib", "partitor", "analysis.py"))
+        hits = [x for x in ast.walk(tree) if isinstance(x, ast.Constant) and x.value == 1400]
+        self.assertEqual(len(hits), 1)          # PROOF_H = 1400; the resize uses the name
+
+
 class TestTestsSource(unittest.TestCase):
     def test_helper_reads_every_test_file_but_this_one(self):
         src = tests_source()

@@ -7,6 +7,13 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.92 — 2026-11-17
+
+### Changed
+- The preview page height is the constant `PROOF_H` everywhere (a second copy of the number 1400 is gone). The line
+  count of `analyse_page` in `DESIGN.md` and `tools/modules.txt` is the real one (833), and a test keeps it so.
+  `README.md` and `KNOWN-LIMITS.md` name release 0.8, not 0.4. No change of output.
+
 ## 0.8.91 — 2026-11-17
 
 ### Removed

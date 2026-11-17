@@ -1529,7 +1529,7 @@ This map comes from function names and headings. Check it when a module exists.
 - **`global`.** `global NAME` is allowed only for a name that the same module assigns
   or defines at top level. For a name of another module write `owner.NAME = value`.
 - **Size.** At most 1 100 definition lines per module. One module is exempt
-  (`ownership`: `analyse_page` is one function of 852 lines).
+  (`ownership`: `analyse_page` is one function of 833 lines).
 - **Pickles.** Saved `.lines` files hold class paths. Files of 0.4.2 say `__main__.Strip`;
   files written since 0.5.0-dev.2 say `partitor.model.Strip`. The reader (`_LinesUnpickler`, in `lines`)
   accepts `__main__`, `partitor`, `pt` and every `partitor.*` path for `Strip` and `RestRun`

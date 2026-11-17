@@ -9,7 +9,7 @@ systems, asks you which staff is which part, and writes one PDF per part, in
 large print if you want it: big staves, a calm layout, page turns at rests,
 bar numbers, rehearsal marks. It was made for amateur players with older eyes.
 
-Status: first public release line (0.4). It works for the author, on one setup. Read
+Status: early public release (0.8). It works for the author, on one setup. Read
 `docs/KNOWN-LIMITS.md` before you rely on it.
 
 ## Scope
@@ -34,7 +34,7 @@ If you write your own publishing, use the documented, stable file layout
 ```bash
 sudo apt install git python3-venv tesseract-ocr
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.8.91
+cd /opt/partitor && sudo git checkout --detach 0.8.92
 sudo bin/partitor-init                      # guided; --yes takes the defaults
 sudo usermod -aG partitor "$USER"          # log in again afterwards
 cp score.pdf /var/lib/partitor/library/inbox/

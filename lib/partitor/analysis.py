@@ -202,7 +202,7 @@ def preview_page(res: PageResult, recs: list[dict], pdir: Path) -> str:
         cv2.putText(img, st.clef, (max(0, x_r - cw_), int(st.lines[3] + 1.1 * res.sp)),
                     cv2.FONT_HERSHEY_SIMPLEX, cs, (0, 0, 0), 2)
     f = PROOF_H / h
-    small = cv2.resize(img, (int(w * f), 1400), interpolation=cv2.INTER_AREA)
+    small = cv2.resize(img, (int(w * f), PROOF_H), interpolation=cv2.INTER_AREA)
     name = f"page-{res.page + 1:02d}.png"
     cv2.imwrite(str(pdir / name), small)
     desc = ", ".join(f"{r['id']}: {len(r['staves'])} staves" for r in recs) or "no music"
