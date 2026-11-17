@@ -7,6 +7,12 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.83 — 2026-11-16
+
+### Fixed
+- `partitor bars`: line number 0 (or a negative number) acted on the last lines of the piece. It is now refused.
+
+
 ## 0.8.82 — 2026-11-16
 
 ### Fixed

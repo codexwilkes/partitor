@@ -503,6 +503,46 @@ def bach_like(anchors=((8,), (16,))):
 class TestBarRules(unittest.TestCase):
     """Pickups, split bars at repeats, fixes, rehearsal letters."""
 
+    def run_bars_menu(self, *answers):
+        """cmd_bars on a saved item with the given menu lines (then Enter). -> the item data."""
+        import builtins
+        import contextlib
+        import io
+        import tempfile
+        import argparse
+        with tempfile.TemporaryDirectory() as tmp:
+            share = Path(tmp, "share")
+            item = share / "library" / "2026-10-0001-c-t"
+            item.mkdir(parents=True)
+            (share / "inbox").mkdir()
+            pt.save_item(item, {"id": "2026-10-0001", "slug": "c-t", "created": "2026-10-27",
+                                "systems": bach_like()})
+            it = iter(list(answers) + [""])
+            real_input, old_share = builtins.input, os.environ.get("PARTITOR_LIBRARY")
+            builtins.input = lambda prompt="": next(it)
+            os.environ["PARTITOR_LIBRARY"] = str(share)
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    pt.cmd_bars(argparse.Namespace(id="2026-10-0001"))
+            finally:
+                builtins.input = real_input
+                if old_share is None:
+                    os.environ.pop("PARTITOR_LIBRARY", None)
+                else:
+                    os.environ["PARTITOR_LIBRARY"] = old_share
+            pt._reset_counts()
+            return pt.load_item(item)
+
+    def test_bars_menu_refuses_line_zero(self):
+        data = self.run_bars_menu("f 0=5", "b 0", "j 0 1", "k 0", "u 0", "m 0:1", "s 0 1")
+        self.assertNotIn("bar_rules", data)             # nothing changed, nothing saved
+        self.assertFalse(data.get("pending"))
+
+    def test_bars_menu_refuses_a_negative_line(self):
+        data = self.run_bars_menu("p -1", "i -1", "f -2=5")
+        self.assertNotIn("bar_rules", data)
+        self.assertFalse(data.get("pending"))
+
     def test_proposals_from_widths(self):
         r = pt.propose_bar_rules(bach_like())
         self.assertEqual(r["pickup"], ["p1.s1"])

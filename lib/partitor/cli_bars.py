@@ -172,6 +172,15 @@ def bars_listing(sy: dict, ef: dict, rules: dict, ln: int) -> list[str]:
     return out
 
 
+def _line(arg: str, n: int) -> int:
+    """_line -> the line number in `arg` when 1 <= number <= n, else ValueError (the menu
+    numbers lines from 1: 0 or a negative number must not reach the last lines)."""
+    v = int(arg)
+    if not 1 <= v <= n:
+        raise ValueError(arg)
+    return v
+
+
 @locks_item
 def cmd_bars(a: argparse.Namespace) -> int:
     """bars <id>: set pickups, split bars, barlines, line-start numbers and
@@ -251,7 +260,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     print(BARS_EXAMPLE, end="")
                     continue
                 if op == "v":
-                    ln_ = int(arg) if arg.strip() else None
+                    ln_ = _line(arg, len(systems)) if arg.strip() else None
                     if not item_file(item, "proof.pdf").is_file():
                         print(f"     {YLW}no proof.pdf: analyse again makes it{RST}")
                         continue
@@ -263,7 +272,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                            f"(source page {g_})" if g_ else ""))
                     continue
                 if op == "p":
-                    sid = systems[int(arg) - 1]["id"]
+                    sid = systems[_line(arg, len(systems)) - 1]["id"]
                     if sid not in movement_first:
                         print(f"     {YLW}line {arg} does not start a movement{RST}")
                         continue
@@ -274,7 +283,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     else:
                         rules["pickup"].append(sid)
                 elif op == "i":
-                    sid = systems[int(arg) - 1]["id"]
+                    sid = systems[_line(arg, len(systems)) - 1]["id"]
                     if sid not in movement_first:
                         print(f"     {YLW}line {arg} does not start a movement{RST}")
                         continue
@@ -287,7 +296,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                 elif op == "s":
                     w_ = arg.split()
                     if len(w_) == 2:                       # s N I: bar I of line N
-                        ln, i = int(w_[0]), int(w_[1])
+                        ln, i = _line(w_[0], len(systems)), int(w_[1])
                         sy, ef = systems[ln - 1], eff[ln - 1]
                         cur = int(ef.get("bars") or 0)
                         if not 1 <= i <= cur:
@@ -302,7 +311,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                             continue
                         key = f"{sy['id']}:{i - 1}"
                     elif len(w_) == 1 and cands:           # s K: bar after repeat sign K
-                        key = cands[int(w_[0]) - 1]
+                        key = cands[_line(w_[0], len(cands)) - 1]
                     else:
                         raise ValueError(arg)
                     if key in rules["split"]:
@@ -318,8 +327,11 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     for w_ in words_:
                         if ":" in w_:                      # m N:I
                             ln, _, i = w_.partition(":")
-                            tgt = (systems[int(ln) - 1]["id"], int(i) - 1)
-                            label = f"bar {int(i)} of line {int(ln)}"
+                            ln = _line(ln, len(systems))
+                            if int(i) < 1:
+                                raise ValueError(w_)
+                            tgt = (systems[ln - 1]["id"], int(i) - 1)
+                            label = f"bar {int(i)} of line {ln}"
                         else:
                             tgt, label = int(w_), f"bar {int(w_)}"
                         try:
@@ -339,7 +351,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                             if m_[0] < len(e_.get("bar_nums") or [])) or "none"))
                 elif op in ("j", "a"):
                     w_ = arg.split()
-                    ln, n = int(w_[0]), int(w_[1])
+                    ln, n = _line(w_[0], len(systems)), int(w_[1])
                     sy = systems[ln - 1]
                     raw = int(sy.get("bars") or 0)
                     cur = int(eff[ln - 1].get("bars") or 0)
@@ -359,7 +371,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                             continue
                         rules["bar_edits"].append(format_bar_edit(sy["id"], "a", n, raw, pc))
                 elif op == "u":
-                    sid = systems[int(arg) - 1]["id"]
+                    sid = systems[_line(arg, len(systems)) - 1]["id"]
                     mine = [t for t in rules["bar_edits"]
                             if parse_bar_edit(t) and parse_bar_edit(t)["sid"] == sid]
                     if not mine:
@@ -367,12 +379,12 @@ def cmd_bars(a: argparse.Namespace) -> int:
                         continue
                     rules["bar_edits"].remove(mine[-1])
                 elif op == "b":
-                    ln = int(arg)
+                    ln = _line(arg, len(systems))
                     for t_ in bars_listing(systems[ln - 1], eff[ln - 1], rules, ln):
                         print(f"     {t_}")
                     continue
                 elif op == "k":
-                    sid = systems[int(arg) - 1]["id"]
+                    sid = systems[_line(arg, len(systems)) - 1]["id"]
                     hit = [m for m in ms if m["id"] == sid]
                     if not hit:
                         print(f"     {YLW}no difference at line {arg}{RST}")
@@ -380,7 +392,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     rules["bars_ack"].extend(m["key"] for m in hit)
                 elif op == "f":
                     ln, _, val = arg.partition("=")
-                    sid = systems[int(ln) - 1]["id"]
+                    sid = systems[_line(ln, len(systems)) - 1]["id"]
                     if val.strip():
                         rules["fix"][sid] = int(val)
                     else:
