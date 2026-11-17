@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
+import math
 import os
 import re
 import shutil
@@ -69,6 +70,11 @@ SET_KEYS = {          # set key -> (layout key or None for metadata, parser)
     "rest_bar": ("rest_bar", ("engraved", "bold", "heavy")),
     "turns": ("turns", ("any", "rest")), "breaks": ("breaks", "breaks"),
     "foldouts": ("foldouts", ("off", "on")), "foldside": ("foldside", ("right", "left", "auto")),
+}
+SET_RANGES = {        # set key -> (low, high) of the number keys; wide on purpose (0.8.82)
+    "gap": (1.0, 40.0), "min_gap": (1.0, 40.0), "scale": (0.1, 4.0),
+    "min_staff_mm": (2.0, 15.0), "max_staff_mm": (2.0, 15.0), "bar_raise": (0.0, 10.0),
+    "bar_size": (0.5, 6.0), "gutter": (0.0, 50.0), "binding": (0.0, 50.0),
 }
 GAP_MAX = 14.0        # expand never sets a wider gap (sp)
 PART_SET_KEYS = {"pages", "gap", "min_gap", "scale", "min_staff_mm", "max_staff_mm", "group_gap",
@@ -779,6 +785,10 @@ def apply_set(data: dict, pairs: list[str]) -> list[str]:
             val = v
         else:
             val = kind(v)
+            if k in SET_RANGES:
+                lo, hi = SET_RANGES[k]
+                if not (math.isfinite(val) and lo <= val <= hi):
+                    raise ValueError(f"{k}: a number from {lo:g} to {hi:g}")
         if part is not None:
             pl = plays.setdefault(part, {})
             done.append(f"{part}:{k}: {set_value(k, pl.get(lk, lay.get(lk)))} -> "

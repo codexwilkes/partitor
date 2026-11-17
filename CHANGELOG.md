@@ -7,6 +7,15 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.82 — 2026-11-16
+
+### Fixed
+- `partitor set` took any number: `gap=nan`, `max_staff_mm=inf` or `bar_size=-3` were saved and the next build
+  stopped with a Python error. Each number key now has a range (`gap` and `min_gap` 1-40, `scale` 0.1-4,
+  `min_staff_mm` and `max_staff_mm` 2-15, `bar_raise` 0-10, `bar_size` 0.5-6, `gutter` and `binding` 0-50)
+  and a value outside it is refused with the range. Values already saved are read as before.
+
+
 ## 0.8.81 — 2026-11-16
 
 ### Fixed

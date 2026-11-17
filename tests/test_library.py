@@ -1151,6 +1151,26 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(pt.apply_part_ops(d2, "1+2"), "")      # the target's entry stays
         self.assertEqual(d2["ambitus"], {"B": {"range": "C3-G3", "from": "operator"}})
 
+    def test_set_refuses_numbers_that_are_not_finite(self):
+        for bad in ("gap=nan", "gap=inf", "max_staff_mm=-inf"):
+            data = {"layout": {"paper": "letter"}}
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    pt.apply_set(data, [bad])
+                self.assertEqual(data, {"layout": {"paper": "letter"}})
+
+    def test_set_refuses_numbers_outside_the_range(self):
+        for bad in ("bar_size=-3", "min_staff_mm=0", "gap=500"):
+            data = {"layout": {}}
+            with self.subTest(bad=bad):
+                with self.assertRaisesRegex(ValueError, "a number from"):
+                    pt.apply_set(data, [bad])
+                self.assertEqual(data, {"layout": {}})
+        data = {"layout": {}}
+        pt.apply_set(data, ["gap=11", "bar_size=2.5"])
+        self.assertEqual(data["layout"]["gap"], 11.0)
+        self.assertEqual(data["layout"]["bar_size"], 2.5)
+
     def test_keep_one_staff_of_a_two_staff_part(self):
         # Riccio La Pichi: Violin, Trombone and the organ twice (right and left hand);
         # only the left hand (the continuo line) is wanted

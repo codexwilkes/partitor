@@ -133,7 +133,10 @@ text format does not change).
 | `ambitus` | `{part: {range: C4-F5, from: auto}}` | Lowest and highest note of each part (§4.3 item 13). |
 | `page_header_sp` | `6.0` | Analysis tunable. |
 
-`partitor set` rejects unknown keys and changes nothing (§6.2 lists them).
+`partitor set` rejects unknown keys and changes nothing (§6.2 lists them). A number key has a range,
+wide on purpose, and a value outside it, or not finite, is refused with the range (0.8.82):
+`gap` and `min_gap` 1-40, `scale` 0.1-4, `min_staff_mm` and `max_staff_mm` 2-15, `bar_raise` 0-10,
+`bar_size` 0.5-6, `gutter` and `binding` 0-50. The margins keep their own check.
 The layout keys are also available per part (`Part:key=value`) where §6.2
 says so.
 
