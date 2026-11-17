@@ -1575,13 +1575,24 @@ class TestItemLock(unittest.TestCase):
         for name, (lk, _) in pt.SET_KEYS.items():
             if lk is not None:
                 self.assertRegex(text, rf"\n[ *] {name} ", name)
-        self.assertRegex(text, r"\n\* gap +12\.0 +10\.0 +number")
+        self.assertRegex(text, r"\n\* gap +12\.0 +10\.0 +1-40\n")
         self.assertIn("foldouts       off        off        off | on", text)
         self.assertIn("A: pages=4, foldouts=on", text)                       # the names `set` takes
         self.assertEqual(Path(self.item, "2026-10-0007-score.yaml").read_text(encoding="utf-8"), before)
         r = subprocess.run([sys.executable, str(Path(LIB, "partitor-engine")), "set", "--help"],
                            capture_output=True, text=True, env={**os.environ, "PARTITOR_ALLOW_ROOT": "1"})
         self.assertIn("none: list every key", " ".join(r.stdout.split()))
+
+    def test_set_list_shows_the_ranges(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(pt.cmd_set(argparse.Namespace(id="2026-10-0007", pairs=[],
+                                                           build=False)), 0)
+        text = out.getvalue()
+        for name, (lo, hi) in pt.SET_RANGES.items():
+            self.assertRegex(text, rf"\n[ *] {name} +\S+ +\S+ +{lo:g}-{hi:g}\n", name)
+        self.assertRegex(text, r"\n  margin_top +\S+ +\S+ +number\n")      # margins keep their own check
+        self.assertIn("(10, 1-40; --gap)", pt.LAYOUT_HELP)
 
     def test_every_command_that_changes_an_item_holds_its_lock(self):
         for name in ("cmd_set", "cmd_rebuild", "cmd_repage", "cmd_pages", "cmd_plan", "cmd_parts",

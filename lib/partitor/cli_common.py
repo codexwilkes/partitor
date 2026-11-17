@@ -11,7 +11,7 @@ from pathlib import Path
 from .config import LAYOUT_DEFAULTS, PART_LAYOUT_KEY
 from .console import _die, _head, _note, _ok, _summary, _warn
 from .library import (
-    SET_KEYS, ItemBusy, apply_set, find_item, folder_name, item_id, item_lock, item_status,
+    SET_KEYS, SET_RANGES, ItemBusy, apply_set, find_item, folder_name, item_id, item_lock, item_status,
     library_root, load_item, mark_pending, save_item, step_size,
 )
 from .proof import annotate_proof
@@ -97,7 +97,9 @@ def settings_lines(data: dict) -> list[str]:
     out = [f"  {'key':<{w}}  {'value':<10} {'default':<10} accepts"]
     for name, lk, how in keys:
         d = LAYOUT_DEFAULTS.get(lk)
-        acc = " | ".join(how) if isinstance(how, tuple) else "number" if how is float else ACCEPTS.get(how, str(how))
+        acc = " | ".join(how) if isinstance(how, tuple) else \
+            (f"{SET_RANGES[name][0]:g}-{SET_RANGES[name][1]:g}" if name in SET_RANGES else "number") \
+            if how is float else ACCEPTS.get(how, str(how))
         out.append(f"{'*' if lk in lay else ' '} {name:<{w}}  {show(lay.get(lk, d)):<10} {show(d):<10} {acc}")
     back = {lk: name for name, lk, _ in keys}
     for part, own in sorted(((data.get("layout") or {}).get(PART_LAYOUT_KEY) or {}).items()):

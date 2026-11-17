@@ -1120,7 +1120,7 @@ partitor list [words] | show <id>
 partitor expand <id> [part] | contract <id> [part]
 partitor set <id> pages=2 scale=1.2 gap=11 paper=a4 title="..."
 partitor set <id> "Continuo:pages=2"      (one part)
-partitor set <id>                         every key: value, default, what it accepts (0.8.46)
+partitor set <id>                         every key: value, default, what it accepts (0.8.46; a number key shows its range, 0.8.85)
 partitor rename <id>           folder name follows title and composer
 partitor reid <id>             old YYYY-NNN item -> YYYY-MM-NNNN
 partitor rebuild <id> [part ...] [--jobs N|auto]

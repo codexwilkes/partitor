@@ -98,11 +98,11 @@ LAYOUT_HELP = """\
 #   paper: letter | a4 | ledger (letter; --paper). ledger = 17 x 11 in
 #     landscape, no large-print copy; the staff is chosen
 #     as large as possible first (pages and page turns follow)
-#   gap: staff spaces between staves, the widest leading (10; --gap)
-#   gap_min: smallest leading to save a page turn (7; --min-gap)
+#   gap: staff spaces between staves, the widest leading (10, 1-40; --gap)
+#   gap_min: smallest leading to save a page turn (7, 1-40; --min-gap)
 #   clearance: least space between ink of two lines, sp (1; --clearance)
-#   scale: largest size, 1 = source size (none: up to max_staff_mm; --scale)
-#   max_staff_mm: largest staff height (8; --max-staff-mm)
+#   scale: largest size, 1 = source size, 0.1-4 (none: up to max_staff_mm; --scale)
+#   max_staff_mm: largest staff height (8, 2-15; --max-staff-mm)
 #   turns: any | rest (any; per part; `repage` sets rest). rest = a page turn
 #     falls only beside a multi-bar rest line (the player rests); a turn
 #     elsewhere is a warning, except a movement start when no rest is near (a
@@ -131,18 +131,18 @@ LAYOUT_HELP = """\
 #     printed double-sided (auto; --title-page)
 #   logo: on | off; the logo on the first page and the back page: the file of
 #     PARTITOR_LOGO, else logo.png in the library folder (on; `set ID logo=off`)
-#   min_staff_mm: smallest staff height (5; --min-staff-mm)
+#   min_staff_mm: smallest staff height (5, 2-15; --min-staff-mm)
 #   page_count: force this many pages (none; --page-count)
 #   margin_top, margin_bottom, margin_side: mm (15, 15, 15; --margin-top,
 #     --margin-bottom, --margin-side)
 #   gutter: mm added at the spine in double-sided print and taken from
-#     the outer margin (5; --gutter)
+#     the outer margin (5, 0-50; --gutter)
 #   duplex: auto | on | off; auto = double-sided when over 2 pages
 #     (auto; --duplex)
 #   bar_numbers: start | none (start; --bar-numbers)
 #   bar_raise: least height of a bar number baseline above the staff, sp;
-#     a number also clears the clef by 0.5 sp (1; --bar-raise)
-#   bar_size: bar number size, sp (2; --bar-size)
+#     a number also clears the clef by 0.5 sp (1, 0-10; --bar-raise)
+#   bar_size: bar number size, sp (2, 0.5-6; --bar-size)
 #   ink: normal | darker (normal; --ink)
 #   large: on | off; on = also a large-print copy per part: Letter -> 11x17
 #     with a cut line, A4 -> A3 (on; --large)

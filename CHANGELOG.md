@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.85 — 2026-11-16
+
+### Changed
+- `partitor set ID` (no pairs) shows the range of each number key in its `accepts` column, and the layout help
+  at the top of `score.yaml` names the ranges (`gap` 1-40, `scale` 0.1-4, staff sizes 2-15 mm, ...). These are the
+  ranges `set` has enforced since 0.8.82. The comment block of every `score.yaml` changes once, at its next save.
+
+
 ## 0.8.84 — 2026-11-16
 
 ### Changed
