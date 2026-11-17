@@ -1330,6 +1330,28 @@ class TestGroupReflowReal(unittest.TestCase):
             _, f = self.run_build(b, 1, 1)
             self.assertEqual(round(pymupdf.open(str(f))[0].rect.width), 612)
 
+    def part_pages(self, layout=None):
+        """Page signatures of Alto and Tenor of a 2-system build."""
+        with tempfile.TemporaryDirectory() as d:
+            _, g = self.run_build(d, 2, 1, layout=layout)
+            return {n: self.sig(g.parent / f) for n, f in
+                    (("Alto", "01-Alto.pdf"), ("Tenor", "02-Tenor.pdf"))}
+
+    def test_part_ink_changes_only_that_part(self):
+        """0.8.86: Alto:ink=darker reached no strip (the item value was read)."""
+        base = self.part_pages()
+        dark = self.part_pages({"parts": {"Alto": {"ink": "darker"}}})
+        self.assertNotEqual(dark["Alto"], base["Alto"])
+        self.assertEqual(dark["Tenor"], base["Tenor"])
+
+    def test_part_bar_number_size_and_height_change_only_that_part(self):
+        base = self.part_pages()
+        for key, val in (("bar_size", 4.0), ("bar_raise", 3.0)):
+            with self.subTest(key=key):
+                new = self.part_pages({"parts": {"Alto": {key: val}}})
+                self.assertNotEqual(new["Alto"], base["Alto"])
+                self.assertEqual(new["Tenor"], base["Tenor"])
+
     def test_binding_narrows_the_text_and_the_staff(self):
         def staff(d, *args, layout=None):
             txt, _ = self.run_build(d, 1, 1, *args, layout=layout)

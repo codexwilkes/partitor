@@ -7,6 +7,12 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.86 — 2026-11-17
+
+### Fixed
+- `Part:bar_size`, `Part:bar_raise` and `Part:ink` were saved and shown but did not change the part. They do now.
+  A part that has one of them set changes at its next rebuild.
+
 ## 0.8.85 — 2026-11-16
 
 ### Changed

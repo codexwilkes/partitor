@@ -431,7 +431,22 @@ def cmd_build(a: argparse.Namespace) -> int:
     want_groups = [g for g in groups if not only or g in only]
     # parts whose staves this build reads: the parts and the members of the groups
     consumers = set(want_parts) | {x for g in want_groups for x in groups[g]}
-    darker = opts["ink"] == "darker"
+    plays = (lay.get("layout") or {}).get(PART_LAYOUT_KEY) or {}
+
+    def own_opts(name: str) -> dict:
+        """The item layout with the keys the part (or group) `name` sets for
+        itself in layout.parts; command-line options are not overridden.
+        Returns `opts` itself when there is none."""
+        own = {k: v for k, v in (plays.get(name) or {}).items()
+               if k in LAYOUT_DEFAULTS and k not in cli_set}
+        if not own:
+            return opts
+        o = {**opts, **own}
+        for key in ("gap", "gap_min", "bar_raise", "bar_size", "max_staff_mm"):
+            o[key] = float(o[key])
+        o["gap_min"] = min(o["gap_min"], o["gap"])
+        return o
+
     # bar number at each line start (not on a movement's first line)
     if lay.get("bar_rules") is not None:
         renumber(lay)                 # bar and marks follow bar_rules
@@ -544,6 +559,8 @@ def cmd_build(a: argparse.Namespace) -> int:
                 edges = [min(res.staves[i].x0 for i in idx)] + res.barlines.get(gsys, [])
                 mk = [(edges[i], str(t)) for i, t in marks_of.get(srec["id"], [])
                       if 0 <= i < len(edges)]
+                po = own_opts(part)
+                darker = po["ink"] == "darker"
                 gg = own_group_gap(lay, part, opts)
                 if gg is not None and len(idx) > 1:       # a part on two staves
                     stp = group_strip(res, srec["staves"], [(part, [i]) for i in idx],
@@ -556,7 +573,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                     stp = make_strip(res, idx, OWN_HEADER_BASE + gsys, darker,
                                      bar_no=bar_of.get(srec["id"]), marks=mk,
                                      movement=gsys in res.restart)
-                stp.bar_raise, stp.bar_size = opts["bar_raise"], opts["bar_size"]
+                stp.bar_raise, stp.bar_size = po["bar_raise"], po["bar_size"]
                 stp.rest_bar = opts["rest_bar"]
                 set_bar_geometry(stp, res, idx, gsys, nums_of.get(srec["id"], []))
                 ap[part].append(stp)
@@ -571,6 +588,8 @@ def cmd_build(a: argparse.Namespace) -> int:
                 edges = [min(res.staves[i].x0 for i in idx)] + res.barlines.get(gsys, [])
                 mk = [(edges[i], str(t)) for i, t in marks_of.get(srec["id"], [])
                       if 0 <= i < len(edges)]
+                go = own_opts(gname)
+                darker = go["ink"] == "darker"
                 order = list(dict.fromkeys(x for x in m if x in gparts))
                 runs = [(x, [srec["staves"][i] for i, y in enumerate(m) if y == x])
                         for x in order]
@@ -579,7 +598,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                                   movement=gsys in res.restart,
                                   nums=nums_of.get(srec["id"], []),
                                   gap_sp=own_group_gap(lay, gname, opts))
-                stp.bar_raise, stp.bar_size = opts["bar_raise"], opts["bar_size"]
+                stp.bar_raise, stp.bar_size = go["bar_raise"], go["bar_size"]
                 stp.rest_bar = opts["rest_bar"]
                 stp.bracket = len(idx) > 1
                 ag[gname].append(stp)
@@ -651,9 +670,11 @@ def cmd_build(a: argparse.Namespace) -> int:
     if _counts["fail"]:
         return _summary(start)
 
-    part_strips = {p: coalesce_rest_lines(merge_rest_bars(fill_rests(v, opts), opts), opts)
+    part_strips = {p: coalesce_rest_lines(merge_rest_bars(fill_rests(v, own_opts(p)), own_opts(p)),
+                                          own_opts(p))
                    for p, v in part_strips.items()}
-    group_strips = {g: merge_rest_bars(fill_rests(v, opts), opts) for g, v in group_strips.items()}
+    group_strips = {g: merge_rest_bars(fill_rests(v, own_opts(g)), own_opts(g))
+                    for g, v in group_strips.items()}
     for v in group_strips.values():
         for s_ in v:
             if s_.rest_src is not None:
@@ -672,7 +693,6 @@ def cmd_build(a: argparse.Namespace) -> int:
     LAST_BUILD.clear()
     meta = {k: lay.get(k, "") for k in ("title", "subtitle", "composer", "composer_short")}
 
-    plays = (lay.get("layout") or {}).get(PART_LAYOUT_KEY) or {}
     amb_data = {k: lay.get(k) for k in ("parts", "systems", "ambitus", SKIP_KEY)}
     refresh_ambitus(amb_data)
     # group members need their ambitus also when not extracted on their own
@@ -688,10 +708,7 @@ def cmd_build(a: argparse.Namespace) -> int:
         own = {k: v for k, v in (plays.get(name) or {}).items()
                if k in LAYOUT_DEFAULTS and k not in cli_set}
         if own:
-            opts = {**opts, **own}
-            for key in ("gap", "gap_min", "bar_raise", "bar_size", "max_staff_mm"):
-                opts[key] = float(opts[key])
-            opts["gap_min"] = min(opts["gap_min"], opts["gap"])
+            opts = own_opts(name)
             _note(f"{name}: own layout " + " ".join(f"{k}={v}" for k, v in own.items()))
         plan_src = None
         if lines_dir is not None:             # the lines as the plan command needs them (before re-flow)
