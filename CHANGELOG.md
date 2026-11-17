@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.89 — 2026-11-17
+
+### Fixed
+- A part on two staves that are larger or smaller than the other staves of the page (an organ part) was built with
+  the staff space of the page when `group_gap` was set for it: the staff size shown and the limit `max_staff_mm`
+  were wrong by the ratio of the two sizes, and `group_gap` counted in the page's staff spaces. It now uses the
+  staff space of its own staves. Such a part changes at its next rebuild.
+
 ## 0.8.88 — 2026-11-17
 
 ### Changed

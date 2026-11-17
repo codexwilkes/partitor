@@ -190,9 +190,12 @@ def group_strip(res: PageResult, sys_staves: list[int], runs: list[tuple[str, li
     line and the next staff's top line, in staff spaces, instead of the
     source distance (operator request 2026-10-27: the white between the staves may
     shrink); the 0.5 sp ink guard stays. labels=False: a part on two staves
-    (no label column, not a group line)."""
-    sp = res.sp
+    (no label column, not a group line).
+    The staff space is that of the first staff of the line (as in make_strip: a
+    page can have staves of two sizes, 0.8.52; 0.8.89); a line that mixes two sizes
+    keeps this one value."""
     idx_all = [i for _, ix in runs for i in ix]
+    sp = res.staves[idx_all[0]].sp or res.sp
     pos = {st: k for k, st in enumerate(sys_staves)}
 
     def bars(st: Strip, off: int) -> Strip:

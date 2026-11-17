@@ -579,6 +579,44 @@ class TestMixedStaffSizes(unittest.TestCase):
             self.assertEqual(len(a.staves), len(b.staves))
             self.assertTrue((a.owner == b.owner).all())
 
+    @staticmethod
+    def organ_page(staff_sp):
+        """A page of staff space 20 with two staves (one part on two staves) of
+        staff space staff_sp (0: the page's own)."""
+        from partitor import model
+        sp, h, w = 20.0, 600, 1400
+        res = model.PageResult(0, (h, w), sp, 2, 0.0, 0.0, [], [], np.full((h, w), -1, np.int32))
+        kw = {"sp": staff_sp} if staff_sp else {}
+        for i, t0 in enumerate((100.0, 330.0)):
+            ls = [t0 + k * (staff_sp or sp) for k in range(5)]
+            for y in ls:
+                res.owner[int(y) - 1:int(y) + 1, 100:1300] = i
+            res.staves.append(model.Staff(0, i, ls, 100, 1300, system=0, thick=2, **kw))
+        res.systems = [list(res.staves)]
+        return res
+
+    def test_two_staff_part_of_another_size_keeps_its_staff_space_with_group_gap(self):
+        """0.8.89: with group_gap the stacked line took the page's staff space (20), not 26."""
+        res = self.organ_page(26.0)
+        runs = [("Organ", [0]), ("Organ", [1])]
+        a = pt.group_strip(res, [0, 1], runs, 100000, gap_sp=None, labels=False)
+        b = pt.group_strip(res, [0, 1], runs, 100000, gap_sp=5.0, labels=False)
+        self.assertEqual(a.sp, 26.0)
+        self.assertEqual(b.sp, 26.0)
+        self.assertEqual(b.staff_bottom - b.staff_top - 8 * 26, 5 * 26)     # the gap, in their staff space
+
+    def test_group_strip_one_size_is_unchanged(self):
+        import hashlib
+        res = self.organ_page(0)
+        runs = [("O", [0]), ("O", [1])]
+        got = []
+        for gap in (None, 5.0):
+            b = pt.group_strip(res, [0, 1], runs, 100000, gap_sp=gap, labels=False)
+            got.append((hashlib.md5(b.img.tobytes()).hexdigest(), b.img.shape, b.sp,
+                        b.staff_top, b.staff_bottom))
+        self.assertEqual(got, [("46753b6d6e57868da1b6a285fec24eb9", (312, 1200), 20.0, 1, 311),
+                               ("7c409eebc5d71eca3dfc1208efdafa67", (262, 1200), 20.0, 1, 261)])    # as 0.8.88
+
 
 @needs_deps
 class TestHeaderTitles(unittest.TestCase):

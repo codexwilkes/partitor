@@ -523,7 +523,9 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
       members.
     - Staff distance: key `group_gap` (staff spaces, bottom line to the next
       top line, 1-40, default `source`) stacks the staves of a group line, and
-      of a part on two staves, at that gap. The 0.5 sp ink guard and the
+      of a part on two staves, at that gap. The staff space is that of the
+      first staff of the line, also on a page with two staff sizes (0.8.89;
+      before, the page's). The 0.5 sp ink guard and the
       system gap rule (§5.3) stay. Per group or part:
       `set ID "Trombones:group_gap=5"`.
     - A group line prints only the staves of its parts that the source prints
