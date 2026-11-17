@@ -1463,6 +1463,52 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(data["pending"], ["gap", "title"])
         self.assertEqual(pt.item_status(data), "changes not built")
 
+    def flock_state(self, path):
+        """'free' or 'busy': whether a second file description can take the flock of a folder."""
+        import fcntl
+        fd = os.open(path, os.O_RDONLY)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return "free"
+        except BlockingIOError:
+            return "busy"
+        finally:
+            os.close(fd)
+
+    def test_new_holds_the_item_lock_while_it_works(self):
+        """0.8.93: `new` made the item and ran detect and build for minutes with no lock."""
+        make_score_pdf(str(self.share / "inbox" / "chorale.pdf"))
+        seen = []
+
+        def detect(item, *a, **k):
+            seen.append(self.flock_state(item))
+            return 1                                   # detect failed: new stops at once
+        old = os.environ.get("PARTITOR_LIBRARY")
+        os.environ["PARTITOR_LIBRARY"] = str(self.share)
+        try:
+            with mock_attr(build, "run_detect", detect), \
+                 mock_attr(builtins, "input", lambda *_: ""), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                pt._engine_step(pt.cmd_new, argparse.Namespace(n="1", jobs=None))
+        finally:
+            if old is None:
+                os.environ.pop("PARTITOR_LIBRARY", None)
+            else:
+                os.environ["PARTITOR_LIBRARY"] = old
+        self.assertEqual(seen, ["busy"])
+        item = next((self.share / "library").iterdir())
+        self.assertEqual(self.flock_state(item), "free")      # released when new ends
+
+    def test_the_item_lock_survives_the_rename_of_the_folder(self):
+        """`new` renames the folder (slug) while it holds the lock: the lock is on the folder itself."""
+        old = Path(self.tmp.name, "2026-11-0001-new")
+        old.mkdir()
+        with pt.item_lock(old):
+            final = Path(self.tmp.name, "2026-11-0001-schein-x")
+            os.replace(old, final)
+            self.assertEqual(self.flock_state(final), "busy")
+        self.assertEqual(self.flock_state(final), "free")
+
     def test_new_stopped_keeps_pdf_in_inbox(self):
         make_score_pdf(str(self.share / "inbox" / "chorale.pdf"))
         r = self.run_cli("new", stdin="1\nq\n")

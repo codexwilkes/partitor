@@ -1119,7 +1119,9 @@ Sections 5.1 to 5.8 keep their numbers.
   command is working on it` and changes nothing; `show` and `list` take no lock. Before, a `set`
   during a rebuild was saved, and the rebuild then marked it built (`pending` cleared) although
   the parts used the old value. The lock is on the folder itself (no lock file). A command that
-  calls another (`pages --move` runs `repage`) keeps the one lock. A file system without locks
+  calls another (`pages --move` runs `repage`) keeps the one lock. `new` (0.8.93) takes the lock as
+  soon as it has made the item folder and holds it to the end, over the rename to the final
+  folder name (the lock is on the folder itself). A file system without locks
   (some SMB mounts) gives no lock and no error.
 
 ### 6.2 Commands

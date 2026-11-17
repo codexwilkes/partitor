@@ -7,6 +7,13 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.93 — 2026-11-17
+
+### Fixed
+- `new` made the item and then ran detect and build for minutes with no lock on it, so a second command on the new id
+  (a `set`, a `rebuild`) was not stopped. `new` now holds the item lock from the moment the folder exists to the end;
+  a second command stops at once with "item ID is in use".
+
 ## 0.8.92 — 2026-11-17
 
 ### Changed

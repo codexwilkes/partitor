@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import re
 import shutil
@@ -89,78 +90,85 @@ def cmd_new(a: argparse.Namespace) -> int:
     iid = next_id(lib, now.tm_year, now.tm_mon)
     item = lib / f"{iid}-new"
     item.mkdir()                                  # fails if it exists
-    os.replace(src, item / f"{iid}-source.pdf")   # same share: atomic move
-    keep = {"id": iid, "slug": "new", "created": time.strftime("%Y-%m-%d")}
-    save_item(item, {**keep, "source": src.name})
-    print(f"\n  {GRN}✔{RST}  item:  {item.name}  (moved {src.name} here)")
-    rc = run_detect(item, rng, "", "", jobs=jobs)
-    detected = load_item(item) if item_file(item, SCORE_FILE).is_file() else {}
-    if rc or "systems" not in detected:
-        _reset_counts()
-        if (item / "preview").is_dir():
-            proof_from_preview(item)       # the proof shows what failed (gate in red)
-        _fail(f"detect:  failed for {item.name}")
-        _note(f"Item kept. Retry: partitor rebuild {iid}")
-        return _summary(start)
-    # title and composer: the score's own text first, then PDF metadata
-    t_sug = detected.get("title") or title0
-    c_sug = detected.get("composer") or comp0
-    short = ""
+    # 0.8.93: a second command on the new id stops while detect and build run. The lock is on
+    # the folder itself, so the rename to the final name below keeps it.
+    lock = contextlib.ExitStack()
+    lock.enter_context(item_lock(item))
     try:
-        _head("Title and composer (Enter accepts)")
-        title = ask("title", t_sug)
-        composer = ask("composer, full name (page 1)", c_sug)
-        short = ask("composer, short (interior pages)", composer_surname(composer))
-    except Abort:
-        title, composer = t_sug, c_sug
-        _warn("new:  stopped; title and composer kept as suggested")
-    slug = make_slug(composer, title)
-    final = lib / f"{iid}-{slug}"
-    os.replace(item, final)
-    item = final
-    keep.update(slug=slug, title=title, composer=composer)
-    if short and short != composer_surname(composer):
-        keep["composer_short"] = short
-    data = merge_item_keys(item, keep)
-    proof_from_preview(item)
-    try:
-        new = rename_parts(item)
-        if new:
-            _note(f"{len(new)} names for {len(data.get('parts') or [])} parts: detecting again")
-            if run_detect(item, rng, title, composer, ",".join(new), jobs=jobs):
-                _die("detect failed", f"partitor rebuild {iid}")
-            merge_item_keys(item, keep)
-            proof_from_preview(item)
-        choose_maps(item)
-        confirm_bar_rules(item)
-        confirm_ambitus(item)
-        # review, then build now or later (groups, settings first)
-        _reset_counts()
-        _head(f"Review: {item.name}")
-        for line in review_lines(item, load_item(item))[1:]:
-            print(line)
-        go = yes("Build now? (n: edit first — groups, settings — then menu r)", True)
-    except Abort:
-        _reset_counts()
-        _warn(f"new:  stopped; item {iid} kept (status: {item_status(load_item(item))})")
-        _note(f"Continue: partitor rebuild {iid}")
+        os.replace(src, item / f"{iid}-source.pdf")   # same share: atomic move
+        keep = {"id": iid, "slug": "new", "created": time.strftime("%Y-%m-%d")}
+        save_item(item, {**keep, "source": src.name})
+        print(f"\n  {GRN}✔{RST}  item:  {item.name}  (moved {src.name} here)")
+        rc = run_detect(item, rng, "", "", jobs=jobs)
+        detected = load_item(item) if item_file(item, SCORE_FILE).is_file() else {}
+        if rc or "systems" not in detected:
+            _reset_counts()
+            if (item / "preview").is_dir():
+                proof_from_preview(item)       # the proof shows what failed (gate in red)
+            _fail(f"detect:  failed for {item.name}")
+            _note(f"Item kept. Retry: partitor rebuild {iid}")
+            return _summary(start)
+        # title and composer: the score's own text first, then PDF metadata
+        t_sug = detected.get("title") or title0
+        c_sug = detected.get("composer") or comp0
+        short = ""
+        try:
+            _head("Title and composer (Enter accepts)")
+            title = ask("title", t_sug)
+            composer = ask("composer, full name (page 1)", c_sug)
+            short = ask("composer, short (interior pages)", composer_surname(composer))
+        except Abort:
+            title, composer = t_sug, c_sug
+            _warn("new:  stopped; title and composer kept as suggested")
+        slug = make_slug(composer, title)
+        final = lib / f"{iid}-{slug}"
+        os.replace(item, final)
+        item = final
+        keep.update(slug=slug, title=title, composer=composer)
+        if short and short != composer_surname(composer):
+            keep["composer_short"] = short
+        data = merge_item_keys(item, keep)
+        proof_from_preview(item)
+        try:
+            new = rename_parts(item)
+            if new:
+                _note(f"{len(new)} names for {len(data.get('parts') or [])} parts: detecting again")
+                if run_detect(item, rng, title, composer, ",".join(new), jobs=jobs):
+                    _die("detect failed", f"partitor rebuild {iid}")
+                merge_item_keys(item, keep)
+                proof_from_preview(item)
+            choose_maps(item)
+            confirm_bar_rules(item)
+            confirm_ambitus(item)
+            # review, then build now or later (groups, settings first)
+            _reset_counts()
+            _head(f"Review: {item.name}")
+            for line in review_lines(item, load_item(item))[1:]:
+                print(line)
+            go = yes("Build now? (n: edit first — groups, settings — then menu r)", True)
+        except Abort:
+            _reset_counts()
+            _warn(f"new:  stopped; item {iid} kept (status: {item_status(load_item(item))})")
+            _note(f"Continue: partitor rebuild {iid}")
+            return _summary(start)
+        if not go:
+            _ok(f"saved:  {item.name} ({item_status(load_item(item))})")
+            _note(f"Edit in the menu (g groups, s set, m title/composer), then r to build; "
+                  f"or: partitor groups {iid}; partitor rebuild {iid}")
+            return _summary(start)
+        rc = build.run_build(item, jobs=jobs)
+        _reset_counts(keep_warnings=True)               # the build's warnings stay in the last verdict
+        _head(f"Result: {item.name}")
+        if rc:
+            _fail(f"build:  failed (see above); item kept. Retry: partitor rebuild {iid}")
+        else:
+            _ok(f"built:  {item_line(item, load_item(item))}")
+            build_report(item)
+            maybe_offer_reflow(item)
+            _note(f"Parts: {item / 'parts'}   Proof: {item_file(item, 'proof.pdf')}")
         return _summary(start)
-    if not go:
-        _ok(f"saved:  {item.name} ({item_status(load_item(item))})")
-        _note(f"Edit in the menu (g groups, s set, m title/composer), then r to build; "
-              f"or: partitor groups {iid}; partitor rebuild {iid}")
-        return _summary(start)
-    rc = build.run_build(item, jobs=jobs)
-    _reset_counts(keep_warnings=True)               # the build's warnings stay in the last verdict
-    _head(f"Result: {item.name}")
-    if rc:
-        _fail(f"build:  failed (see above); item kept. Retry: partitor rebuild {iid}")
-    else:
-        _ok(f"built:  {item_line(item, load_item(item))}")
-        build_report(item)
-        maybe_offer_reflow(item)
-        _note(f"Parts: {item / 'parts'}   Proof: {item_file(item, 'proof.pdf')}")
-    return _summary(start)
+    finally:
+        lock.close()
 
 
 def item_matches(item: Path, words: str, data: dict | None = None) -> bool:
