@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.88 — 2026-11-17
+
+### Changed
+- Faster build: the search for the clef and key signature of each line ran again from the start for the rest lines,
+  the source lines and the re-flow of one part, on the same lines. One part now keeps the work of its lines over
+  these searches. The parts are the same. Sample score, warm, one worker: 52.7 s before, 32.2 s after (the search:
+  24.2 s before, 6.9 s after); 3 workers: rendering 21-26 s before, 13 s after.
+
 ## 0.8.87 — 2026-11-17
 
 ### Changed

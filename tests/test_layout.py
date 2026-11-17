@@ -327,6 +327,60 @@ class TestReflow(unittest.TestCase):
                 pt.find_prefixes(self._six_lines())
         self.assertEqual(reflow._BAND_MEMO, {})
 
+    def test_prefix_session_makes_each_band_once(self):
+        """0.8.88: each call of find_prefixes made every band again, also for the same lines."""
+        from dataclasses import replace as dc_replace
+        reflow = sys.modules["partitor.reflow"]
+        ls = self._six_lines()
+        seen = []
+        real = reflow._band_now
+
+        def count(s):
+            seen.append(id(s))
+            return real(s)
+        with mock_attr(reflow, "_band_now", count), reflow.prefix_session():
+            pt.find_prefixes(ls)
+            n = len(seen)
+            pt.find_prefixes([dc_replace(x) for x in ls])    # new Strip objects, same images
+            pt.find_prefixes(ls)
+        self.assertEqual(len(seen), n)                       # no band made again
+        self.assertEqual(len(seen), len(set(seen)))          # one band for each line
+        self.assertEqual(reflow._BAND_MEMO, {})              # the session ends empty
+
+    def test_prefix_session_result_is_the_same(self):
+        reflow = sys.modules["partitor.reflow"]
+        for ls in (self._six_lines(), self.lines()):
+            plain = pt.find_prefixes(ls)
+            with reflow.prefix_session():
+                first = pt.find_prefixes(ls)
+                again = pt.find_prefixes(ls)
+            self.assertEqual(list(first), list(plain))
+            self.assertEqual(list(again), list(plain))
+            self.assertEqual(again.borrowed, plain.borrowed)
+            self.assertEqual(first.borrowed, plain.borrowed)
+
+    def test_prefix_session_sees_a_changed_line(self):
+        from dataclasses import replace as dc_replace
+        reflow = sys.modules["partitor.reflow"]
+        ls = self._six_lines()
+        seen = []
+        real = reflow._band_now
+
+        def count(s):
+            seen.append(id(s.img))
+            return real(s)
+        with mock_attr(reflow, "_band_now", count), reflow.prefix_session():
+            pt.find_prefixes(ls)
+            n = len(seen)
+            other = ls[2].img.copy()
+            other[60:70, 100:104] = ~other[60:70, 100:104]       # another picture, same place
+            ls2 = list(ls)
+            ls2[2] = dc_replace(ls[2], img=other)
+            pre2 = pt.find_prefixes(ls2)
+        self.assertGreater(len(seen), n)                     # the changed line is read again
+        self.assertIn(id(other), seen[n:])
+        self.assertEqual(list(pre2), list(reflow._find_prefixes(ls2)))   # as with no memo at all
+
     def test_band_ignores_skewed_staff_lines_and_system_barline(self):
         s = flow_line([], [198])
         s.img[40:81, 0:2] = True                      # system barline at the start

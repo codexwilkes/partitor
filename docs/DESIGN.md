@@ -207,6 +207,11 @@ notehead, slur or word goes whole to one owner.
      band of a line (staff lines removed) is made once per line during one
      search, not once per pair (about 15 times per line before). Same result,
      about half the time.
+     Session (0.8.88): the build runs the searches of one part (rest lines, source
+     lines, re-flow) in one `reflow.prefix_session`. The bands and the
+     comparison of each pair of lines are kept over these calls; a line is the
+     same line when its image arrays, staff rows, staff x and size are the same.
+     Outside a session each search starts and ends empty. Same result.
    - Lines that cannot be cut safely stay whole: no prefix, not ending at a
      barline, one-line movements, multi-bar rests. A line ends at a barline
      when the last barline found lies within 2.5 sp of the staff end (0.8.2;

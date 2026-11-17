@@ -15,7 +15,7 @@ import numpy as np
 import pymupdf
 import yaml
 
-from . import VERSION, analysis, config, lines, parallel, stagecache, vision
+from . import VERSION, analysis, config, lines, parallel, reflow, stagecache, vision
 from .analysis import (
     check_page, iter_pages, parse_joins, parse_pages, preview_page, write_preview_index,
 )
@@ -837,7 +837,8 @@ def cmd_build(a: argparse.Namespace) -> int:
 
     def render_task(i: int) -> dict:
         _, name_, strips_, num_, extra_, group_ = emits[i]
-        return emit(name_, strips_, num_, extra_, group=group_)
+        with reflow.prefix_session():          # one part: its lines are compared once
+            return emit(name_, strips_, num_, extra_, group=group_)
 
     results = parallel.fork_map(render_task, range(len(emits)), rjobs)
     try:

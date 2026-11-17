@@ -3,6 +3,7 @@
 """Re-flow of strips: move ink from one system into the previous one."""
 from __future__ import annotations
 
+import contextlib
 import itertools
 from dataclasses import replace as dc_replace
 
@@ -36,21 +37,44 @@ def _single(s: Strip) -> bool:
 
 
 # find_prefixes compares each line with its neighbours many times; while it runs, the band of a
-# line is made once (0.8.34). id(strip) -> (strip, band); the strip is kept, so no id is reused.
+# line is made once (0.8.34). The key is every input of _band_now (_line_key); the image arrays are
+# kept in "keep", so no id is reused. Inside prefix_session (0.8.88) the memo, and the memo of
+# _diverge, live over several find_prefixes calls for one part.
 _BAND_MEMO: dict = {}
 
 
+def _line_key(s: Strip) -> tuple:
+    """The inputs of _band_now and _aligned_bands for one line; the arrays are kept."""
+    _BAND_MEMO.setdefault("keep", {})[id(s.img), id(s.hdr)] = (s.img, s.hdr)
+    return (id(s.img), id(s.hdr), s.staff_top, s.staff_bottom, _x0(s), s.sp)
+
+
 def _band(s: Strip) -> np.ndarray:
-    """_band -> _band_now(s); inside find_prefixes, made once per strip (read-only array)."""
+    """_band -> _band_now(s); inside find_prefixes, made once per line (read-only array)."""
     if not _BAND_MEMO.get("on"):
         return _band_now(s)
-    hit = _BAND_MEMO.get(id(s))
-    if hit is not None and hit[0] is s:
-        return hit[1]
+    key = ("band", _line_key(s))
+    hit = _BAND_MEMO.get(key)
+    if hit is not None:
+        return hit
     out = _band_now(s)
     out.flags.writeable = False
-    _BAND_MEMO[id(s)] = (s, out)
+    _BAND_MEMO[key] = out
     return out
+
+
+@contextlib.contextmanager
+def prefix_session():
+    """Inside it, find_prefixes keeps the bands and the _diverge results of its lines for the
+    next call (a line is the same when its image arrays, staff rows, staff x and sp are the
+    same). Outside, each call starts empty and ends empty. Not nested."""
+    _BAND_MEMO.clear()
+    _BAND_MEMO["session"] = True
+    _BAND_MEMO["on"] = True
+    try:
+        yield
+    finally:
+        _BAND_MEMO.clear()
 
 
 def _band_now(s: Strip) -> np.ndarray:
@@ -120,6 +144,16 @@ def _aligned_bands(a: Strip, b: Strip, cap_px: float):
 
 
 def _diverge(a: Strip, b: Strip) -> float:
+    """_diverge -> _diverge_now(a, b); in a prefix_session a pair of lines is compared once."""
+    if not _BAND_MEMO.get("session"):
+        return _diverge_now(a, b)
+    key = ("div", _line_key(a), _line_key(b))
+    if key not in _BAND_MEMO:
+        _BAND_MEMO[key] = _diverge_now(a, b)
+    return _BAND_MEMO[key]
+
+
+def _diverge_now(a: Strip, b: Strip) -> float:
     """Distance (px, from the staff start) where the music of two lines of
     the same part stops being identical: clef and key signature are the
     same on every line, the first note is not."""
@@ -299,7 +333,9 @@ class _Prefixes(list):
 
 def find_prefixes(strips: list[Strip]) -> _Prefixes:
     """find_prefixes -> _find_prefixes(strips), with the band of each line made once
-    (_BAND_MEMO; the same result, 0.8.34)."""
+    (_BAND_MEMO; the same result, 0.8.34). In a prefix_session the memo is kept for the next call."""
+    if _BAND_MEMO.get("session"):
+        return _find_prefixes(strips)
     _BAND_MEMO.clear()
     _BAND_MEMO["on"] = True
     try:
