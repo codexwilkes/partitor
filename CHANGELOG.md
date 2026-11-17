@@ -7,6 +7,12 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.90 — 2026-11-17
+
+### Fixed
+- A logo file that is missing or not an image gave one warning for each part when the parts were rendered by
+  workers. It now gives one warning for the build.
+
 ## 0.8.89 — 2026-11-17
 
 ### Fixed

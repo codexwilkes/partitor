@@ -15,7 +15,7 @@ import numpy as np
 import pymupdf
 import yaml
 
-from . import VERSION, analysis, config, lines, parallel, reflow, stagecache, vision
+from . import VERSION, analysis, config, lines, parallel, reflow, render, stagecache, vision
 from .analysis import (
     check_page, iter_pages, parse_joins, parse_pages, preview_page, write_preview_index,
 )
@@ -807,6 +807,7 @@ def cmd_build(a: argparse.Namespace) -> int:
     # each when jobs > 1; the numbers NN are those of all parts, also when only
     # some are built)
     _font_warning()
+    render.logo_check(opts)      # one warning for the build, before the workers fork
     steps: list[tuple] = []
     for num, (part, strips) in enumerate(part_strips.items(), 1):
         if only and part not in only:

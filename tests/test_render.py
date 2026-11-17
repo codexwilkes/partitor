@@ -1801,6 +1801,41 @@ class TestLogoInLibrary(unittest.TestCase):
         else:
             os.environ["PARTITOR_LIBRARY"] = self.env_lib
 
+    def logo_warnings(self, jobs):
+        """Lines '⚠  logo:' of a build of 3 parts with a logo file that is not there."""
+        pdf = os.path.join(self.tmp.name, f"s{jobs}.pdf")
+        make_score_pdf(pdf, systems=1, staves=3, lyrics=False)
+        env = dict(os.environ, PARTITOR_ALLOW_ROOT="1", PARTITOR_JOBS=str(jobs),
+                   PARTITOR_LOGO=os.path.join(self.tmp.name, "nowhere.png"))
+        run = lambda *a: subprocess.run([sys.executable, SRC, *a], capture_output=True,
+                                        text=True, env=env)
+        r = run("detect", pdf, "--dpi", "300")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = run("build", pdf, "--large", "off")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        return [ln for ln in (r.stdout + r.stderr).splitlines() if "logo:" in ln and "⚠" in ln]
+
+    def test_missing_logo_warns_once_with_workers(self):
+        """0.8.90: each render worker warned for itself (3 parts, 3 jobs: 3 times, +1 in the summary)."""
+        got = self.logo_warnings(3)
+        self.assertEqual(len(got), 2, got)               # the warning and its copy in the summary
+
+    def test_missing_logo_warns_once_with_one_job(self):
+        got = self.logo_warnings(1)
+        self.assertEqual(len(got), 2, got)
+
+    def test_logo_check_warns_in_the_parent_only_when_pages_carry_a_logo(self):
+        os.environ["PARTITOR_LOGO"] = os.path.join(self.tmp.name, "nowhere.png")
+        for opts, want in (({}, 1), ({"logo": "off"}, 0)):
+            with self.subTest(opts=opts):
+                pt._LOGO_WARNED.clear()
+                before = len(pt._WARNINGS)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    render.logo_check(opts)
+                    render.logo_check(opts)                  # a second call: no second warning
+                self.assertEqual(len(pt._WARNINGS) - before, want)
+        pt._LOGO_WARNED.clear()
+
     def strips(self, n):
         return TestBatchExtras.strips(self, n)
 

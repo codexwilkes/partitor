@@ -736,18 +736,36 @@ def logo_width(h: float, opts: dict | None = None) -> float | None:
     return h * pix.width / pix.height
 
 
+def _logo_warn(path: Path | None, opts: dict | None) -> None:
+    """The warning for a logo that cannot be used: once per process (_LOGO_WARNED)."""
+    if not _LOGO_WARNED:
+        _LOGO_WARNED.append(True)
+        what = "not found" if path is None else "is not a readable image"
+        _warn(f"logo: {_logo_label(opts)} {what}: {_logo_setting(opts)} (pages are drawn without it)")
+
+
+def logo_check(opts: dict) -> None:
+    """logo_check -> the warning of put_logo, given now: build calls it in the parent
+    before the render workers are forked (0.8.90), so a missing or unreadable logo
+    gives one warning for the build, not one for each worker. Nothing when pages
+    carry no logo."""
+    if not logo_wanted(opts):
+        return
+    path = logo_path(opts)
+    if path is None or logo_width(1.0, opts) is None:
+        _logo_warn(path, opts)
+
+
 def put_logo(page: pymupdf.Page, x: float, y: float, h: float, align: str = "left",
              opts: dict | None = None) -> float:
     """put_logo -> width of the logo drawn (0.0 when the file is missing or not
-    a readable image, with one warning per run). Top-left at (x, y), height h pt;
-    align "right" takes x as the right edge, "centre" as the centre line."""
+    a readable image, with one warning per run: see logo_check). Top-left at
+    (x, y), height h pt; align "right" takes x as the right edge, "centre" as
+    the centre line."""
     path = logo_path(opts)
     w = logo_width(h, opts) if path is not None else None
     if w is None:
-        if not _LOGO_WARNED:
-            _LOGO_WARNED.append(True)
-            what = "not found" if path is None else "is not a readable image"
-            _warn(f"logo: {_logo_label(opts)} {what}: {_logo_setting(opts)} (pages are drawn without it)")
+        _logo_warn(path, opts)
         return 0.0
     x0 = x - w if align == "right" else (x - w / 2 if align == "centre" else x)
     page.insert_image(pymupdf.Rect(x0, y, x0 + w, y + h), filename=str(path))
