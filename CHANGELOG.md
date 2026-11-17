@@ -7,6 +7,13 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.87 — 2026-11-17
+
+### Changed
+- Faster build with workers: the multi-bar rest lines of each part were made in the main process, one part after
+  the other, before the render workers started. Each render worker now makes those of its part. The parts are the same.
+  Sample score, 3 workers: rendering 31-32 s before, 21-26 s after. With one worker the steps took 21 s of 55 s.
+
 ## 0.8.86 — 2026-11-17
 
 ### Fixed

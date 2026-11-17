@@ -641,6 +641,10 @@ main process). `--jobs 1` runs in one process, page by page.
   builds in one process, so this holds across both steps.
 - **Failures.** A worker that raises, calls `_die` or is killed (out of
   memory) ends the run with its message; the other workers are stopped.
+- **Rest lines (0.8.87).** The multi-bar rest lines of a part or group
+  (`fill_rests`, `merge_rest_bars`, and for a part `coalesce_rest_lines`) are made
+  in the render worker of that part, not in the main process before the fork.
+  The parts are the same; the main process keeps the raw lines of each part.
 - `pieces` still analyses in one process.
 
 ---

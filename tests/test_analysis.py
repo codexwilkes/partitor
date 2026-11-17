@@ -38,6 +38,7 @@ from support import (  # noqa: E402,F401
     config,
     console,
     cv2,
+    lines,
     make_score_pdf,
     mock_attr,
     needs_deps,
@@ -921,6 +922,35 @@ class TestDetectParallel(unittest.TestCase):
             else:
                 os.environ["PARTITOR_JOBS"] = old
         self.assertEqual(self._pages_seen(log), [0, 1, 2, 3])
+
+    def test_rest_lines_are_made_in_the_render_worker(self):
+        # 0.8.87: fill_rests ran in the parent, one part after the other, before the fork
+        item = Path(self.tmp, "2026-10-0003-c-t")
+        item.mkdir()
+        shutil.copy(self.pdf, item / "2026-10-0003-source.pdf")
+        pt.save_item(item, {"id": "2026-10-0003", "slug": "c-t", "created": "2026-10-30"})
+        log = os.path.join(self.tmp, "rests.log")
+        real = lines.fill_rests
+
+        def spy(items, opts):
+            with open(log, "a") as f:
+                f.write(f"{os.getpid()}\n")
+            return real(items, opts)
+        old = os.environ.get("PARTITOR_JOBS")
+        os.environ["PARTITOR_JOBS"] = "2"
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(pt.run_detect(item, None, "T", "C D"), 0)
+                with mock_attr(lines, "fill_rests", spy):
+                    self.assertEqual(build.run_build(item), 0)
+        finally:
+            if old is None:
+                os.environ.pop("PARTITOR_JOBS", None)
+            else:
+                os.environ["PARTITOR_JOBS"] = old
+        pids = Path(log).read_text().split()
+        self.assertTrue(pids)
+        self.assertNotIn(str(os.getpid()), pids)
 
     def test_detect_then_build_in_one_process(self):
         # `new`: detect, then (after the prompts) build, in one process

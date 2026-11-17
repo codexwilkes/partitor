@@ -15,7 +15,7 @@ import numpy as np
 import pymupdf
 import yaml
 
-from . import VERSION, analysis, config, parallel, stagecache, vision
+from . import VERSION, analysis, config, lines, parallel, stagecache, vision
 from .analysis import (
     check_page, iter_pages, parse_joins, parse_pages, preview_page, write_preview_index,
 )
@@ -38,7 +38,7 @@ from .library import (
     piece_tag, recover_parts, save_item, score_name, set_pins, swap_parts,
 )
 from .lines import (
-    coalesce_rest_lines, count_bad_turns, fill_rests, finish_lines, label_column, lines_path, merge_rest_bars, save_lines, turn_where,
+    coalesce_rest_lines, count_bad_turns, finish_lines, label_column, lines_path, merge_rest_bars, save_lines, turn_where,
 )
 from .partplan import read_source
 from .mapping import assign_maps
@@ -670,17 +670,8 @@ def cmd_build(a: argparse.Namespace) -> int:
     if _counts["fail"]:
         return _summary(start)
 
-    part_strips = {p: coalesce_rest_lines(merge_rest_bars(fill_rests(v, own_opts(p)), own_opts(p)),
-                                          own_opts(p))
-                   for p, v in part_strips.items()}
-    group_strips = {g: merge_rest_bars(fill_rests(v, own_opts(g)), own_opts(g))
-                    for g, v in group_strips.items()}
-    for v in group_strips.values():
-        for s_ in v:
-            if s_.rest_src is not None:
-                s_.bracket = True      # a group's rest line keeps the system bracket
-                                       # (operator request 2026-10-25: it had none)
-
+    # part_strips / group_strips keep the raw items (Strip | RestRun); the rest
+    # lines are made in emit, in the render worker of the part
     _head("Parts")
     parts_dir = Path(getattr(a, "parts_dir", None) or out / "parts")   # library: parts.new
     parts_dir.mkdir(exist_ok=True)
@@ -699,8 +690,8 @@ def cmd_build(a: argparse.Namespace) -> int:
     amb_all = {**amb_data, SKIP_KEY: [], "ambitus": dict(amb_data.get("ambitus") or {})}
     refresh_ambitus(amb_all)
 
-    def emit(name: str, strips: list[Strip], num: int, extra: dict, opts: dict = opts
-             ) -> dict:
+    def emit(name: str, strips: list, num: int, extra: dict, opts: dict = opts,
+             group: bool = False) -> dict:
         # -> the record of the part for `built` (a worker returns it to the
         # parent; LAST_BUILD is filled there, in part order)
         # per-part layout (layout.parts) over the item layout; command-line
@@ -710,6 +701,15 @@ def cmd_build(a: argparse.Namespace) -> int:
         if own:
             opts = own_opts(name)
             _note(f"{name}: own layout " + " ".join(f"{k}={v}" for k, v in own.items()))
+        # the multi-bar rest lines (they print nothing; find_prefixes is the cost)
+        strips = merge_rest_bars(lines.fill_rests(strips, opts), opts)
+        if group:
+            for s_ in strips:
+                if s_.rest_src is not None:
+                    s_.bracket = True  # a group's rest line keeps the system bracket
+                                       # (operator request 2026-10-25: it had none)
+        else:
+            strips = coalesce_rest_lines(strips, opts)
         plan_src = None
         if lines_dir is not None:             # the lines as the plan command needs them (before re-flow)
             try:
@@ -813,29 +813,31 @@ def cmd_build(a: argparse.Namespace) -> int:
             continue
         if part in skip:
             steps.append(("skip", f"part:  {part}  (not extracted)"))
-        elif not strips:
+        elif not any(isinstance(x, Strip) for x in strips):
             steps.append(("warn", f"part:  {part}  (no staves mapped)"))
         else:
-            steps.append(("emit", part, strips, num, {"ambitus": ambitus_for(amb_data, part)}))
+            steps.append(("emit", part, strips, num, {"ambitus": ambitus_for(amb_data, part)},
+                          False))
     for gi, (gname, strips) in enumerate(group_strips.items(), len(part_strips) + 1):
         if only and gname not in only:
             continue
-        if not strips:
+        if not any(isinstance(x, Strip) for x in strips):
             steps.append(("warn", f"group:  {gname}  (none of its parts is mapped)"))
         else:
             steps.append(("emit", gname, strips, gi,
                           {"members": " · ".join(groups[gname]),
                            "ambitus_map": {p_: ambitus_for(amb_all, p_) for p_ in groups[gname]},
                            "short_map": {p_: plays[p_]["short"] for p_ in groups[gname]
-                                         if (plays.get(p_) or {}).get("short")}}))
+                                         if (plays.get(p_) or {}).get("short")}},
+                          True))
     emits = [st_ for st_ in steps if st_[0] == "emit"]
     rjobs = job_count(getattr(a, "jobs", None), RENDER_WORKER_GB, len(emits))
     if rjobs > 1:
         _note(f"rendering {len(emits)} part(s) with {rjobs} worker(s)")
 
     def render_task(i: int) -> dict:
-        _, name_, strips_, num_, extra_ = emits[i]
-        return emit(name_, strips_, num_, extra_)
+        _, name_, strips_, num_, extra_, group_ = emits[i]
+        return emit(name_, strips_, num_, extra_, group=group_)
 
     results = parallel.fork_map(render_task, range(len(emits)), rjobs)
     try:
