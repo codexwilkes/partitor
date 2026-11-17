@@ -230,7 +230,7 @@ def gaps_fit(gaps, sp: float, up: float) -> bool:
     of the page: up to `up` x sp above sp and up to LOW_GAP x sp below it.
     The bounds are not equal on purpose. A staff 1.3 x larger than the page
     size (an organ realization) has to stay outside, so that it is read as a
-    second size (analyse_page_mixed); a smaller staff (Riccio Canzon: 17.5 px
+    second size (analyse_page_mixed); a smaller staff (score E: 17.5 px
     on a page of 23) has to be found, and the centres of its lines are
     measured to about 1 px, so its first gap stood 0.1 px outside the old
     bound (0.8.57, 0.8.60)."""
@@ -238,7 +238,7 @@ def gaps_fit(gaps, sp: float, up: float) -> bool:
     low = sp - LOW_GAP * sp
     # the lower bound holds for the mean gap; a single gap may stand
     # LOW_SINGLE below it (a bowed line near the page edge: 14.5 px against
-    # 14.95, Riccio Canzon La Savoldi p4, 0.8.65)
+    # 14.95, score E p4, 0.8.65)
     return bool(np.all(g < sp + up * sp) and np.all(g > low - LOW_SINGLE * sp)
                 and g.mean() > low)
 
@@ -405,7 +405,7 @@ def group_systems(ink: np.ndarray, staves: list[Staff], sp: float, thick: int
     for a, b in zip(staves, staves[1:]):
         frac = gap_column_fraction(ink, a, b, thick)
         # the starts as found count too: extend_starts may have moved a start
-        # left over the connector (Biber p17: staves start at x 404, the system
+        # left over the connector (score A p17: staves start at x 404, the system
         # barline stands there, the start moved to 346)
         xs = [x for s_ in (a, b) for x in (s_.x0, s_.x0_found) if x >= 0]
         zx0 = max(0, min(xs) - int(3 * sp))
@@ -427,7 +427,7 @@ def group_systems(ink: np.ndarray, staves: list[Staff], sp: float, thick: int
         lim = 1.2 * float(np.median(known))
         # ... but not a gap with no connecting ink at all at the system
         # start when other gaps on the page have a bracket or barline: the
-        # bracket shows where a system ends (operator request 2026-10-25; Biber p53:
+        # bracket shows where a system ends (operator request 2026-10-25; score A p53:
         # four small systems joined into one of 18 staves). Broken scan
         # barlines leave some ink (0.15 or more).
         n_bar = sum(1 for zm in zone_max if zm >= 0.5)
@@ -437,9 +437,9 @@ def group_systems(ink: np.ndarray, staves: list[Staff], sp: float, thick: int
         # all that equals (within 3%) a neighbouring gap the rules above
         # joined, and that has no ink at the system start either, stays
         # joined (a neighbour with a bracket or barline makes the blank gap a
-        # real break: Biber p38, systems of 4 and 3 staves). A blank system start (the connector missing on
+        # real break: score A p38, systems of 4 and 3 staves). A blank system start (the connector missing on
         # some pages, or measured left of it after extend_starts) must not cut
-        # seven equal gaps at the one place (Biber p5: 4 + 13 staves instead
+        # seven equal gaps at the one place (score A p5: 4 + 13 staves instead
         # of 17). A real cut between systems is wider than the gaps in them.
         for _ in range(len(joined)):
             more = False
@@ -479,10 +479,10 @@ def _join_by_rhythm(groups: list[list[Staff]], gaps_all: list[float],
     staves as the full systems of the page (the size 2 or more groups have,
     the largest such size), both are smaller, they start at one x, and the
     gap between them is no wider than the widest gap a connector proves to
-    be inside a system. Riccio La Pichi p1: the first system has no
+    be inside a system. score E p1: the first system has no
     connector between its instrument staves and its organ staves (2 + 2),
     the others have (4 + 4 + 4); the gap is 131 px against 150 connected and
-    193 between systems (0.8.53). Biber p38 (two systems of two staves, one
+    193 between systems (0.8.53). score A p38 (two systems of two staves, one
     size only) stays cut."""
     from collections import Counter
     sizes = Counter(len(g) for g in groups)
@@ -610,7 +610,7 @@ def text_in_rect(page: pymupdf.Page, rect_px: tuple[int, int, int, int],
 def looks_like_text(widths: list[int], height: float) -> bool:
     """A text line is several glyphs (3+ components), none much wider than
     the line is high (4x); a scan's page edge or a rule is one long
-    stroke (Maria p2: one component 1465 x 21 px read as a title)."""
+    stroke (score C p2: one component 1465 x 21 px read as a title)."""
     return len(widths) >= 3 and max(widths) <= 4 * height
 
 

@@ -296,7 +296,7 @@ notehead, slur or word goes whole to one owner.
    A part whose staves in a system show no notehead and no stem is a rest
    too (`rests=compress`). A stemless note (a breve or whole note) counts as a
    note even without a ledger line, under or over the staff (0.8.50; the last
-   bars of the Grillo Sonata Bassus were lost as a rest before): the system
+   bars of the score D Bassus were lost as a rest before): the system
    stays as engraved and the build warns "ink that is not a rest".
    Bars of rests inside a line that is printed (0.8.11, `merge_rest_bars` in
    `lines`, before re-flow): a run of 2 or more bars is one measure when every
@@ -342,7 +342,7 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
    - Ruled lines that no accepted staff explains (rows with a line across 35%
      of the page, 4 or more within 3 sp of one another, outside every staff) are
      `_fail`: a staff of another size than the page's, such as an organ
-     realization printed larger (Riccio Canzon, 0.8.51), was never found and
+     realization printed larger (score E, 0.8.51), was never found and
      its ink went to the nearest staff. `proof.pdf` marks it in red. Before
      the failure, `analyse_page_mixed` (0.8.52) tries the page as two pages:
      the staves of the page's size with the bands of the other size blanked,
@@ -417,7 +417,7 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
      than two bracket-joined gaps; and then it is cut only when no neighbouring
      gap of the same size (within 3%) is joined without ink at the system start
      either; the connector is looked for at the start of the staves as found and
-     at the start after `extend_starts` (`Staff.x0_found`, 0.8.23: Biber p17)
+     at the start after `extend_starts` (`Staff.x0_found`, 0.8.23: score A p17)
      (0.8.22: seven equal gaps on a page without a start connector are one
      system; a neighbour with a bracket makes the blank gap a real break).
      The operator can join two systems the analysis took apart:
@@ -1369,7 +1369,9 @@ lists what a run would change (exit 0).
   run; only a missing third-party package skips the engine tests.
 - Corpus tests run the engine on real scores and compare staff, system and bar
   counts. They need your own PDFs and skip per missing file (`TestCorpus.need()`
-  in `tests/test_analysis.py`; the file list is the `CORPUS` table there).
+  in `tests/test_analysis.py`; the file list is the `CORPUS` table there). Comments and tests that
+  refer to such a score call it `score A`, `score B`, ... (0.8.94); the key stays with the
+  author, outside the repository.
 - `tools/test-parallel.py` is the local runner of the full suite: the same discovery as CI,
   split by test class over 4 processes (`--jobs N`), balanced by `tools/test-weights.txt`.
   It fails when a test fails, a process dies, a test file does not import, or the number of tests
@@ -1531,7 +1533,7 @@ This map comes from function names and headings. Check it when a module exists.
 - **`global`.** `global NAME` is allowed only for a name that the same module assigns
   or defines at top level. For a name of another module write `owner.NAME = value`.
 - **Size.** At most 1 100 definition lines per module. One module is exempt
-  (`ownership`: `analyse_page` is one function of 833 lines).
+  (`ownership`: `analyse_page` is one function of 832 lines).
 - **Pickles.** Saved `.lines` files hold class paths. Files of 0.4.2 say `__main__.Strip`;
   files written since 0.5.0-dev.2 say `partitor.model.Strip`. The reader (`_LinesUnpickler`, in `lines`)
   accepts `__main__`, `partitor`, `pt` and every `partitor.*` path for `Strip` and `RestRun`

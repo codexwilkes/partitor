@@ -40,7 +40,7 @@ def label_match(label: str, name: str) -> float:
     if not lt or not nt:
         return 0.0
     # continuo names are one part: Continuo, Basso continuo, Organo, B.C.
-    # (Biber: "Continuo" on later systems, "Organo BC" on page 1)
+    # (score A: "Continuo" on later systems, "Organo BC" on page 1)
     if CONTINUO_RE.search(label) and CONTINUO_RE.search(name):
         return 1.0
     ln = {_NUMERALS[x] for x in lt if x in _NUMERALS}
@@ -94,7 +94,7 @@ def build_reference(sysrecs: list[dict], parts: list[str]) -> tuple[list[str], l
     unlabeled staff in the same brace as a labeled one takes that name
     (a two-staff part); else "Staff N"."""
     # the system with the most printed labels (page 1 names every part),
-    # then the most staves: a stray system with an extra staff (Biber p53,
+    # then the most staves: a stray system with an extra staff (score A p53,
     # small systems joined) no longer names the parts (0.3.0-dev.21)
     ref = max(sysrecs, key=lambda r: (sum(1 for x in r["labels"] if x.strip()),
                                       len(r["staves"]), -sysrecs.index(r)))
@@ -164,7 +164,7 @@ def map_system(rec: dict, slots: list[str], slot_clefs: list[str],
                 c += 0.0 if ok[k][j] else 2.0
             else:
                 # bottom alignment, capped: in a short system it outweighed
-                # the labels below (Biber p46: violins above "Vla I")
+                # the labels below (score A p46: violins above "Vla I")
                 c += 0.3 + min(0.9, 0.3 * abs((n - 1 - k) - (m - 1 - j)))
             ck, cj = rec["clefs"][k], slot_clefs[j]
             if not _clef_same(ck, cj):
@@ -177,7 +177,7 @@ def map_system(rec: dict, slots: list[str], slot_clefs: list[str],
                 if j in prev:           # the part goes on from the system before
                     c -= 0.4
         # braces: two staves in one brace (keyboard, continuo) map to two
-        # slots in one brace of the reference, and the reverse (Schein Nun
+        # slots in one brace of the reference, and the reverse (score B
         # p3.s1: misread clefs took the braced continuo for two trombones)
         rb = rec.get("braces") or []
         if slot_braces and len(rb) == n:
@@ -198,7 +198,7 @@ def map_system(rec: dict, slots: list[str], slot_clefs: list[str],
 
 def _clef_same(x: str, y: str) -> bool:
     """Same clef for the mapping: '?' is any; G2 and G8 are one (the 8 is
-    often missed; Maria p3.s1 G2 after G8 asked again)."""
+    often missed; score C p3.s1 G2 after G8 asked again)."""
     g = {"G2", "G8"}
     return x == "?" or y == "?" or x == y or (x in g and y in g)
 
@@ -248,7 +248,7 @@ def assign_maps(sysrecs: list[dict], parts: list[str]) -> tuple[list[str], list[
                 certain = (n == len(slots)) or (second - best >= 1.0) or \
                           (all_match and second - best >= 0.25)
                 # the same parts as the certain system before (one clef
-                # misread breaks "same as previous"; Schein Nun p3, p6-p7)
+                # misread breaks "same as previous"; score B p3, p6-p7)
                 goes_on = (not certain and prev_certain and prev is not None
                            and idx == list(prev) and second - best >= 0.3)
                 if certain or goes_on:

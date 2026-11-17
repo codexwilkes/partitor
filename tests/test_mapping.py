@@ -101,7 +101,7 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(pt.clean_label("[BASSO] TROMBONE"), "BASSO TROMBONE")
 
     def test_clean_label_bracketed_numeral_and_debris(self):
-        # Riccio Canzon: "[I] [II] [III]" label the three instrument staves
+        # score E: "[I] [II] [III]" label the three instrument staves
         self.assertEqual(pt.clean_label("[I]"), "[I]")
         self.assertEqual(pt.clean_label("[1]"), "[I]")
         self.assertEqual(pt.clean_label("[11]"), "[II]")
@@ -215,7 +215,7 @@ class TestMapping(unittest.TestCase):
         self.assertGreaterEqual(pt.label_match("Cornet", "Cornetto"), 0.7)
 
     def test_part_goes_on_when_staff_count_changes(self):
-        # Schein Nun p6: Canto, Alto, continuo (2 braced) -> 3 staves without
+        # score B p6: Canto, Alto, continuo (2 braced) -> 3 staves without
         # labels; the top one is the Alto, not the Bass (bottom alignment)
         parts = ["Canto I", "Canto II", "Alto I", "Alto II", "Tenor", "Bass", "Org", "Cont"]
         full = self.rec("p1.s1", parts, ["G2", "G2", "G2", "C3", "C4", "F4", "G2", "F4"],

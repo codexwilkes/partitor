@@ -537,7 +537,7 @@ class TestMixedStaffSizes(unittest.TestCase):
         self.assertTrue(all(st.system == res.staves[0].system for st in res.staves))
 
     def test_larger_staff_inside_the_gap_bound_is_a_second_size(self):
-        """Riccio Canzon La Finetta p2: one organ staff, 1.2 to 1.26 x larger, passed the staff test at
+        """score E p2: one organ staff, 1.2 to 1.26 x larger, passed the staff test at
         the page size and was kept out of the bands; the other organ staves of the page were
         not merged and the page kept the gate failure (0.8.61)."""
         def big(page, tops):            # 1.2 x and 1.4 x larger: the first one passes the staff test
@@ -772,7 +772,7 @@ class TestRestsAndTitles(unittest.TestCase):
             self.assertNotIn(digits, text("03-Bass.pdf").split())
 
     def test_stemless_note_without_ledger_keeps_staff_as_engraved(self):
-        # Grillo Sonata p32 Bassus: whole notes (no stem) below the staff, no
+        # score D p32 Bassus: whole notes (no stem) below the staff, no
         # ledger line printed; the staff was compressed to a multi-bar rest
         def whole(page, tops):
             bot = tops[3 + 2] + 4 * SP              # Bass, system 2: bottom line
@@ -1645,7 +1645,7 @@ class TestMergeRestBars(unittest.TestCase):
         self.assertEqual(pt.rest_bar_runs(self.line(staves=3, hollow=(0, 1)), self.PRE), [(1, 2)])
 
     def test_breve_and_dotted_rests_are_merged(self):
-        # Grillo Sonata Bassus: a block filling a space, and dotted whole rests
+        # score D Bassus: a block filling a space, and dotted whole rests
         self.assertEqual(pt.rest_bar_runs(self.line(kind="breve"), self.PRE), [(0, 2)])
         self.assertEqual(pt.rest_bar_runs(self.line(dot="near"), self.PRE), [(0, 2)])
         self.assertEqual(pt.rest_bar_runs(self.line(staves=3, kind="breve", dot="near"), self.PRE),
@@ -1670,7 +1670,7 @@ class TestMergeRestBars(unittest.TestCase):
         return s
 
     def test_lines_of_rests_become_one_line(self):
-        # Grillo Sonata Bassus: lines "2", "2" and "4" are one line "8"
+        # score D Bassus: lines "2", "2" and "4" are one line "8"
         a, b, c = self.rest_line(71), self.rest_line(73), self.rest_line(75)
         self.assertEqual(a.rest_counts, [4])
         out = pt.coalesce_rest_lines([a, b, c], {"rests": "compress"})

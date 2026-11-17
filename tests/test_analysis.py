@@ -149,7 +149,7 @@ class TestStaffTracking(unittest.TestCase):
     def test_staff_one_third_larger_than_the_page_is_not_found(self):
         # gaps of 23-24 px on a page of sp 18: an organ-size staff. It stays
         # unseen so that the page is read as two sizes (0.8.57 let it in and
-        # Riccio Canzon p2 fell apart into systems of 3, 2 and 1 staves).
+        # score E p2 fell apart into systems of 3, 2 and 1 staves).
         img = np.zeros((900, 2000), bool)
         for y in (300, 323, 346, 370, 393):      # gaps 23, 23, 24, 23
             img[y - 2:y + 3, 300:1900] = True
@@ -163,7 +163,7 @@ class TestStaffTracking(unittest.TestCase):
         self.assertTrue(pt.gaps_fit([18, 18, 18, 23], 18.0, 0.3))
 
     def test_one_gap_a_little_under_the_bound_is_fit_when_the_mean_is_not(self):
-        # Riccio Canzon La Savoldi p4: gaps 16.5 16 18.5 14.5 on a page of 23 (bound 14.95)
+        # score E p4: gaps 16.5 16 18.5 14.5 on a page of 23 (bound 14.95)
         self.assertTrue(pt.gaps_fit([16.5, 16, 18.5, 14.5], 23.0, 0.3))
         self.assertFalse(pt.gaps_fit([16.5, 16, 18.5, 13.5], 23.0, 0.3))     # too far under
         self.assertFalse(pt.gaps_fit([14.5, 14.5, 14.5, 14.5], 23.0, 0.3))   # mean under the bound
@@ -210,7 +210,7 @@ class TestStaffTracking(unittest.TestCase):
         ink[int(st[i].bottom):int(st[i + 1].top) + 1, x:x + w] = True
 
     def test_group_systems_two_small_groups_make_a_full_system(self):
-        # Riccio La Pichi p1: the first system has no connector between its
+        # score E p1: the first system has no connector between its
         # 2 + 2 staves, the others have (4 + 4 + 4): the page shows the rhythm
         st = [pt.Staff(0, i, [t + k * 20 for k in range(5)], 100, 1800)
               for i, t in enumerate((100, 240, 440, 580, 1060, 1200, 1400, 1540, 2020, 2160, 2360, 2500))]
@@ -244,7 +244,7 @@ class TestStaffTracking(unittest.TestCase):
         self.assertEqual(analysis.parse_joins(None), {})
 
     def test_group_systems_blank_gap_between_blank_joined_gaps(self):
-        # Biber p5 after extend_starts: no ink at the system start in the
+        # score A p5 after extend_starts: no ink at the system start in the
         # gaps 0-1 and 3-4 (joined by two barlines inside the staves), a
         # bracket on the gaps 5-6, and the equal gap 2 blank: one system
         st = self._gap_staves(8)
@@ -257,7 +257,7 @@ class TestStaffTracking(unittest.TestCase):
         self.assertEqual([len(g) for g in pt.group_systems(ink, st, 24, 3)], [8])
 
     def test_group_systems_connector_where_the_start_was_found(self):
-        # Biber p17: the staves start at x 404 where the system barline
+        # score A p17: the staves start at x 404 where the system barline
         # stands; extend_starts moved the start 58 px left, out of the zone.
         # Staves 0-3 are one system (connector at the start as found), 4-6
         # another (bracket at the moved start).
@@ -280,7 +280,7 @@ class TestStaffTracking(unittest.TestCase):
         self.assertTrue(all(s.x0_found >= 0 and s.x0 <= s.x0_found for s in staves))
 
     def test_group_systems_blank_gap_next_to_bracket_stays_a_cut(self):
-        # Biber p38: the neighbours have a bracket, the blank gap between
+        # score A p38: the neighbours have a bracket, the blank gap between
         # them is a real break (two systems of two staves)
         st = self._gap_staves(4)
         ink = np.zeros((1000, 1900), bool)

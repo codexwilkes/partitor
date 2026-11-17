@@ -139,6 +139,27 @@ class TestNumbersInDocs(unittest.TestCase):
         self.assertEqual(len(hits), 1)          # PROOF_H = 1400; the resize uses the name
 
 
+class TestPublicRepoText(unittest.TestCase):
+    """The repository names no real score of the author's collection (0.8.94): a comment cites
+    one as `score A`, `score B`, ... The test looks for the form of such a citation, a capitalised
+    name and a page: `Name p12`."""
+
+    def test_no_named_score_pages(self):
+        pkg = os.path.join(ROOT, "lib", "partitor")
+        texts = {n: read("lib", "partitor", n) for n in os.listdir(pkg) if n.endswith(".py")}
+        texts["DESIGN.md"] = DESIGN
+        for n in os.listdir(os.path.join(ROOT, "tests")):
+            if n.endswith(".py") and n != "test_docs.py":
+                texts[n] = read("tests", n)
+        found = [f"{n}: {m.group(0)}" for n, t in texts.items()
+                 for m in re.finditer(r"\b[A-Z][a-z]+ p[0-9]+", t)]
+        self.assertEqual(found, [])
+
+    def test_gate_notes_is_not_written(self):
+        """ownership wrote `res.gate_notes`; nothing read it (removed in 0.8.94)."""
+        self.assertNotIn("gate_notes", ENGINE)
+
+
 class TestTestsSource(unittest.TestCase):
     def test_helper_reads_every_test_file_but_this_one(self):
         src = tests_source()

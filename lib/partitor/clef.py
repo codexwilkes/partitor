@@ -66,7 +66,7 @@ CLEF_CANDIDATES = [("G", 2), ("G", 1), ("C", 1), ("C", 2), ("C", 3), ("C", 4), (
                    ("F", 3), ("F", 4), ("F", 5)]
 _CLEF_TPL: dict = {}
 _TPL_DOC: dict = {}         # "doc" -> one kept PDF document: the music font is read once
-CLEF_MIN_NCC = 0.55         # Maria (scan): right reads 0.66-0.98
+CLEF_MIN_NCC = 0.55         # score C (scan): right reads 0.66-0.98
 CLEF_COMMON = {"G2", "G8", "C1", "C3", "C4", "F4"}
 CLEF_RARE_LEAD = 0.05       # a rare clef (G1, C2, C5, F3, F5) must lead the best common one
 CLEF_LAST: dict = {}        # idx -> (label, score, margin) of the last page (diagnosis)
@@ -129,7 +129,7 @@ def clef_blob(owner: np.ndarray, line_px: np.ndarray, st: Staff, idx: int, sp: f
     blk = ((owner[y0:y1, x0:x1] == idx) & ~line_px[y0:y1, x0:x1]).astype(np.uint8)
     # barline or bracket: ink through the whole window height (3 sp above
     # to 3 sp below the staff); a clef never. Its bars matched a C clef
-    # (Schein Nun p2: G2 read as C3)
+    # (score B p2: G2 read as C3)
     anyink = owner[y0:y1, x0:x1] != OWN_NONE
     full = anyink.mean(axis=0) >= 0.9
     if full.any():
@@ -466,7 +466,7 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
     read: the steps are letter names. ledgers=False drops the ledger-line
     rule: a head far outside the staff counts without a ledger line (the
     empty-staff check of build: a breve or whole note under a staff whose
-    ledger line the print left out, Grillo Sonata p32, is a note, not a
+    ledger line the print left out, score D p32, is a note, not a
     rest; lyrics there only keep a staff as engraved).
     Returns (lowest, highest, count, x of the lowest, x of the highest)."""
     import cv2
@@ -483,11 +483,11 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
     m = (own & ~line_px[y0:y1, x0:x1]).astype(np.uint8)
     orig = m.astype(bool)
     # rejoin a head cut by line removal (thick + 2: a larger kernel bridged
-    # line remnants into blobs on empty staves, Maria p7 Tenore I)
+    # line remnants into blobs on empty staves, score C p7 Tenore I)
     m = cv2.morphologyEx(m, cv2.MORPH_CLOSE,
                          cv2.getStructuringElement(cv2.MORPH_RECT, (1, thick + 2)))
     # close the ring of a half or whole note broken by line removal (a
-    # small round kernel; Maria p10 Tenore II: most half notes missed)
+    # small round kernel; score C p10 Tenore II: most half notes missed)
     rk = max(3, int(round(0.4 * sp)) | 1)
     m = cv2.morphologyEx(m, cv2.MORPH_CLOSE,
                          cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (rk, rk)))
@@ -517,16 +517,16 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
             continue                               # a block: whole or half rest
         if h <= 1.4 * sp and _wide_run(orig, x, y, w, h, sp, thick) >= 1.7 * sp:
             continue                               # a digit (time signature): wide ink
-                                                   # 2 sp or more high (Maria p10 3/2)
+                                                   # 2 sp or more high (score C p10 3/2)
         if h <= 1.4 * sp and w < 1.1 * h:
             continue                               # a head is wider than high; letters
-                                                   # ("Cap."), digits are not (Maria p10)
+                                                   # ("Cap."), digits are not (score C p10)
         if orig[y:y + h, x:x + w][lab[y:y + h, x:x + w] == j].mean() < 0.35:
             continue                               # mostly filled space, little ink
         if h > 1.4 * sp:
             # a chord, or a head with ledger lines filled between them: a
             # head is a band of real ink 0.45 sp or more high (a ledger
-            # line is a few rows; Maria p1.s2 gave G1 for C2)
+            # line is a few rows; score C p1.s2 gave G1 for C2)
             rows = (orig[y:y + h, x:x + w] & (lab[y:y + h, x:x + w] == j)).sum(axis=1) >= 0.4 * sp
             runs, r0_ = [], None
             for r_, ok in enumerate(list(rows) + [False]):
@@ -550,7 +550,7 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
                 continue
             if ledgers and (step >= 10 or step <= -2):   # needs every ledger line
                 # between the staff and the head (a lyric under a ledger
-                # note passed with the first one only: Maria p11 F1)
+                # note passed with the first one only: score C p11 F1)
                 need = range(10, step + 1, 2) if step >= 10 else range(-2, step - 1, -2)
                 if not all(_ledger_beside(own, bot_y - ls * half, x, w, sp, thick)
                            for ls in need):
@@ -559,7 +559,7 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
                 continue
             cands.append((x0 + x + w / 2.0, y0 + yc, step))
     # a time signature after the clef or a barline: two "heads" at one x,
-    # one in the upper half of the staff, one in the lower (Maria p10 3/2)
+    # one in the upper half of the staff, one in the lower (score C p10 3/2)
     starts = [st.x0 + 3.5 * sp] + [float(b) for b in barxs or []]
     drop = set()
     half_rows = int(2 * sp)
@@ -598,7 +598,7 @@ def clef_signature(owner: np.ndarray, line_px: np.ndarray, st: Staff,
                    idx: int, sp: float, thick: int = 3) -> str:
     """clef_signature -> the clef read at several staff-start offsets
     (CLEF_SHIFTS), the one with the best glyph match. A start 0.57 sp off
-    turned G2 and F4 into C3 (Schein Nun p6.s1, 0.3.0-dev.12): the
+    turned G2 and F4 into C3 (score B p6.s1, 0.3.0-dev.12): the
     window is fixed to the measured start."""
     best_lab, best_sc = "?", -1.0
     for d in CLEF_SHIFTS:
@@ -652,7 +652,7 @@ def _clef_once(owner: np.ndarray, line_px: np.ndarray, st: Staff,
     C clef. The line: F from the dots (the F line runs between them), G
     and C by comparing the clef with the Bravura glyph at each line where
     that clef is used (normalised cross-correlation of blurred images,
-    staff lines drawn into both). Maria (scan): mensuration signs, scan
+    staff lines drawn into both). score C (scan): mensuration signs, scan
     tails and taller old C clefs no longer mislead."""
     import cv2
     import numpy as np

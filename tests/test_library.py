@@ -1209,7 +1209,7 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(data["layout"]["bar_size"], 2.5)
 
     def test_keep_one_staff_of_a_two_staff_part(self):
-        # Riccio La Pichi: Violin, Trombone and the organ twice (right and left hand);
+        # score E: Violin, Trombone and the organ twice (right and left hand);
         # only the left hand (the continuo line) is wanted
         data = {"parts": ["Violin", "Trombone", "Organ"],
                 "systems": [{"map": ["Violin", "Trombone", "Organ", "Organ"]},

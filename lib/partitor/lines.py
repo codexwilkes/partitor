@@ -693,7 +693,7 @@ def coalesce_rest_lines(strips: list[Strip], opts: dict) -> list[Strip]:
     that hold only rests made one multi-bar rest line (the bars add up).
 
     A part with a long rest was printed as several lines "2", "2", "4": one
-    line "8" saves lines, and so page turns (Grillo Sonata Bassus, bars 71 to
+    line "8" saves lines, and so page turns (score D Bassus, bars 71 to
     74; 0.8.56). One-staff lines only; a movement start (title) or a line
     with a mark or a number ends the run and keeps its own line.
     `rests: keep` leaves the lines alone."""

@@ -733,7 +733,7 @@ def cmd_build(a: argparse.Namespace) -> int:
             o_r, floor = opts, None
             if group and not opts.get("page_count"):
                 # a group is several staves per line: its pages grow with the
-                # square of the staff size (Biber Trombones: 12 pages at 3.7 mm,
+                # square of the staff size (score A Trombones: 12 pages at 3.7 mm,
                 # about 60 at 8 mm). pages=auto: at most GROUP_REFLOW_PAGES times
                 # the pages without re-flow; pages=N sets the count instead.
                 base = finish_lines(strips, name, group, extra.get("ambitus"),

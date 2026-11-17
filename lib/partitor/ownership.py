@@ -53,7 +53,7 @@ def detect_barlines(owner: np.ndarray, conn: np.ndarray, ink: np.ndarray,
     merge (double bars, repeat signs). Nothing within 3.5 sp of the staff
     start counts: that is the clef zone (a C clef has two vertical bars).
     Dotted evidence (D) alone needs 6 sp: the tails of stacked G clefs
-    reach into the gaps at one x and look like Mensurstriche (Schein Nun
+    reach into the gaps at one x and look like Mensurstriche (score B
     p4.s1: a false bar at 3.65 sp counted a bar too many)."""
     pts: list[tuple[float, str]] = []
     sts = [staves[i] for i in idxs]
@@ -243,7 +243,7 @@ def align_system_start(grp: list[Staff], sp: float, ink: np.ndarray | None = Non
     indent, unless a barline or bracket at the system start runs solid
     through the gap between it and its neighbour (ink given): then its start
     was lost (a tilted staff that no track straightened, the clef and key
-    broken the lines: Riccio Canzon p3.s1, the Violin staff at x 515 against
+    broken the lines: score E p3.s1, the Violin staff at x 515 against
     146) and it takes the start of the system (0.8.60)."""
     med = float(np.median([st.x0 for st in grp]))
     near = [st.x0 for st in grp if abs(st.x0 - med) <= 4 * sp]
@@ -288,7 +288,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
 
     # Safety: every staff track must be an accepted staff.
     # Within 1.6 sp: beams under a dense continuo staff pull a track's
-    # centre by about one line (Biber p41: 15 px at sp 14, a false FAIL);
+    # centre by about one line (score A p41: 15 px at sp 14, a false FAIL);
     # a missed staff is always 4 sp or more from any accepted one.
     for t in tracks:
         yc = float(np.mean([c[1][2] for c in t]))
@@ -303,7 +303,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
             st.system = sys_base + k
         align_system_start(grp, sp, ink, thick)
     # systems of a page start at one x: a system starting 1-4 sp right of
-    # the others (the clef hid the short line start, Schein Nun p3.s1:
+    # the others (the clef hid the short line start, score B p3.s1:
     # clefs misread, brace lost) takes their median start. An indented
     # system (more than 4 sp) keeps its own.
     if len(systems) >= 3:
@@ -527,9 +527,9 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
         elif ib is None:                                 # below last staff
             own = D_FOOTER if da > PAGE_FOOTER_SP else ia
             # nearer: copyright, publisher, page number, footnote by its
-            # text (Schein Nun p1: "(c) 1986 by Baerenreiter" 6.0 sp below)
+            # text (score B p1: "(c) <year> by <publisher>" 6.0 sp below)
             # a wide text line nearer, as a footnote ("*) Das Pausenzeichen
-            # ...", Schein Nun p8, on the row of the figures)
+            # ...", score B p8, on the row of the figures)
             if own == ia and ocr and da <= FOOTER_TEXT_SP and gx1 - gx0 >= 8 * sp:
                 txt = read_text(page, (gx0, gy0, gx1, gy1), dpi,
                                 ink[gy0:gy1, gx0:gx1], vector_text)
@@ -540,7 +540,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
                 txt = read_text(page, (gx0, gy0, gx1, gy1), dpi,
                                 ink[gy0:gy1, gx0:gx1], vector_text)
                 # digits alone: a page number only beyond 4.5 sp (figures
-                # reach about 3.5 sp; Schein Nun page numbers at 5.0 sp)
+                # reach about 3.5 sp; score B page numbers at 5.0 sp)
                 if is_footer_text(txt) and (da > 4.5 or not txt.strip().isdigit()):
                     own = D_FOOTER
         if own is not None:
@@ -553,7 +553,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
     # Rows of text in one gap (lyric line, figured bass): an item joins a
     # row when its centre is within 0.6 sp of the row's last item or its
     # box overlaps the row's band by half its height (descenders, hyphens:
-    # Maria p10 "ja," and "al-le-lu-ja" were split between two staves). A
+    # score C p10 "ja," and "al-le-lu-ja" were split between two staves). A
     # text line (3+ items over a quarter of the staff width) belongs to the
     # staff above (operator request 2026-10-25: a split word is worse than a stray
     # "Cap."); another row of 3+ items unless it sits in the lowest quarter
@@ -600,7 +600,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
                                    min(it["box"][1] for it in row),
                                    max(it["box"][3] for it in row)))
     # a syllable of a text line attached earlier to the staff below (its
-    # high notes stand close to the line: Maria p11 "al-le-lu" under the
+    # high notes stand close to the line: score C p11 "al-le-lu" under the
     # Alto went to the Tenore) joins its line: small, inside the band and
     # span, clear of the lower staff
     for ia, ib, bx0, bx1, by0, by1 in text_bands:
@@ -618,7 +618,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
             if ov >= 0.5 * ch:
                 lab_owner[c] = ia
     # scan dust: a lone speck given to a system header would be copied into
-    # every part (Maria p1). One small component with no text within 1 sp
+    # every part (score C p1). One small component with no text within 1 sp
     # (its own group) is noise; a full stop stays with its word.
     for members in groups:
         if len(members) == 1:
@@ -729,7 +729,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
         elif 0 <= o < len(staves) and stats[c][0] > win[staves[o].system][1] - \
                 (EDGE_RIGHT_SP - 0.25) * sp and stats[c][4] < 0.6 * sp * sp \
                 and max(stats[c][2], stats[c][3]) < 1.0 * sp:
-            # a small speck wholly right of the staff end (Maria: dots in a
+            # a small speck wholly right of the staff end (score C: dots in a
             # column past the right margin, scan debris); larger marks stay
             lab_owner[c] = D_EDGE
         elif 0 <= o < len(staves):
@@ -857,7 +857,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
         zone_y0, zone_y1 = top.top - BARNUM_ZONE_SP * sp, top.top - 0.2 * sp
         cand = [c for c in range(1, n)
                 if stats[c][1] >= zone_y0 and stats[c][1] + stats[c][3] <= zone_y1 + 1
-                and 0.7 * sp <= stats[c][3] <= 2.4 * sp and stats[c][2] <= 1.6 * sp   # Maria: 2.05 sp
+                and 0.7 * sp <= stats[c][3] <= 2.4 * sp and stats[c][2] <= 1.6 * sp   # score C: 2.05 sp
                 and top.x0 - 1.0 * sp <= stats[c][0] <= top.x1]
         cset = set(cand)
         for members in group_components(cand, stats, 0.4 * sp):
@@ -1001,7 +1001,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
         res.repeats[g] = sorted(kk for kk, cnt in found.items() if cnt >= need)
 
     # ink of the last staff wholly below PAGE_FOOTER_SP: page-edge lines and
-    # curl shadows (Schein Nun p6, p8: lines 14-21 sp down made the strip
+    # curl shadows (score B p6, p8: lines 14-21 sp down made the strip
     # tall, a large gap in the part)
     last = len(staves) - 1
     yb = int(staves[last].bottom + PAGE_FOOTER_SP * sp)
@@ -1014,7 +1014,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
                 if c not in touch:
                     owner[yb:][lb == c] = D_FOOTER
 
-    # a system end without its barline (page curl, Schein Nun p6.s1): a
+    # a system end without its barline (page curl, score B p6.s1): a
     # last segment as wide as a bar is a bar, not a bar cut by the line
     # break (that bar lost its number before)
     for g in sorted({st.system for st in staves}):
@@ -1027,7 +1027,6 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
         widths = np.diff([xs] + list(bls))
         if len(widths) and xend - bls[-1] >= 0.75 * float(np.median(widths)):
             res.barlines[g] = list(bls) + [int(xend)]
-            res.gate_notes = getattr(res, "gate_notes", []) + [f"system {g}: end barline added"]
 
     # movement start: page title, or a large header text at a system start
     for members in groups:
@@ -1042,7 +1041,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
         first = next(st for st in staves if st.system == gsys)
         if gy1 - gy0 >= 1.3 * sp and gx1 - gx0 >= 4 * sp and gx0 <= first.x0 + 6 * sp:
             # not a movement: a bar number with a voice cue, "35 (Alto I)"
-            # (Schein Nun ist das Heil p6: the numbering restarted at 1)
+            # (score B p6: the numbering restarted at 1)
             txt = read_text(page, (gx0, gy0, gx1, gy1), dpi,
                             ink[gy0:gy1, gx0:gx1], vector_text) if ocr else ""
             if not is_cue_text(txt):
@@ -1055,7 +1054,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
             sub[np.isin(labels[gy0:gy1, gx0:gx1], members)] = D_LABEL
             if not first.label:
                 # the cue names the part of the top staff: a label for the
-                # choices (Schein Nun p6.s3 "(Alto I)" was suggested as
+                # choices (score B p6.s3 "(Alto I)" was suggested as
                 # Bass Trombone)
                 t2 = read_text(page, (gx0, gy0, gx1, gy1), dpi,
                                ink[gy0:gy1, gx0:gx1], vector_text, scale_up=True)
@@ -1068,7 +1067,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
     for i, st in enumerate(staves):
         st.clef = clef_signature(owner, line_px, st, i, sp, thick)
         # printed bar numbers and the barlines (with repeat dots and line
-        # stubs: Maria p10 a double barline gave E5 and a low note)
+        # stubs: score C p10 a double barline gave E5 and a low note)
         bl_boxes = [(int(x - 1.2 * sp), int(st.top - 6 * sp), int(x + 1.2 * sp),
                      int(st.bottom + 6 * sp)) for x in res.barlines.get(st.system, [])]
         bl_boxes.append((int(st.x1 - 1.5 * sp), int(st.top - 6 * sp), int(st.x1 + sp),
@@ -1083,7 +1082,7 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
         else:
             st.steps = None
             # no head read: stemless notes far outside the staff with no
-            # ledger line printed (Grillo Sonata p32 Bassus) are not rests
+            # ledger line printed (score D p32 Bassus) are not rests
             # (build.staff_is_empty checks this count)
             r2_ = note_steps(owner, line_px, st, i, sp, thick,
                              blank=res.num_boxes.get(st.system, []) + bl_boxes,
@@ -1144,7 +1143,7 @@ def _size_bands(res: PageResult) -> list[tuple[int, int]]:
     """_size_bands -> row ranges of the staves that no accepted staff
     explains (res.unseen), each cut half way to the nearest staff of the
     other size. Neighbours of one size share a band (the two organ staves
-    of a system, Riccio Canzon). An accepted staff whose own line pitch is
+    of a system, score E). An accepted staff whose own line pitch is
     above OTHER_SIZE x sp is of the other size too: its gaps passed the
     staff test (gaps_fit allows 0.3 sp above sp) but it is no staff of the
     page size. Left out of the bands, it stayed in the pass of the page size
@@ -1178,7 +1177,7 @@ def analyse_page_mixed(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
 
     analyse_page measures one staff size per page. When ruled staves are
     left that no accepted staff explains (res.unseen: an organ realization
-    printed 1.3 x larger than the instrument staves, Riccio Canzon), the
+    printed 1.3 x larger than the instrument staves, score E), the
     page is analysed twice more, as two ordinary pages: the staves of the
     first size with the bands of the other size blanked, and the other
     size alone. The two results are merged (merge_sizes): every staff keeps
@@ -1319,7 +1318,7 @@ def _gate_unseen_staves(res: PageResult, ink: np.ndarray, staves: list[Staff],
     """Safety gate: ruled lines that no accepted staff explains.
 
     Staff tracks are searched at one line spacing per page. Staves printed
-    at another size (an organ realization 1.3 x larger, Riccio Canzon p1)
+    at another size (an organ realization 1.3 x larger, score E p1)
     were never found, and their ink went to the nearest staff. A ruled
     line is a row with a horizontal run of 35% of the page width. Lines
     outside every accepted staff (2 line thicknesses of slack) that stand in

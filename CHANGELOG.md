@@ -7,6 +7,14 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.94 — 2026-11-17
+
+### Changed
+- Comments, test comments and `DESIGN.md` named real scores of the author's collection with page numbers. They now
+  call them `score A`, `score B`, and so on; a test looks for the form `Name p12`.
+- The attribute `gate_notes` of a page result, written by the barline check and read by nothing, is removed.
+- The analysis code text changed, so every item analyses its pages again once at its next build or `analyse`.
+
 ## 0.8.93 — 2026-11-17
 
 ### Fixed

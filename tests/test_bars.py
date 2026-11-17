@@ -94,7 +94,7 @@ class TestBarNumbers(unittest.TestCase):
 
 
     def test_clef_tails_in_two_gaps_are_no_barline(self):
-        # Schein Nun p4.s1: G clefs stacked at one x reach into the gaps
+        # score B p4.s1: G clefs stacked at one x reach into the gaps
         # (ink in the top and bottom fifth of both gaps): not a barline
         sp, th = 20.0, 2
         owner = np.full((600, 1200), pt.OWN_NONE, np.int32)
@@ -134,7 +134,7 @@ class TestBarEdits(unittest.TestCase):
     """The operator mends a misread barline (bar_rules.bar_edits)."""
 
     def systems(self):
-        # Schein Nun p4: 3 bars counted in p4.s1, 2 printed; p5.s1 prints 25
+        # score B p4: 3 bars counted in p4.s1, 2 printed; p5.s1 prints 25
         return [{"id": "p3.s1", "bars": 19, "widths": [30.0] * 19, "restart": True,
                  "anchors": [[0, 1]]},
                 {"id": "p4.s1", "bars": 3, "widths": [3.65, 55.26, 60.52]},
@@ -277,7 +277,7 @@ class TestBarEdits(unittest.TestCase):
 
 
 def half_bar_like():
-    """Schein Nun p7.s4 / p8.s1 in small: the last bar of line 2 is a half
+    """score B p7.s4 / p8.s1 in small: the last bar of line 2 is a half
     bar; line 3 starts with a clef stub (5.7 sp), a repeat start and the
     other half (new mensuration). The source prints 8 at bar 4 of line 3
     (stub counted); the halves are bar 6. Line 4 prints 10 at its bar 2."""
@@ -295,7 +295,7 @@ def half_bar_like():
 @needs_deps
 class TestHalfBarOverStub(unittest.TestCase):
     """A half bar at a line end, its other half after a clef stub and a repeat
-    sign at the start of the next line (Schein Nun p7.s4 / p8.s1)."""
+    sign at the start of the next line (score B p7.s4 / p8.s1)."""
 
     def lay(self, **rules):
         return {"systems": half_bar_like(),
