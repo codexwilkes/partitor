@@ -989,6 +989,43 @@ class TestLibrary(unittest.TestCase):
         pt.save_item(a, {"id": "2026-10-0012", "systems": [{"map": ["?"]}]})
         self.assertEqual(pt.work_mark(a), "*")
 
+    def count_menu_loads(self, *answers):
+        """load_item calls of cmd_menu on 3 items with the given menu lines. -> the count."""
+        from partitor import cli_main, library
+        for n in (1, 2, 3):
+            d = self.share / "library" / f"2026-11-{n:04d}-x"
+            d.mkdir()
+            pt.save_item(d, {"id": f"2026-11-{n:04d}", "title": f"T{n}", "parts": ["A"]})
+        count = {"n": 0}
+        real = library.load_item
+
+        def counting(item):
+            count["n"] += 1
+            return real(item)
+
+        mods = (library, cli_main, cli_items)
+        saved = [(m, m.load_item) for m in mods if hasattr(m, "load_item")]
+        it = iter(list(answers))
+        real_input = builtins.input
+        builtins.input = lambda prompt="": next(it)
+        try:
+            for m, _ in saved:
+                m.load_item = counting
+            with mock.patch.dict(os.environ, {"PARTITOR_LIBRARY": str(self.share)}), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(cli_main.cmd_menu(argparse.Namespace()), 0)
+        finally:
+            builtins.input = real_input
+            for m, f in saved:
+                m.load_item = f
+        return count["n"]
+
+    def test_menu_reads_each_item_once(self):
+        self.assertEqual(self.count_menu_loads("q"), 3)
+
+    def test_menu_with_filter_reads_each_item_once_for_a_draw(self):
+        self.assertEqual(self.count_menu_loads("/t", "q"), 6)       # a draw before and one after
+
     def test_item_matches_and_page_size(self):
         item = self.share / "library" / "2026-10-0005-schein-x"
         item.mkdir()

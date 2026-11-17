@@ -140,15 +140,33 @@ def cmd_menu(a: argparse.Namespace) -> int:
     size = list_page_size()
     year = time.localtime().tm_year
 
+    seen: dict[Path, dict | None] = {}      # one draw: each score.yaml is read once (None = unreadable)
+
+    def data_of(d: Path) -> dict | None:
+        if d not in seen:
+            try:
+                seen[d] = load_item(d)
+            except (OSError, yaml.YAMLError):
+                seen[d] = None
+        return seen[d]
+
+    def mark(d: Path) -> str:
+        data = data_of(d)
+        return "*" if data is None else work_mark(d, data)
+
     def line(key: str, d: Path) -> str:
+        data = data_of(d)
+        if data is None:
+            return f"  *{key:>7}  {d.name} · (no score.yaml)"
         try:
-            return f"  {work_mark(d)}{key:>7}  {item_line(d, load_item(d))}"
+            return f"  {work_mark(d, data)}{key:>7}  {item_line(d, data)}"
         except (OSError, yaml.YAMLError):
             return f"  *{key:>7}  {d.name} · (no score.yaml)"
 
     while True:
+        seen.clear()                        # another command may have changed an item
         allit = sorted(item_dirs(lib), key=id_order, reverse=True)
-        items = [d for d in allit if not words or item_matches(d, words)]
+        items = [d for d in allit if not words or item_matches(d, words, data_of(d) or {})]
         recent = sorted(items, key=item_mtime, reverse=True)[:len(RECENT_KEYS)] \
             if len(allit) >= RECENT_MIN_ITEMS else []
         pages = max(1, -(-len(items) // size))
@@ -170,7 +188,7 @@ def cmd_menu(a: argparse.Namespace) -> int:
             nav.append(f"page {page + 1}/{pages}: + next  - back")
         nav.append("/words filter" + ("  / clears" if words else ""))
         print(f"  n  new from inbox ({waiting} waiting)   {'   '.join(nav)}   q quit"
-              + ("   * = work pending" if any(work_mark(d) == "*" for d in items[:size]) else ""))
+              + ("   * = work pending" if any(mark(d) == "*" for d in items[:size]) else ""))
         try:
             k = ask(">", "q").strip()
         except Abort:

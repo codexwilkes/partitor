@@ -163,13 +163,15 @@ def cmd_new(a: argparse.Namespace) -> int:
     return _summary(start)
 
 
-def item_matches(item: Path, words: str) -> bool:
+def item_matches(item: Path, words: str, data: dict | None = None) -> bool:
     """item_matches -> True when every word (case ignored) is in the item's
-    id, folder name, composer, short composer, title, subtitle or parts."""
-    try:
-        data = load_item(item)
-    except (OSError, yaml.YAMLError):
-        data = {}
+    id, folder name, composer, short composer, title, subtitle or parts.
+    data: the item already loaded ({} when it cannot be read); None = load it here."""
+    if data is None:
+        try:
+            data = load_item(item)
+        except (OSError, yaml.YAMLError):
+            data = {}
     hay = " ".join([item.name, str(data.get("id", "")), str(data.get("composer", "")),
                     str(data.get("composer_short", "")), str(data.get("title", "")),
                     str(data.get("subtitle", ""))] + [str(p) for p in data.get("parts") or []]

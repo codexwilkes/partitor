@@ -834,11 +834,12 @@ def item_mtime(item: Path) -> float:
     return f.stat().st_mtime if f.exists() else 0.0
 
 
-def work_mark(item: Path) -> str:
+def work_mark(item: Path, data: dict | None = None) -> str:
     """'*' when the item has work pending (choices, changes not built,
-    not analysed), else ' '."""
+    not analysed), else ' '. data: the item already loaded (the menu reads
+    each item once for a screen); None = load it here."""
     try:
-        st_ = item_status(load_item(item))
+        st_ = item_status(load_item(item) if data is None else data)
     except (OSError, yaml.YAMLError):
         return "*"
     return " " if st_ in ("built", "ready to build") else "*"

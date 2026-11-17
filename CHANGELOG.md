@@ -7,6 +7,12 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.84 — 2026-11-16
+
+### Changed
+- The menu read the `score.yaml` of each item on the screen two or three times for one screen. It now reads it once.
+
+
 ## 0.8.83 — 2026-11-16
 
 ### Fixed
