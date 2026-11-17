@@ -1201,7 +1201,7 @@ Details:
   (`:pages=auto` clears); `expand ID [part]`, `contract ID [part]`; the menu keys
   `e`, `c`, `p` ask for a part (Enter = all). Build options on the command line
   win. A rename in `parts` moves the part's layout with it, and a rename or a join keeps the part
-  in its groups (0.8.80).
+  in its groups (0.8.80); the ambitus of a part, also one set by hand, follows a rename (0.8.81).
 - Item menu: edits `m` title/composer, `t` part names, `g` groups, `n` bar
   numbers, `e` expand, `c` contract, `p` pages, `a` paper (Letter -> A4 ->
   Ledger -> Letter), `k` ambitus (parts numbered with their range; LOW-HIGH,

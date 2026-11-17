@@ -1132,6 +1132,25 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(data["groups"], {"G": ["B"], "H": ["B"]})
         self.assertEqual(data["parts"], ["B", "C"])
 
+    def test_rename_keeps_an_ambitus_set_by_hand(self):
+        data = {"parts": ["A", "B"], "ambitus": {"A": {"range": "C4-F5", "from": "operator"}},
+                "systems": [{"id": "p1.s1", "map": ["A", "B"], "clefs": ["G2", "F4"], "steps": [[0, 8], [-4, 2]]}]}
+        self.assertEqual(pt.apply_part_ops(data, "1=Alpha"), "")
+        pt.refresh_ambitus(data)
+        self.assertEqual(data["ambitus"]["Alpha"], {"range": "C4-F5", "from": "operator"})
+        self.assertNotIn("A", data["ambitus"])
+
+    def test_rename_keeps_ambitus_off(self):
+        data = {"parts": ["A", "B"], "ambitus": {"A": {"range": "", "from": "off"}},
+                "systems": [{"id": "p1.s1", "map": ["A", "B"], "clefs": ["G2", "F4"], "steps": [[0, 8], [-4, 2]]}]}
+        self.assertEqual(pt.apply_part_ops(data, "1=Alpha"), "")
+        pt.refresh_ambitus(data)
+        self.assertEqual(data["ambitus"]["Alpha"], {"range": "", "from": "off"})
+        d2 = {"parts": ["A", "B"], "ambitus": {"A": {"range": "C4-F5", "from": "operator"},
+                                               "B": {"range": "C3-G3", "from": "operator"}}}
+        self.assertEqual(pt.apply_part_ops(d2, "1+2"), "")      # the target's entry stays
+        self.assertEqual(d2["ambitus"], {"B": {"range": "C3-G3", "from": "operator"}})
+
     def test_keep_one_staff_of_a_two_staff_part(self):
         # Riccio La Pichi: Violin, Trombone and the organ twice (right and left hand);
         # only the left hand (the continuo line) is wanted

@@ -400,6 +400,10 @@ def apply_part_ops(data: dict, line: str) -> str:
             data["groups"] = moved
         else:
             data.pop("groups")
+    amb = data.get("ambitus")
+    if amb:                                 # the ambitus (by hand or off) follows a rename;
+        gone = {parts[k] for k in join}     # a joined part's entry goes, the target's stays
+        data["ambitus"] = {target.get(n, n): v for n, v in amb.items() if n not in gone}
     pick = {new_name[k]: v for k, v in only.items()}
     for s_ in data.get("systems") or []:
         for key in ("map", "suggest"):

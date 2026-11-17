@@ -7,6 +7,13 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.81 — 2026-11-16
+
+### Fixed
+- `partitor parts ID`: a renamed part lost the ambitus set by hand (and `off`): it was computed again from the notes.
+  The ambitus now follows the rename.
+
+
 ## 0.8.80 — 2026-11-16
 
 ### Fixed
