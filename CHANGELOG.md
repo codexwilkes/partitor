@@ -7,6 +7,11 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.91 — 2026-11-17
+
+### Removed
+- `render.pack` and `render._pack`, the page packer from before 0.8.41. No build used them; the tests that did now test the planner.
+
 ## 0.8.90 — 2026-11-17
 
 ### Fixed

@@ -23,7 +23,7 @@ from .strips import (
     REH_PAD, ambitus_width, anchor, bar_mark, bar_x, pitches, reh_boxes, rest_boxes,
 )
 from .typography import (
-    CROP_MARK, CUT_DASHES, FILL_COST, MIN_LAST_LINES, PAGE_COST, REPAGE_FILL, REST_TURN_MIN,
+    CROP_MARK, CUT_DASHES, FILL_COST, PAGE_COST, REPAGE_FILL, REST_TURN_MIN,
     SHORT_LAST, TURN_BAD, TURN_HARD, TURN_MOVE, assemble_text, cut_words, flap_guides, put_text, sheet_guides,
     text_len,
 )
@@ -71,50 +71,6 @@ def usable_width(opts: dict, pw: float) -> float:
 def is_duplex(opts: dict, npages: int) -> bool:
     d = opts.get("duplex", "auto")
     return d == "on" or (d == "auto" and npages > 2)
-
-
-def pack(strips: list[Strip], dpi: int, opts: dict
-         ) -> list[list[tuple[Strip, float]]]:
-    """pack -> pages of (strip, y of the strip image top, pt within the
-    content area). Strips follow at constant pitch (see pitches); a strip
-    that does not fit goes to the next page. Free space stays at the
-    bottom of the page. A last page with fewer than MIN_LAST_LINES lines
-    takes lines from the pages before it (largest lines-per-page limit
-    that gives it enough), with the same page count."""
-    pages = _pack(strips, dpi, opts, None)
-    n, total = len(pages), len(strips)
-    need = min(MIN_LAST_LINES, total // n) if n > 1 else 0
-    if n > 1 and len(pages[-1]) < need:
-        for cap in range(max(len(p) for p in pages) - 1, -(-total // n) - 1, -1):
-            alt = _pack(strips, dpi, opts, cap)
-            if len(alt) == n and len(alt[-1]) >= need:
-                return alt
-    return pages
-
-
-def _pack(strips: list[Strip], dpi: int, opts: dict, cap: int | None
-          ) -> list[list[tuple[Strip, float]]]:
-    """Greedy packing; cap = most lines per page (None: no limit)."""
-    _, ph = PAPER[opts["paper"]]
-    k = 72.0 / dpi * (opts.get("scale") or 1.0)
-    pit = pitches(strips, opts)
-    _, _, mt, mb = page_box(opts, 0, False)
-    avail1 = ph - mt - mb - (RUN_HEAD if opts.get("_no_band") else TITLE_BAND)
-    availn = ph - mt - mb - RUN_HEAD
-    pages: list[list[tuple[Strip, float]]] = [[]]
-    y_top = 0.0
-    for i, s in enumerate(strips):
-        avail = avail1 if len(pages) == 1 else availn
-        if pages[-1]:
-            y_top += pit[i - 1] * k
-            y_img = y_top - s.staff_top * k
-            if y_img + s.img.shape[0] * k > avail or (cap and len(pages[-1]) >= cap):
-                pages.append([])
-        if not pages[-1]:
-            y_img = 0.0
-            y_top = s.staff_top * k
-        pages[-1].append((s, y_img))
-    return pages
 
 
 def flat_ok(opts: dict) -> bool:

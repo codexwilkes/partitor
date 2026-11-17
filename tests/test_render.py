@@ -170,7 +170,7 @@ class TestRendering(unittest.TestCase):
             g = np.frombuffer(pix.samples, np.uint8).reshape(pix.h, pix.w)
             # the low note must still be visible as a dark blob
             self.assertGreater(int((g < 100).sum()), 0)
-            pages = pt.pack([strip(True), strip(False)], 400, opts)
+            pages = pt.plan_pages([strip(True), strip(False)], 400, opts, False)[0]
             self.assertEqual(len(pages), 1)
             (s1, y1), (s2, y2) = pages[0]
             k = 72.0 / 400
@@ -206,14 +206,23 @@ class TestLayoutModel(unittest.TestCase):
     def test_last_page_never_holds_one_line(self):
         strips = [self.strip() for _ in range(40)]
         opts = {**pt.LAYOUT_DEFAULTS, "gap": 6.0, "scale": 2.0}
-        greedy = pt._pack(strips, 400, opts, None)
-        k = next(m for m in range(len(strips), 0, -1)
-                 if len(pt._pack(strips[:m], 400, opts, None)[-1]) == 1)
-        pages = pt.pack(strips[:k], 400, opts)
-        self.assertGreater(len(greedy), 1)
-        self.assertEqual(len(pages), len(pt._pack(strips[:k], 400, opts, None)))
-        self.assertGreaterEqual(len(pages[-1]), pt.MIN_LAST_LINES)
-        self.assertEqual(sum(len(p) for p in pages), k)
+        # DESIGN.md §5.2 item 5: for every line count, a part of more than one
+        # page ends on a page of at least MIN_LAST_LINES lines (none lost)
+        multi = 0
+        for k in range(1, len(strips) + 1):
+            pages = pt.plan_pages(strips[:k], 400, opts, False)[0]
+            self.assertEqual(sum(len(p) for p in pages), k)
+            if len(pages) > 1:
+                multi += 1
+                self.assertGreaterEqual(len(pages[-1]), min(pt.MIN_LAST_LINES, k // len(pages)))
+        self.assertGreater(multi, 0)                      # the range does reach a second page
+
+    def test_no_greedy_packer(self):
+        """0.8.91: the page packer from before the planner of 0.8.41 had no caller in the engine."""
+        render = sys.modules["partitor.render"]
+        self.assertFalse(hasattr(render, "pack"))
+        self.assertFalse(hasattr(render, "_pack"))
+        self.assertFalse(hasattr(pt, "pack"))
 
     def test_two_staff_part_uses_one_staff_height(self):
         img = np.zeros((300, 600), bool)
@@ -360,9 +369,9 @@ class TestBatchExtras(unittest.TestCase):
 
     def test_two_pages_of_music_get_no_title_page(self):
         opts = {**pt.LAYOUT_DEFAULTS, "scale": 2.0, "gap": 6.0}
-        n1 = len(pt.pack(self.strips(1), 400, opts))
+        n1 = len(pt.plan_pages(self.strips(1), 400, opts, False)[0])
         per = 1
-        while len(pt.pack(self.strips(per + 1), 400, opts)) == n1:
+        while len(pt.plan_pages(self.strips(per + 1), 400, opts, False)[0]) == n1:
             per += 1
         with tempfile.TemporaryDirectory() as d:
             n = pt.render_part("X", self.strips(per + 1), {"title": "T"}, 400, opts,
@@ -431,7 +440,7 @@ class TestBatchExtras(unittest.TestCase):
     def test_logo_not_on_page_1_band_and_sits_above_the_folio(self):
         opts = {**pt.LAYOUT_DEFAULTS, "scale": 2.0, "gap": 6.0}
         per = 1
-        while len(pt.pack(self.strips(per + 1), 400, opts)) == 1:
+        while len(pt.plan_pages(self.strips(per + 1), 400, opts, False)[0]) == 1:
             per += 1
         n, boxes, _ = self._render(per + 1)
         self.assertEqual(n, 2)
@@ -625,8 +634,10 @@ class TestLedger(unittest.TestCase):
         opts = {**pt.LAYOUT_DEFAULTS, "paper": "ledger", "gap": 6.0}
         strips = self.wide(60)
         o_lt = {**pt.LAYOUT_DEFAULTS, "gap": 6.0}
-        n_lt = len(pt.pack(strips, 400, {**o_lt, "scale": pt.fit_scale(strips, 400, o_lt)}))
-        n_lg = len(pt.pack(strips, 400, {**opts, "scale": pt.fit_scale(strips, 400, opts)}))
+        n_lt = len(pt.plan_pages(strips, 400, {**o_lt, "scale": pt.fit_scale(strips, 400, o_lt)},
+                                 False)[0])
+        n_lg = len(pt.plan_pages(strips, 400, {**opts, "scale": pt.fit_scale(strips, 400, opts)},
+                                 False)[0])
         self.assertGreater(n_lg, n_lt)
 
     def test_render_geometry_and_footer_on_a_landscape_page(self):

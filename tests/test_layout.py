@@ -955,7 +955,8 @@ class TestEngravedLook(unittest.TestCase):
             return pt.Strip(img, 0, 40, 80, 10.0, np.zeros_like(img),
                             marks=[(0, "A")] if mark else [])
         opts = {**pt.LAYOUT_DEFAULTS, "scale": 2.0, "gap": 6.0}
-        per = len(pt.pack([strip() for _ in range(40)], 400, {**opts, "_no_band": True})[0])
+        per = len(pt.plan_pages([strip() for _ in range(40)], 400, {**opts, "_no_band": True},
+                                False)[0][0])
         # music before the section, then a section of 2 pages (letter A)
         before, sect = 2 * per + 1, 2 * per
         lines = [strip() for _ in range(before)] + [strip(True)] + \
