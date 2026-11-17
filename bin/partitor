@@ -74,7 +74,8 @@
 #                                         2 GB for the main process)
 #   PARTITOR_CPU_WEIGHT   (default 20)    cgroup CPU weight (100 = normal)
 #   PARTITOR_IO_WEIGHT    (default 20)    cgroup IO weight (100 = normal)
-#   PARTITOR_RUNTIME_MAX  (default 3600)  seconds before a run is stopped
+#   PARTITOR_RUNTIME_MAX  (default 3600)  seconds before a run is stopped (not for `menu` and
+#                                         `new`: they wait for a person and have no limit)
 #   PARTITOR_LIST_PAGE    (default 20)    items per page in the menu (5-200)
 #   PARTITOR_LOGO         (default none)  PNG file drawn on title and back pages
 #   PARTITOR_CACHE        (default on)    0 = do not keep or use the page-analysis cache
@@ -242,6 +243,11 @@ if [[ -t 1 ]]; then
   color=1
 fi
 
+# The time limit does not apply to `menu` (also the default command) and `new`: they wait for a
+# person, and systemd would stop the unit one hour after its start, in the middle of a question.
+runtime="$PARTITOR_RUNTIME_MAX"
+case "${1:-}" in menu|new) runtime="infinity" ;; esac
+
 exec "$RUN" --quiet --collect --wait "$mode" \
   --uid="$SVC_USER" --gid="$SVC_USER" \
   --working-directory="$cwd" \
@@ -261,5 +267,5 @@ exec "$RUN" --quiet --collect --wait "$mode" \
   -p SystemCallArchitectures=native -p UMask=0027 \
   -p MemoryMax="$PARTITOR_MEMORY_MAX" -p CPUWeight="$PARTITOR_CPU_WEIGHT" \
   -p IOWeight="$PARTITOR_IO_WEIGHT" -p Nice=10 \
-  -p RuntimeMaxSec="$PARTITOR_RUNTIME_MAX" \
+  -p RuntimeMaxSec="$runtime" \
   -- "${CMD[@]}" "$@"

@@ -7,6 +7,13 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.95 — 2026-11-17
+
+### Fixed
+- The menu (also the command you get with no argument) and `new` were stopped one hour after they started, also while
+  they waited for your answer or ran a build. They now have no time limit. Every other command keeps
+  `PARTITOR_RUNTIME_MAX` (default 3600 s).
+
 ## 0.8.94 — 2026-11-17
 
 ### Changed

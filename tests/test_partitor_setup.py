@@ -232,6 +232,28 @@ class TestWrapper(unittest.TestCase):
                 self.run_w("list", cwd=self.tmp, extra={"PARTITOR_DEFAULTS": d})
                 self.assertIn(f"--setenv=PARTITOR_JOBS={want}", self.args())
 
+    def runtime_max(self, *args, extra=None):
+        self.make_share()
+        r = self.run_w(*args, cwd=self.tmp, extra=extra)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        a = self.args()
+        return next(x for x in a if x.startswith("RuntimeMaxSec="))
+
+    def test_menu_and_new_have_no_run_time_limit(self):
+        """0.8.95: the menu waits for a person; systemd stopped it one hour after its start."""
+        for args in ((), ("menu",), ("new",), ("new", "2")):
+            with self.subTest(args=args):
+                self.assertEqual(self.runtime_max(*args), "RuntimeMaxSec=infinity")
+
+    def test_other_commands_keep_the_run_time_limit(self):
+        self.assertEqual(self.runtime_max("rebuild", "1"), "RuntimeMaxSec=3600")
+        d = os.path.join(self.tmp, "defaults")
+        write(d, "PARTITOR_RUNTIME_MAX=120\n", 0o644)
+        self.assertEqual(self.runtime_max("rebuild", "1", extra={"PARTITOR_DEFAULTS": d}),
+                         "RuntimeMaxSec=120")
+        self.assertEqual(self.runtime_max("menu", extra={"PARTITOR_DEFAULTS": d}),
+                         "RuntimeMaxSec=infinity")
+
     def test_rebuild_parts_are_words_not_paths(self):
         self.make_share()
         r = self.run_w("rebuild", "12", "Trombones", "2-4", "--jobs", "3", cwd=self.tmp)

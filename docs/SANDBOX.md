@@ -43,7 +43,7 @@ Set them in `/etc/default/partitor` (`KEY=value` lines):
 | `PARTITOR_LOG_DIR` | none | A folder for the run log: each run writes `run-<date>-<time>-<pid>.log` there (what it printed, your answers, the exit code; `DESIGN.md` §12.5). Absolute, existing, writable by user `partitor`, not below `/home`. The sandbox may write there. |
 | `PARTITOR_CPU_WEIGHT` | 20 | cgroup CPU weight (100 = normal). |
 | `PARTITOR_IO_WEIGHT` | 20 | cgroup IO weight (100 = normal). |
-| `PARTITOR_RUNTIME_MAX` | 3600 | Seconds before a run is stopped. |
+| `PARTITOR_RUNTIME_MAX` | 3600 | Seconds before a run is stopped. Not for `menu` and `new`: they wait for a person and have no limit. |
 
 The workers run in the same unit, so the limits cover all of them together.
 
