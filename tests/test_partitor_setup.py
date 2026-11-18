@@ -239,11 +239,18 @@ class TestWrapper(unittest.TestCase):
         a = self.args()
         return next(x for x in a if x.startswith("RuntimeMaxSec="))
 
-    def test_menu_and_new_have_no_run_time_limit(self):
-        """0.8.95: the menu waits for a person; systemd stopped it one hour after its start."""
+    def test_menu_and_new_have_their_own_run_time_limit(self):
+        """0.8.95: the menu waits for a person; systemd stopped it one hour after its start.
+        0.8.96: it has its own limit, 8 hours by default."""
         for args in ((), ("menu",), ("new",), ("new", "2")):
             with self.subTest(args=args):
-                self.assertEqual(self.runtime_max(*args), "RuntimeMaxSec=infinity")
+                self.assertEqual(self.runtime_max(*args), "RuntimeMaxSec=28800")
+        d = os.path.join(self.tmp, "defaults")
+        for given, want in (("600", "600"), ("infinity", "infinity"), ("x", "28800"), ("-5", "28800")):
+            with self.subTest(given=given):
+                write(d, f"PARTITOR_MENU_RUNTIME_MAX={given}\n", 0o644)
+                self.assertEqual(self.runtime_max("menu", extra={"PARTITOR_DEFAULTS": d}),
+                                 f"RuntimeMaxSec={want}")
 
     def test_other_commands_keep_the_run_time_limit(self):
         self.assertEqual(self.runtime_max("rebuild", "1"), "RuntimeMaxSec=3600")
@@ -252,7 +259,7 @@ class TestWrapper(unittest.TestCase):
         self.assertEqual(self.runtime_max("rebuild", "1", extra={"PARTITOR_DEFAULTS": d}),
                          "RuntimeMaxSec=120")
         self.assertEqual(self.runtime_max("menu", extra={"PARTITOR_DEFAULTS": d}),
-                         "RuntimeMaxSec=infinity")
+                         "RuntimeMaxSec=28800")
 
     def test_rebuild_parts_are_words_not_paths(self):
         self.make_share()

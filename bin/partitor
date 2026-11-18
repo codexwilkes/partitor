@@ -74,8 +74,9 @@
 #                                         2 GB for the main process)
 #   PARTITOR_CPU_WEIGHT   (default 20)    cgroup CPU weight (100 = normal)
 #   PARTITOR_IO_WEIGHT    (default 20)    cgroup IO weight (100 = normal)
-#   PARTITOR_RUNTIME_MAX  (default 3600)  seconds before a run is stopped (not for `menu` and
-#                                         `new`: they wait for a person and have no limit)
+#   PARTITOR_RUNTIME_MAX  (default 3600)  seconds before a run is stopped (not for `menu` and `new`)
+#   PARTITOR_MENU_RUNTIME_MAX (default 28800)  the same for `menu` and `new`, which wait for a
+#                                         person (seconds, or `infinity`)
 #   PARTITOR_LIST_PAGE    (default 20)    items per page in the menu (5-200)
 #   PARTITOR_LOGO         (default none)  PNG file drawn on title and back pages
 #   PARTITOR_CACHE        (default on)    0 = do not keep or use the page-analysis cache
@@ -131,6 +132,7 @@ PARTITOR_MEMORY_MAX="auto"
 PARTITOR_CPU_WEIGHT="20"
 PARTITOR_IO_WEIGHT="20"
 PARTITOR_RUNTIME_MAX="3600"
+PARTITOR_MENU_RUNTIME_MAX="28800"
 PARTITOR_LIST_PAGE="20"
 PARTITOR_JOBS="auto"
 if [[ -r "$DEFAULTS" ]]; then
@@ -149,6 +151,7 @@ die() {
 
 # a number, else the default (the value goes into the sandbox environment)
 [[ "$PARTITOR_LIST_PAGE" =~ ^[0-9]{1,3}$ ]] || PARTITOR_LIST_PAGE="20"
+[[ "$PARTITOR_MENU_RUNTIME_MAX" =~ ^([0-9]{1,9}|infinity)$ ]] || PARTITOR_MENU_RUNTIME_MAX="28800"
 [[ "$PARTITOR_JOBS" =~ ^(auto|[0-9]{1,2})$ ]] || PARTITOR_JOBS="auto"
 [[ "$LIBRARY" == /* ]] || die "PARTITOR_LIBRARY must be an absolute path: $LIBRARY"
 # auto: 70 % of the memory of the machine, at least 1G
@@ -243,10 +246,10 @@ if [[ -t 1 ]]; then
   color=1
 fi
 
-# The time limit does not apply to `menu` (also the default command) and `new`: they wait for a
-# person, and systemd would stop the unit one hour after its start, in the middle of a question.
+# `menu` (also the default command) and `new` wait for a person: they have their own, longer limit,
+# or none, so that systemd does not stop the unit one hour after its start, in the middle of a question.
 runtime="$PARTITOR_RUNTIME_MAX"
-case "${1:-}" in menu|new) runtime="infinity" ;; esac
+case "${1:-}" in menu|new) runtime="$PARTITOR_MENU_RUNTIME_MAX" ;; esac
 
 exec "$RUN" --quiet --collect --wait "$mode" \
   --uid="$SVC_USER" --gid="$SVC_USER" \

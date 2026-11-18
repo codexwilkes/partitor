@@ -69,7 +69,7 @@ Print one with `partitor log` (the newest), `partitor log 2`, `partitor log --ta
 - **Take parts** from `library/<id>-<slug>/parts/` (`LIBRARY-LAYOUT.md`).
 - **Back up** the library folder. The host holds code and settings only.
 - **Build time**: minutes for a long score. The run has a time limit
-  (`PARTITOR_RUNTIME_MAX`, default 3600 s; not for `menu` and `new`, which wait for you) and runs
+  (`PARTITOR_RUNTIME_MAX`, default 3600 s; `menu` and `new`, which wait for you, use `PARTITOR_MENU_RUNTIME_MAX`, default 28800 s) and runs
   at low priority.
 
 ## Change the paper or the staff size of one part
@@ -105,7 +105,7 @@ the real numbers.
 | `venv not found`, `engine not found` | Run `sudo /opt/partitor/bin/partitor-install`. |
 | `item ID is in use: another partitor command is working on it` | Another command (a rebuild, `new`, a menu session) works on that item. Wait until it ends, then run the command again. Nothing was changed. |
 | `path outside /var/lib/partitor/work` | Copy the PDF into the work folder first. |
-| A run stops after an hour | Raise `PARTITOR_RUNTIME_MAX`. (`menu` and `new` have no limit; a build started from the menu runs in the menu's unit.) |
+| A run stops after an hour | Raise `PARTITOR_RUNTIME_MAX`. (`menu` and `new` have `PARTITOR_MENU_RUNTIME_MAX`, default 8 hours, `infinity` = none; a build started from the menu runs in the menu's unit.) |
 | Killed during a detect or a build (out of memory) | Lower `PARTITOR_JOBS` or raise `PARTITOR_MEMORY_MAX`. |
 | A `build` is slow although only the layout changed | The first `detect` or `build` of a PDF fills `cache/` in the item folder; later ones read it (`analysis cache: N of M page(s) found`). A new PDF, a new dpi, a change of the analysis code or of the cv2, numpy, pymupdf or tesseract version analyses again. `PARTITOR_CACHE=0` turns it off; `rm -r cache/` is safe. |
 | A part prints with a very small staff (4 mm) | The page limit is too low. See "Change the paper or the staff size of one part". |

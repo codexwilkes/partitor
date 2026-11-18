@@ -7,6 +7,12 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.96 — 2026-11-17
+
+### Added
+- `PARTITOR_MENU_RUNTIME_MAX` (default 28800 s, 8 hours; a number or `infinity`) is the time limit of `menu` and `new`,
+  which wait for a person. 0.8.95 had removed their limit; this is a safety net. Other commands keep `PARTITOR_RUNTIME_MAX`.
+
 ## 0.8.95 — 2026-11-17
 
 ### Fixed

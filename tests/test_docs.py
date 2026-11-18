@@ -279,7 +279,8 @@ class TestSettingsDocs(unittest.TestCase):
         d = self.wrapper_defaults()
         sandbox = read("docs", "SANDBOX.md")
         for key in ("PARTITOR_MEMORY_MAX", "PARTITOR_JOBS", "PARTITOR_CPU_WEIGHT",
-                    "PARTITOR_IO_WEIGHT", "PARTITOR_RUNTIME_MAX"):
+                    "PARTITOR_IO_WEIGHT", "PARTITOR_RUNTIME_MAX",
+                    "PARTITOR_MENU_RUNTIME_MAX"):
             with self.subTest(key=key):
                 m = re.search(rf"\| `{key}` \| `?([^|`]+?)`? \|", sandbox)
                 self.assertTrue(m, key)

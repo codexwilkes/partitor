@@ -109,7 +109,7 @@ In order (details in the header of `bin/partitor-install`):
 `/etc/default/partitor` holds `KEY=value` lines. The wrapper reads it at every
 run. Keys: `PARTITOR_LIBRARY`, `PARTITOR_SMB_HOST`, `PARTITOR_SMB_SHARE`
 (storage; the installer reads these); `PARTITOR_MEMORY_MAX`, `PARTITOR_JOBS`,
-`PARTITOR_CPU_WEIGHT`, `PARTITOR_IO_WEIGHT`, `PARTITOR_RUNTIME_MAX`
+`PARTITOR_CPU_WEIGHT`, `PARTITOR_IO_WEIGHT`, `PARTITOR_RUNTIME_MAX`, `PARTITOR_MENU_RUNTIME_MAX`
 (`SANDBOX.md`); `PARTITOR_LIST_PAGE` (menu items per page, 5-200);
 `PARTITOR_CACHE` (`0` = no page-analysis cache; `SANDBOX.md`);
 `PARTITOR_LOG_DIR` (a folder for a text log of each run; `OPERATING.md`);
