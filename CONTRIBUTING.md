@@ -5,6 +5,16 @@
 Helpful pull requests are welcome. The maintainer supports what he can test:
 Ubuntu LTS on x86-64 with systemd. Other platforms are best effort.
 
+## Where things are
+
+| File | About |
+|---|---|
+| `docs/DESIGN.md` | Rules and algorithms (section numbers are stable) |
+| `docs/SANDBOX.md`, `SECURITY.md` | What the sandbox does; reporting problems |
+| `docs/LIBRARY-LAYOUT.md` | The stable folder and file-name contract, for tools that publish or read the library |
+| `docs/OVERLAYS.md` | Wrap the installer for a site (unsupported sample) |
+| `CHANGELOG.md`, `NOTICE` | History, third-party licences |
+
 ## Rules
 
 - **One change, one pull request.** Say what and why.

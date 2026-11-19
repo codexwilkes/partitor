@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+# partitor-quick-install — one step set-up for a player (docs/INSTALL.md)
+#
+# Run as root from a clone of the repo. It
+#   1. installs the system packages that are missing (apt),
+#   2. runs partitor-init with the defaults (a local library, no questions),
+#   3. puts the user who called sudo in the group partitor, so that they can
+#      copy scores into the inbox folder without root,
+#   4. says in plain words what to do next.
+# Extra options go to partitor-init (for example --library /data/scores).
+# For a NAS (SMB) or other choices, run partitor-init without --yes instead.
+#
+# Usage: sudo bin/partitor-quick-install [partitor-init options]
+#
+# Test hooks (env): PARTITOR_PREFIX, PARTITOR_ROOT, PARTITOR_INIT,
+# PARTITOR_TEST_NONROOT=1.
+
+set -euo pipefail
+
+PFX="${PARTITOR_PREFIX:-}"
+ROOT="${PARTITOR_ROOT:-$(dirname "$(dirname "$(realpath -- "${BASH_SOURCE[0]}")")")}"
+INIT="${PARTITOR_INIT:-$ROOT/bin/partitor-init}"
+APT_PKGS=(python3-venv tesseract-ocr)
+GROUP=partitor
+
+die() { echo "partitor-quick-install: $1" >&2; exit 1; }
+
+if [[ "$(id -u)" -ne 0 && -z "${PARTITOR_TEST_NONROOT:-}" ]]; then
+  die "run as root: sudo bin/partitor-quick-install"
+fi
+command -v apt-get >/dev/null 2>&1 || die "apt-get not found. This script is for Ubuntu or Debian (docs/INSTALL.md)."
+
+missing=()
+for p in "${APT_PKGS[@]}"; do
+  st="$(dpkg-query -W -f='${Status}' "$p" 2>/dev/null || true)"
+  [[ "$st" == "install ok installed" ]] || missing+=("$p")
+done
+if (( ${#missing[@]} )); then
+  echo "Step 1 of 3: installing ${missing[*]}"
+  apt-get install -y "${missing[@]}" || die "apt-get failed; fix it and run again"
+else
+  echo "Step 1 of 3: system packages are there"
+fi
+
+echo "Step 2 of 3: setting up partitor (local library, default settings)"
+"$INIT" --yes "$@"
+
+echo "Step 3 of 3: access to the inbox folder"
+who="${SUDO_USER:-}"
+if [[ -n "$who" && "$who" != root ]]; then
+  usermod -aG "$GROUP" "$who" || die "could not add $who to the group $GROUP"
+  echo "  $who is now in the group $GROUP"
+else
+  echo "  Run: sudo usermod -aG $GROUP YOUR-USER"
+fi
+
+lib="/var/lib/partitor/library"
+if [[ -r "$PFX/etc/default/partitor" ]]; then
+  v="$(sed -n 's/^PARTITOR_LIBRARY=//p' "$PFX/etc/default/partitor" | tail -n 1 | tr -d "\"'")"
+  [[ -n "$v" ]] && lib="$v"
+fi
+cat <<MSG
+
+Done. What to do next:
+  1. Log out and log in again (the group change needs it).
+  2. Copy a score PDF into: $lib/inbox/
+  3. Run: sudo partitor
+     Choose "new from inbox". partitor asks which staff is which part.
+Guide: docs/operator-flow.html
+MSG

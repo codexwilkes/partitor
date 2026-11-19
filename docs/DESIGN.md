@@ -1327,6 +1327,8 @@ Repeatability rule: no step may live only in documentation. Each step is done
 by the installer, or the installer checks it and prints the exact command to
 run.
 
+`bin/partitor-quick-install` is the one step path for a player: it installs the missing apt
+packages, runs `partitor-init --yes`, and adds the user who called `sudo` to the group `partitor`.
 `bin/partitor-init` asks the questions, writes `/etc/default/partitor` and the SMB
 credentials (0600 root), and runs `bin/partitor-install --config`. It never
 changes the system itself.

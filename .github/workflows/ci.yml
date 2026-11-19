@@ -31,7 +31,7 @@ jobs:
       - name: module structure (import levels, headers, patch registry)
         run: python3 tools/check-modules.py --static
       - name: shellcheck (warnings and errors)
-        run: shellcheck -S warning bin/partitor bin/partitor-init bin/partitor-install tools/check-repo.sh tools/bench-start.sh
+        run: shellcheck -S warning bin/partitor bin/partitor-init bin/partitor-install bin/partitor-quick-install tools/check-repo.sh tools/bench-start.sh
 
   test-ubuntu:
     name: tests (Ubuntu 24.04, Python ${{ matrix.python }})

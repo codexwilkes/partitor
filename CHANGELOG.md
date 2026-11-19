@@ -7,6 +7,18 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.8.97 — 2026-11-19
+
+### Added
+- `bin/partitor-quick-install`: one step set-up for a player. It installs the missing apt packages, runs
+  `partitor-init --yes`, puts the user who called `sudo` in the group `partitor`, and says what to do next.
+  Options go to `partitor-init`. A NAS (SMB) library still uses `partitor-init` with questions.
+
+### Changed
+- `README.md` is for the musician: what you get (large print, bar numbers, ambitus, page turns, fold-outs,
+  scans, proof, corrections), a four command quick start, and the user guides. The index of developer
+  documents moved to `CONTRIBUTING.md`. `docs/INSTALL.md` has a "Quick path".
+
 ## 0.8.96 — 2026-11-17
 
 ### Added

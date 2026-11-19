@@ -19,6 +19,21 @@ result. It is safe to run again.
 - Disk: the venv holds the Python packages (several hundred MB). The library
   size depends on your scores.
 
+## Quick path
+
+For a player who wants the defaults (a local library, no questions):
+
+```bash
+sudo apt install -y git
+sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
+cd /opt/partitor && sudo git checkout --detach 0.8.97   # a release tag, not main
+sudo bin/partitor-quick-install
+```
+
+`partitor-quick-install` installs the missing apt packages, runs `partitor-init --yes`,
+puts the user who called `sudo` in the group `partitor`, and says what to do next. Options go
+to `partitor-init` (`--library PATH`, `--memory SIZE`). For a NAS (SMB library) use the steps below.
+
 ## Steps
 
 1. Install the system packages. The installer only checks them and prints this

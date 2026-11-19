@@ -5,22 +5,66 @@
 Make instrument parts from a score PDF.
 
 Give partitor a PDF of a score, vector or scanned. It finds the staves and
-systems, asks you which staff is which part, and writes one PDF per part, in
-large print if you want it: big staves, a calm layout, page turns at rests,
-bar numbers, rehearsal marks. It was made for amateur players with older eyes.
+systems, asks you which staff is which part, and writes one PDF per part. It
+was made for amateur players with older eyes: you decide how big the music is,
+and the parts are laid out so that you can read them on a stand.
 
 Status: early public release (0.8). It works for the author, on one setup. Read
 `docs/KNOWN-LIMITS.md` before you rely on it.
 
-## Scope
+## What you get
 
-- **In:** analysis of a score PDF, mapping staves to parts, layout, build, a
-  text menu (works over SSH, also from a phone), a local or SMB library.
-- **Out:** publishing, sync, a web interface, accounts, cloud storage, notation
-  export (MusicXML, MIDI).
+**Parts you can read**
+- One PDF per instrument, from a full score. Several staves can share a part
+  (for example three trombones on one staff group), and you can join or split
+  parts as you like.
+- Large print: big staves and a calm layout. A second, larger copy
+  (11 x 17 in, or A3) is made next to the normal one.
+- Bar numbers on every line, and the rehearsal marks of the score, so the
+  conductor's "from bar 45" works for you too.
+- The lowest and highest note of the part is printed on the first line, so you
+  can see at once if the part fits your instrument or your voice.
+- Multi-bar rests are joined, so lines are shorter and the part has fewer pages.
 
-If you write your own publishing, use the documented, stable file layout
-(`docs/LIBRARY-LAYOUT.md`). `docs/OVERLAYS.md` has an unsupported sample.
+**Page turns**
+- Pages end where you can rest, not in the middle of a passage. You turn at a
+  rest.
+- `plan` shows what each paper size (Letter, A4, ledger) and staff size does to
+  the page count and the turns, so you can choose before you print.
+- When no good turn exists, partitor can make a fold-out: a flap that gives you
+  three pages with no turn. It writes a short list of steps to cut, fold and
+  tape it.
+- You can move a system to the next or the previous page by hand, and the
+  choice stays.
+- Parts of three pages or more get extra margin at the spine, for a punched or
+  bound part, printed double-sided.
+
+**Scores that are not clean**
+- Works on vector PDFs and on scans, also phone scans (clean scans work best). It straightens a curled
+  page.
+- Reads staff labels and clefs, and matches them to the parts, also when the
+  staff count changes in the piece.
+- Lyrics and text stay with the right staff.
+- If the score has one piece after another, or a title above the music, it asks
+  and you decide what to leave out.
+
+**You stay in control**
+- A text menu that you can use over SSH, also from a phone. No web page, no
+  account.
+- partitor asks when it is not sure. Nothing is guessed silently.
+- A proof PDF shows what partitor read: staves, bars, and the lowest and
+  highest notes, so you can check before you print.
+- You can correct bar numbers, part names, groups, title and the note range.
+  Your corrections stay when you analyse again.
+- You can rebuild one part, change its paper or staff size, and print again,
+  without a new analysis of the whole score.
+- Your scores stay on your own computer or your own NAS. There is no network
+  use and nothing is sent anywhere.
+
+## What it does not do
+
+partitor makes parts. It does not publish, sync, run a web interface, keep
+accounts, store in the cloud, or export notation (MusicXML, MIDI).
 
 ## What you need
 
@@ -29,36 +73,37 @@ If you write your own publishing, use the documented, stable file layout
 - A score PDF that you have the right to copy. This repository has **no** sample
   scores.
 
-## Quick start (local library)
+## Quick start (Ubuntu)
+
+Four commands set up everything: the packages, a local library, and access
+for you. No questions.
 
 ```bash
-sudo apt install git python3-venv tesseract-ocr
+sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.8.96
-sudo bin/partitor-init                      # guided; --yes takes the defaults
-sudo usermod -aG partitor "$USER"          # log in again afterwards
-cp score.pdf /var/lib/partitor/library/inbox/
-sudo partitor
+cd /opt/partitor && sudo git checkout --detach 0.8.97
+sudo bin/partitor-quick-install
 ```
 
-The menu offers "new from inbox". `docs/operator-flow.html` walks through a piece
-from start to build. `docs/INSTALL.md` has the details, the upgrade and the
-removal.
+Then log out and log in again. Copy a score PDF into
+`/var/lib/partitor/library/inbox/` and run `sudo partitor`. Choose "new from
+inbox"; partitor asks which staff is which part. `docs/operator-flow.html`
+walks through a piece from start to build.
 
-## Documents
+A NAS as library, other folders, upgrade and removal: `docs/INSTALL.md`.
+
+## Guides
 
 | File | About |
 |---|---|
+| `docs/operator-flow.html` | Step by step: from a PDF to printed parts |
+| `docs/OPERATING.md` | Daily use, commands, problems |
+| `docs/PLAN-AND-FOLDOUTS.md` | Paper, staff size, page turns, fold-outs; print and assemble |
 | `docs/INSTALL.md` | Install, settings, upgrade, uninstall |
-| `docs/STORAGE-LOCAL.md`, `docs/STORAGE-SMB.md` | Where the library lives; NAS setup |
-| `docs/OPERATING.md`, `docs/operator-flow.html` | Daily use |
-| `docs/SANDBOX.md`, `SECURITY.md` | What the sandbox does; reporting problems |
-| `docs/LIBRARY-LAYOUT.md` | The stable folder and file-name contract |
-| `docs/PLAN-AND-FOLDOUTS.md` | Plan paper, staff size, page turns, fold-outs; print and assemble |
-| `docs/KNOWN-LIMITS.md` | What the engine gets wrong |
-| `docs/DESIGN.md` | Rules and algorithms |
-| `docs/OVERLAYS.md` | Wrap the installer for a site |
-| `CONTRIBUTING.md`, `CHANGELOG.md`, `NOTICE` | Contributing, history, third-party licences |
+| `docs/STORAGE-LOCAL.md`, `docs/STORAGE-SMB.md` | Where your library lives; NAS setup |
+| `docs/KNOWN-LIMITS.md` | What partitor gets wrong |
+
+Developers and people who build on partitor: see `CONTRIBUTING.md`.
 
 ## Platforms
 
