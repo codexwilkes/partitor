@@ -315,7 +315,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
             lay["system_joins"] = sys_joins
         lay_path.write_text(LAYOUT_HELP + yaml.safe_dump(
             lay, sort_keys=False, allow_unicode=True, default_flow_style=None,
-            width=100), encoding="utf-8")
+            width=100), encoding="utf-8", newline="\n")
         _ok(f"layout:   {lay_path}")
         if unresolved:
             _warn(f"map:  {len(unresolved)} system(s) uncertain: "

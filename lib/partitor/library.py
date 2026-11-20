@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import math
 import os
 import re
@@ -15,7 +14,12 @@ from pathlib import Path
 
 import yaml
 
-from . import config
+from . import config, outfile
+
+try:
+    import fcntl
+except ImportError:        # no flock on this system (Windows): item_lock gives no lock
+    fcntl = None
 from .bars import renumber, system_dropped
 from .clef import order_pitches, parse_pitch, pitch_str, refresh_ambitus
 from .config import (
@@ -35,7 +39,7 @@ from .mapping import clefs_compatible
 # /var/lib/partitor/library. The folder is local or an SMB mount: the engine
 # does not know which. score.yaml is the engine's layout file plus the item keys
 # (id, slug, created, built); the CLI is the only writer.
-LIBRARY_DEFAULT = "/var/lib/partitor/library"
+LIBRARY_DEFAULT = "/var/lib/partitor/library"   # a platform pack may change it (cli_main)
 # item id: YYYY-MM-NNNN (year and month of the extraction, serial in the
 # year); items of 0.3.0-dev.6 and before: YYYY-NNN (still found)
 ITEM_RE = re.compile(r"^(\d{4})-(?:(\d{2})-(\d{4})|(\d{3}))(?:-|$)")
@@ -306,7 +310,7 @@ def save_item(item: Path, data: dict) -> None:
     tmp = dst.with_name(dst.name + ".tmp")
     tmp.write_text(ITEM_HELP + LAYOUT_HELP + yaml.safe_dump(
         data, sort_keys=False, allow_unicode=True, default_flow_style=None, width=100),
-        encoding="utf-8")
+        encoding="utf-8", newline="\n")
     os.replace(tmp, dst)
 
 
@@ -401,6 +405,9 @@ def item_lock(item: Path):
     same item in this process only counts (a command that calls another). The forked
     workers of a build share the lock of their parent. A file system without locks (some
     SMB mounts) gives no lock and no error: the command goes on as before."""
+    if fcntl is None:                          # no flock on this system: no lock
+        yield
+        return
     try:
         st = os.stat(item)
     except OSError:
@@ -454,8 +461,8 @@ def swap_parts(item: Path) -> None:
     new, cur, prev = item / PARTS_NEW, item / "parts", item / PARTS_PREV
     shutil.rmtree(prev, ignore_errors=True)
     if cur.exists():
-        os.replace(cur, prev)
-    os.replace(new, cur)
+        outfile.replace_file(cur, prev)
+    outfile.replace_file(new, cur)
 
 
 def keep_lines(item: Path) -> None:
@@ -478,7 +485,7 @@ def restore_previous_parts(item: Path) -> bool:
     if not prev.is_dir():
         return False
     shutil.rmtree(cur, ignore_errors=True)
-    os.replace(prev, cur)
+    outfile.replace_file(prev, cur)
     shutil.rmtree(item / "lines", ignore_errors=True)   # they match the set that went
     return True
 

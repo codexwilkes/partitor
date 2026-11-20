@@ -7,6 +7,36 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.9.0 — 2026-11-19
+
+### Added
+- Platform seam `lib/partitor/hooks.py`: the Linux behaviour of the few things a platform may change
+  (free memory, console set-up, tesseract path, default library, the hint of a write error). A platform
+  pack in `platforms/<os>/` replaces them at its own entry point; the core never imports a pack.
+- Windows pack `platforms/windows/` (experimental, not supported): the hooks, the entry point of
+  `partitor.exe`, the PyInstaller build script and its README.
+- `tests/test_hooks.py` checks that the core has no OS checks, never imports a pack, and that the modules
+  of the stage-cache hash do not import the seam. `tests/test_packs.py` runs the pack tests.
+- Windows installer (experimental, `platforms/windows/installer/`): `build-windows.py --installer` makes
+  `partitor-<version>-setup.exe` with Inno Setup. It installs per user (no administrator), puts `partitor` on the
+  user PATH, adds a Start menu entry, asks for the library folder (default `Documents\partitor`), and makes
+  `inbox` and `library` in it. It bundles Tesseract 5.4.0 and the language data deu, eng, fra, ita, lat and osd,
+  each pinned by SHA-256. Uninstall never removes the library. The installer is not signed.
+  The Start menu entry, the installer and `partitor.exe` use an icon made from the neume of the author's logo
+  (`platforms/windows/installer/partitor.ico`).
+- Hook `setup_hint` (hook API 2): the hint when the library folder lacks `inbox/` or `library/`. Linux keeps
+  "Run: partitor-init"; a platform pack can name its own way to set up.
+- Platform policy (`docs/DESIGN.md` §12.6, `CONTRIBUTING.md`): Linux is primary. Work for Windows or macOS
+  stays in its pack unless it is better for every system. Platform docs live in `platforms/<os>/`; a test
+  checks that `docs/` has no platform file and that each pack has a README.
+
+### Changed
+- An output PDF or the parts folder that cannot be written ("permission denied") gives one ERROR line
+  that names the file and a hint, not a traceback. On Windows this is also a file open in a viewer.
+- Text files that partitor writes (`layout.yaml`, `score.yaml`, the preview index, the assembly text) always have
+  LF line endings. Windows would have written CRLF. On Linux the files are the same as before.
+- A system without fork (Windows) runs one job and gives one `jobs:` warning, also for `--jobs 4`.
+
 ## 0.8.97 — 2026-11-19
 
 ### Added

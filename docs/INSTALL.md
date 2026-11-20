@@ -10,7 +10,8 @@ result. It is safe to run again.
 - Ubuntu 26.04 LTS with systemd (the tested platform). Ubuntu 24.04 should work:
   the pinned packages have wheels for its Python 3.12 and the tests pass there
   (`KNOWN-LIMITS.md`). macOS and hosts without
-  systemd are not supported yet (`KNOWN-LIMITS.md`).
+  systemd are not supported yet (`KNOWN-LIMITS.md`). An experimental Windows console build
+  exists: see `platforms/windows/README.md`. It is not supported.
 - Root access (`sudo`).
 - Internet access during the install (apt and PyPI).
 - Memory: not measured on small hosts. A detect or a build uses worker processes under a
@@ -26,7 +27,7 @@ For a player who wants the defaults (a local library, no questions):
 ```bash
 sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.8.97   # a release tag, not main
+cd /opt/partitor && sudo git checkout --detach 0.9.0   # a release tag, not main
 sudo bin/partitor-quick-install
 ```
 

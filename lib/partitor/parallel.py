@@ -8,7 +8,6 @@ import io
 import os
 import pickle
 import re
-import resource
 import shutil
 import signal
 import sys
@@ -18,8 +17,13 @@ from pathlib import Path
 
 import cv2
 
-from . import console
+from . import console, hooks
 from .console import _FAILURES, _WARNINGS, _counts, _reset_counts, _warn
+
+try:
+    import resource
+except ImportError:        # Windows has no resource module
+    resource = None
 
 
 # =============================================================================
@@ -51,13 +55,7 @@ def parse_size(text: str) -> int | None:
 
 def mem_available() -> int:
     """mem_available -> bytes of memory the machine can still give (MemAvailable)."""
-    try:
-        for line in Path("/proc/meminfo").read_text().splitlines():
-            if line.startswith("MemAvailable:"):
-                return int(line.split()[1]) * 1024
-    except (OSError, ValueError, IndexError):
-        pass
-    return 4 * GIB
+    return hooks.available_memory()
 
 
 def page_worker_gb(doc, pages, dpi: int) -> float:
@@ -73,6 +71,22 @@ def page_worker_gb(doc, pages, dpi: int) -> float:
     return max(PAGE_WORKER_MIN_GB, PAGE_WORKER_BASE_GB + px * PAGE_BYTES_PER_PX / GIB)
 
 
+def can_fork() -> bool:
+    """can_fork -> True where the system can fork (os.fork exists; not on Windows)."""
+    return hasattr(os, "fork")
+
+
+_NO_FORK_WARNED: list[bool] = []     # one warning per run, not one per loop
+
+
+def _warn_no_fork() -> None:
+    """_warn_no_fork: one `jobs:` warning where the system has no fork (Windows): one job runs."""
+    if not _NO_FORK_WARNED:
+        _NO_FORK_WARNED.append(True)
+        _warn("jobs:  this system cannot fork worker processes; running with 1 job "
+              "(--jobs and PARTITOR_JOBS have no effect)")
+
+
 def job_count(requested, worker_gb: float, items: int) -> int:
     """job_count -> number of children to run at once, 1..items.
 
@@ -82,6 +96,9 @@ def job_count(requested, worker_gb: float, items: int) -> int:
     wrapper; else 80 % of what the machine has free) less MAIN_GB must hold
     every child at worker_gb."""
     if items <= 1:
+        return 1
+    if not can_fork():
+        _warn_no_fork()
         return 1
     req = str(requested if requested is not None
               else os.environ.get("PARTITOR_JOBS", "auto")).strip().lower()
@@ -115,6 +132,8 @@ def rss_kb() -> int | None:
 def worker_peak_mb() -> int:
     """worker_peak_mb -> peak resident size (MB) of the largest child that ended so far. A forked
     child counts the pages it shares with this process too (copy on write)."""
+    if resource is None:
+        return 0
     return int(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss / 1024)
 
 
@@ -173,7 +192,7 @@ def fork_map(fn, items, jobs: int):
     killed (out of memory) raises RuntimeError and the others are stopped.
     Close the generator (contextlib.closing) when you stop early."""
     items = list(items)
-    if jobs <= 1 or len(items) <= 1:
+    if jobs <= 1 or len(items) <= 1 or not can_fork():
         for it in items:
             yield fn(it)
         return

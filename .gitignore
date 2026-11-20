@@ -7,3 +7,9 @@ __pycache__/
 
 # Local session notes (private)
 /.local/
+
+# Windows build output (platforms/windows/build-windows.py)
+/build-venv/
+/build-cache/
+/build/
+/dist/

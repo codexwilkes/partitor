@@ -236,14 +236,14 @@ class TestRealRepo(unittest.TestCase):
         r = subprocess.run([sys.executable, "-I", TOOL, "--static"], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
-    def test_repo_modules_table_has_27_modules_with_known_levels(self):
+    def test_repo_modules_table_has_29_modules_with_known_levels(self):
         r = subprocess.run([sys.executable, "-I", TOOL, "--affected", "console"],
                            capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("tests: *", r.stdout)
         with open(os.path.join(ROOT, "tools", "modules.txt"), encoding="utf-8") as fh:
             rows = [ln.split() for ln in fh if ln.strip() and not ln.startswith("#")]
-        self.assertEqual(len(rows), 27)
+        self.assertEqual(len(rows), 29)
         self.assertEqual(sorted({int(r[0]) for r in rows}), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 
     def test_every_existing_module_imports_alone(self):
@@ -272,7 +272,7 @@ class TestRealRepo(unittest.TestCase):
         self.assertIn("cli_main", present)         # moved in step M8
         self.assertIn("turnplan", present)         # added in 0.8.3
         self.assertIn("partplan", present)         # added in 0.8.6
-        self.assertEqual(len(present), len(listed))    # all 27 modules exist (23 of the plan, stagecache 0.7.0, turnplan 0.8.3, partplan 0.8.6, runlog 0.8.66)
+        self.assertEqual(len(present), len(listed))    # all 29 modules exist (23 of the plan, stagecache 0.7.0, turnplan 0.8.3, partplan 0.8.6, runlog 0.8.66, hooks, outfile)
         for m in present:
             with self.subTest(module=m):
                 code = f"import sys; sys.path.insert(0, {lib!r}); import partitor.{m}"
@@ -311,7 +311,7 @@ class TestRealRepo(unittest.TestCase):
     def test_m3_modules_sit_on_their_levels_and_import_only_lower_ones(self):
         """reflow (1), ownership (2) and analysis (3): imports go to strictly lower levels (plan 3)."""
         import ast
-        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
+        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0, "hooks": 0, "outfile": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
                  "ownership": 2, "stagecache": 2, "analysis": 3}
         for m in ("reflow", "ownership", "analysis"):
@@ -339,7 +339,7 @@ class TestRealRepo(unittest.TestCase):
     def test_m4_modules_sit_on_their_levels_and_import_only_lower_ones(self):
         """lines (2) and render (3): imports go to strictly lower levels (plan 3)."""
         import ast
-        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
+        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0, "hooks": 0, "outfile": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
                  "lines": 2, "ownership": 2, "stagecache": 2, "render": 3, "turnplan": 1}
         for m in ("lines", "render"):
@@ -373,7 +373,7 @@ class TestRealRepo(unittest.TestCase):
     def test_m5_library_sits_on_level_4_and_imports_only_lower_ones(self):
         """library (4): imports go to strictly lower levels; it has no `global` and no render import."""
         import ast
-        level = {"console": 0, "config": 0, "bars": 0, "mapping": 0, "clef": 1, "render": 3, "library": 4}
+        level = {"console": 0, "config": 0, "bars": 0, "hooks": 0, "outfile": 0, "mapping": 0, "clef": 1, "render": 3, "library": 4}
         with open(os.path.join(ROOT, "lib", "partitor", "library.py"), encoding="utf-8") as fh:
             tree = ast.parse(fh.read())
         got_all = set()
@@ -384,7 +384,7 @@ class TestRealRepo(unittest.TestCase):
                 for g in got:
                     self.assertLess(level[g], level["library"], f"library imports {g}")
             self.assertNotIsInstance(node, ast.Global)   # the module keeps no state of its own
-        self.assertEqual(got_all, {"bars", "clef", "config", "console", "mapping"})
+        self.assertEqual(got_all, {"bars", "clef", "config", "console", "mapping", "outfile"})
 
     def test_m5_library_imports_no_patched_name_by_name(self):
         """No name tests replace (patchable.txt) is imported by name by library, and none has a shim."""
@@ -404,7 +404,7 @@ class TestRealRepo(unittest.TestCase):
     def test_m6_build_and_proof_are_level_5_and_do_not_import_each_other(self):
         """build and proof (both 5): lower imports only, none between them, no `global`."""
         import ast
-        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
+        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0, "hooks": 0, "outfile": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
                  "lines": 2, "ownership": 2, "stagecache": 2, "analysis": 3, "render": 3, "partplan": 4, "library": 4,
                  "build": 5, "proof": 5}
@@ -454,7 +454,7 @@ class TestRealRepo(unittest.TestCase):
         """cli_common (6), cli_bars and cli_parts (7), cli_items (8): lower imports only, so
         cli_bars and cli_parts do not import each other; no `global`."""
         import ast
-        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
+        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0, "hooks": 0, "outfile": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1,
                  "lines": 2, "ownership": 2, "stagecache": 2, "analysis": 3, "render": 3, "partplan": 4, "library": 4,
                  "build": 5, "proof": 5, "cli_common": 6, "cli_bars": 7, "cli_parts": 7,
@@ -501,7 +501,7 @@ class TestRealRepo(unittest.TestCase):
         """cli_main (9) imports lower modules only and has no `global`. Its command table is built
         per call and reads build.cmd_build and cli_items.cmd_rebuild as module attributes."""
         import ast
-        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0,
+        level = {"console": 0, "config": 0, "model": 0, "typography": 0, "mapping": 0, "bars": 0, "hooks": 0, "outfile": 0,
                  "parallel": 1, "reflow": 1, "strips": 1, "vision": 1, "clef": 1, "runlog": 1,
                  "lines": 2, "ownership": 2, "stagecache": 2, "analysis": 3, "render": 3, "partplan": 4, "library": 4,
                  "build": 5, "proof": 5, "cli_common": 6, "cli_bars": 7, "cli_parts": 7,

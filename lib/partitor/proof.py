@@ -8,6 +8,7 @@ import re
 import shutil
 from pathlib import Path
 
+from . import outfile
 from .bars import effective_systems, renumber, system_dropped
 from .clef import extreme_bar, part_extremes, pitch_name
 from .config import SCORE_FILE
@@ -32,7 +33,7 @@ def proof_from_preview(item: Path) -> Path | None:
     out = item_file(item, "proof.pdf")
     tmp = out.with_name(out.name + ".tmp")
     doc.save(tmp, garbage=3, deflate=True)
-    os.replace(tmp, out)
+    outfile.replace_file(tmp, out)
     shutil.rmtree(pdir, ignore_errors=True)
     annotate_proof(item)
     return out
@@ -214,4 +215,4 @@ def annotate_proof(item: Path, data: dict | None = None) -> None:
     tmp = proof.with_name(proof.name + ".tmp")
     out.save(tmp, garbage=3, deflate=True)
     src.close()
-    os.replace(tmp, proof)
+    outfile.replace_file(tmp, proof)

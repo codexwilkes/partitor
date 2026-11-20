@@ -13,6 +13,7 @@ Ubuntu LTS on x86-64 with systemd. Other platforms are best effort.
 | `docs/SANDBOX.md`, `SECURITY.md` | What the sandbox does; reporting problems |
 | `docs/LIBRARY-LAYOUT.md` | The stable folder and file-name contract, for tools that publish or read the library |
 | `docs/OVERLAYS.md` | Wrap the installer for a site (unsupported sample) |
+| `platforms/windows/README.md` | Experimental Windows console build and installer (not supported) |
 | `CHANGELOG.md`, `NOTICE` | History, third-party licences |
 
 ## Rules
@@ -102,13 +103,15 @@ only for what you checked by eye. The values say what the engine does now, not t
 
 The engine is the package `lib/partitor/` (`DESIGN.md` §12); `lib/partitor-engine` is only the
 launcher that starts `partitor.cli_main.main`. A change goes into the module that owns the
-name. The 24 modules and their import levels:
+name. The 29 modules and their import levels:
 
 | Lvl | Module | Put here |
 |---|---|---|
 | 0 | `console` | Output, colours, prompts |
 | 0 | `config` | Tunables, defaults, paper sizes, name helpers |
 | 0 | `model` | Data classes |
+| 0 | `hooks` | Platform seam (Linux defaults) |
+| 0 | `outfile` | Output writes, clear error |
 | 0 | `typography` | Fonts, text measure |
 | 0 | `mapping` | Staff label to part map |
 | 0 | `bars` | Bar numbers, barline edits |
@@ -168,6 +171,20 @@ Saved `.lines` files: the reader accepts the class paths of every earlier layout
 (`__main__`, `partitor.*`); do not narrow it. The fixture `tests/data/lines-0.4.2.lines`
 was written by the engine before the first move, and a test loads it. Binary fixtures in
 `tests/data/` carry no licence line (`tools/check-repo.sh` skips that folder for this check).
+
+## Windows and macOS
+
+Linux is the primary system; production runs on it. Windows and macOS are best effort
+(`DESIGN.md` §12.6).
+
+- Work for a platform goes into its pack, `platforms/<os>/`: code, build script, tests and docs.
+  Do not change `lib/partitor/` for one platform.
+- A change goes into the core only when it is better for every system, Linux included. Send it as
+  its own pull request; it must pass the Linux checks.
+- If a pack needs a new hook in `lib/partitor/hooks.py`, send the hook and its Linux default as a
+  separate, small pull request first.
+- Docs for one platform stay in its folder (`platforms/<os>/README.md`). The docs in `docs/` and
+  `README.md` only point to them.
 
 ## Version
 

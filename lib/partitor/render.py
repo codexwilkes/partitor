@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pymupdf
 
-from . import config
+from . import config, outfile
 from .clef import ACC_GLYPH, CLEF_BOTTOM
 from .config import AMB_SP, PAPER, SYSTEM_GAP_FACTOR, composer_surname
 from .console import _warn
@@ -269,7 +269,7 @@ def large_copy(src: Path, paper: str, cutline: str = "dotted") -> Path:
             elif cutline == "marks":
                 for a, b in ((CROP_MARK[0], CROP_MARK[1]), (sw - CROP_MARK[1], sw - CROP_MARK[0])):
                     page.draw_line((a, cut), (b, cut), color=(0, 0, 0), width=0.5)
-    big.save(out, garbage=3, deflate=True)
+    outfile.save_pdf(big, out)
     return out
 
 
@@ -1041,7 +1041,7 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
         f["pdf"] = len(doc)
     if plan.folds and len(doc) % 2:
         doc.new_page(width=pw, height=ph)          # a blank back: the leaves print in pairs
-    doc.save(out, garbage=3, deflate=True)
+    outfile.save_pdf(doc, out)
     foldout = None
     if plan.folds:
         foldout = out.with_name(out.stem + FOLDOUT_TAIL)
@@ -1080,7 +1080,7 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
             sheet_guides(back, pw, ph, 2 * pw - TRIM_PT if left else TRIM_PT, mt,
                           "Back of the sheet (outside of the flap: blank). Cut and fold on the front lines.",
                           hint, lines=False)
-        sheets.save(foldout, garbage=3, deflate=True)
+        outfile.save_pdf(sheets, foldout)
         flaps_pdf = out.with_name(out.stem + FLAPS_TAIL)
         flaps = pymupdf.open()
         for gi, g in enumerate(plan.groups):       # one Letter page per flap, for the tape route
@@ -1099,11 +1099,11 @@ def render_plan(name: str, strips: list[Strip], meta: dict, dpi: int, opts: dict
                          f"Flap {pl['sheet']} of {len(places)}. Print on one side only. Tape the "
                          f"{'right' if left else 'left'} edge of this page to the {pl['edge']} edge of "
                          f"page {pl['bound_label']}.", cutline=cl)
-        flaps.save(flaps_pdf, garbage=3, deflate=True)
+        outfile.save_pdf(flaps, flaps_pdf)
         assemble = out.with_name(out.stem + ASSEMBLE_TAIL)
         assemble.write_text(assemble_text(name, out.name, foldout.name, flaps_pdf.name,
                                           *paper_words(opts["paper"], pw, ph), places, len(doc), cl,
-                                          large_words(out, flaps_pdf, opts)), encoding="utf-8")
+                                          large_words(out, flaps_pdf, opts)), encoding="utf-8", newline="\n")
     LAST_RENDER.update(content=nfaces, title_page=title_page, foldouts=plan.folds,
                        foldout=foldout.name if foldout else None,
                        flaps=flaps_pdf.name if foldout else None,
@@ -1200,6 +1200,6 @@ def render_part(name: str, strips: list[Strip], meta: dict, dpi: int,
                        title_band=(ci == 0 and not title_page),
                        head_right=bool(duplex and phys % 2 == 0),
                        folio=f"{ci + 1}/{n}", last=(ci == n - 1)))
-    doc.save(out, garbage=3, deflate=True)
+    outfile.save_pdf(doc, out)
     LAST_RENDER.update(content=n, title_page=title_page, foldouts=0, foldout=None, flaps=None, assemble=None)
     return n + (1 if title_page else 0)

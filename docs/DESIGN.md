@@ -628,7 +628,8 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
 `--jobs`, else `PARTITOR_JOBS`, else auto (one CPU stays free, at most 6, and
 as many as the memory cap holds at about 36 bytes per pixel of the largest page
 plus 0.1 GB per worker (A4 at 400 dpi: 0.6 GB; a ledger page: 1.1 GB), plus 2 GB for the
-main process). `--jobs 1` runs in one process, page by page.
+main process). `--jobs 1` runs in one process, page by page. A system without fork (Windows) always
+runs one job and gives one `jobs:` warning (§12.6).
 
 - **Same output.** Parallel and single-process runs give the same
   `layout.yaml`, preview files, system ids, titles, check counts and printed
@@ -1435,6 +1436,8 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 0 | `console` | Output primitives, colours, counters, prompts, `Abort` |
 | 0 | `config` | Tunables, `TUNE`, layout and score keys, defaults, paper sizes (`PAPER`), name helpers |
 | 0 | `model` | Data classes `Staff`, `PageResult`, `Strip`, `RestRun` |
+| 0 | `hooks` | The platform seam: Linux defaults that a platform pack may replace (§12.6) |
+| 0 | `outfile` | Writes of output files with one clear error when permission is denied (§12.6) |
 | 0 | `typography` | Fonts and text measure; cut and fold guides; fold-out assembly text |
 | 0 | `mapping` | Staff label to part map, accent folding (`fold_accents`) |
 | 0 | `bars` | Bar numbers, bar marks, barline edits |
@@ -1628,3 +1631,59 @@ A diagnostic record of one CLI run, for the operator who wants to hand over what
   command starts no log of its own, so reading logs adds none.
 - **Failure.** A folder that cannot be written gives one line on stderr (`run log off: ...`); the run
   goes on.
+
+### 12.6 Platform seam (`hooks`) and platform packs
+
+Linux is the product. Windows and macOS are best effort. Work for them must not change, slow
+or block Linux, and people who improve them must not need to change the core.
+
+Policy of the maintainer (keep it):
+
+- **Linux is primary.** Production runs on Linux. A platform never sets the direction of the
+  core.
+- **A platform fix stays in its pack** (`platforms/<os>/`). It goes into the core only when it
+  is better for every system, Linux included, on its own merits: for example LF line endings
+  or a clear error for a file that cannot be written. Such a change is a core change: it has its
+  own commit and passes the Linux gates (tests, G0, bench).
+- **A new hook** is a core change too: one small commit for the hook and its Linux default, before
+  the pack uses it.
+- **Platform docs live in the pack folder** (`platforms/<os>/README.md` and other files there),
+  so a pack can move to its own repository later. The core docs only point to them; they do not
+  explain how to build, install or use a platform. `tests/test_hooks.py` checks the file names.
+- **Deferred:** a worker pool without fork (spawn). It would serve Windows only; the plan is in
+  `platforms/windows/README.md`.
+
+- **The core is Linux.** `lib/partitor/` has no OS check (`os.name`, `sys.platform`), no
+  Windows code (`ctypes`, `msvcrt`) and no loader. Where a system lacks a feature, the core checks
+  the feature: `parallel.can_fork()` (`os.fork` exists), `library.fcntl is None` (no item lock),
+  `hasattr(os, "geteuid")` (root check).
+- **The seam.** `hooks` holds the Linux behaviour of the few things a platform may change:
+  `available_memory`, `console_init`, `tesseract_path`, `default_library`, `locked_hint`,
+  `setup_hint` (the hint when the library folder lacks `inbox/` or `library/`; Linux:
+  `partitor-init`) (`hooks.HOOKS`). `hooks.API` is the version of this list (2 since `setup_hint`);
+  a new hook raises it. `hooks` imports
+  nothing from the package. Callers use `hooks.NAME` (rule R1: `install` rebinds the names).
+- **Platform packs.** A pack is a package in `platforms/<os>/` (Windows: `partitor_windows`). It
+  depends on the core; the core never imports it. Its own entry point calls `hooks.install(pack)`,
+  then `cli_main.main()`. `install` refuses a pack with another `API` or an unknown hook name. On
+  Linux no pack is installed (`hooks.PACK is None`) and no hook code runs at start.
+- **Values into the core.** When a pack is installed, `cli_main.apply_pack` calls its
+  `console_init` and puts its values into module data: `vision._TESS["path"]`,
+  `library.LIBRARY_DEFAULT`. A data hook that returns `None` keeps the core value.
+- **Stage cache.** No module of the stage-cache hash (`stagecache.analysis_modules`, §12.4)
+  imports `hooks` or `outfile`. A pack therefore cannot change the cache key, and a change in a
+  pack never makes Linux items analyse their pages again.
+- **No fork.** `parallel.job_count` gives 1 and one `jobs:` warning (also for `--jobs 4`);
+  `fork_map` runs in the main process.
+- **Output that cannot be written.** `outfile.replace_file` (renames: the part swap, the proof
+  PDF) and `outfile.save_pdf` (part PDFs, written by pymupdf) raise `WriteDenied` on "permission
+  denied": the file name, or the folder when the part set moves. No retry. `cli_main._guarded` prints
+  one `ERROR:` line and the hint of the platform (`hooks.locked_hint`). Linux: a folder without
+  write access; Windows also: a file open in a PDF viewer.
+- **Text files** are written with `newline="\n"`: LF on every system.
+- **File names.** `slugify` gives ASCII letters, digits and hyphens, and part and item names start
+  with a number, so no forbidden character and no Windows reserved name reaches a file name.
+- **Checks.** `tests/test_hooks.py` checks these rules on the source. The pack tests
+  (`platforms/<os>/tests/`) run on Linux with mocks; `tests/test_packs.py` loads them, so they
+  count in `MIN_TESTS`. A pack's own docs and build script live in its folder
+  (`platforms/windows/README.md`).

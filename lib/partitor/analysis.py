@@ -226,7 +226,7 @@ def write_preview_index(pdir: Path, items: list[str], pdfname: str) -> Path:
         f"<h1>{html.escape(pdfname)}</h1><p>Colour = staff number on page "
         "(with clef). Brown = system header (copied to every part). Grey = "
         "discarded (light grey = noise / page edge). Red box = check by eye. "
-        "Red band = safety gate failure.</p>" + "".join(items), encoding="utf-8")
+        "Red band = safety gate failure.</p>" + "".join(items), encoding="utf-8", newline="\n")
     return idx
 
 

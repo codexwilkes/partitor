@@ -12,7 +12,7 @@ from pathlib import Path
 
 import yaml
 
-from . import VERSION, cli_items, runlog
+from . import VERSION, cli_items, hooks, library, outfile, runlog
 from .cli_bars import cmd_bars
 from .cli_common import _lib_or_die, cmd_set
 from .cli_items import (
@@ -313,16 +313,36 @@ def main() -> int:
 def _guarded() -> int:
     try:
         return _main()
+    except outfile.WriteDenied as e:
+        _die(str(e), hooks.locked_hint())
     except KeyboardInterrupt:
         print(f"\n{BOLD}{YLW}stopped (Ctrl-C).{RST} A build that stops leaves parts/ as it was; "
               "run the command again.", file=sys.stderr)
         return STOPPED_EXIT
 
 
+def apply_pack() -> None:
+    """apply_pack: a platform pack is installed (hooks.install, DESIGN.md §12.6): prepare its
+    console and put its values into the core. On Linux no pack is installed and this does not run.
+    Values go into module data (vision._TESS, library.LIBRARY_DEFAULT), so the modules of the
+    stage-cache hash never import hooks. vision is imported here, not at the top: it loads the
+    image packages, which a light command (--version, list) must not load."""
+    from . import vision
+    hooks.console_init()
+    tess = hooks.tesseract_path()
+    if tess:
+        vision._TESS["path"] = tess
+    lib = hooks.default_library()
+    if lib:
+        library.LIBRARY_DEFAULT = lib
+
+
 def _main() -> int:
     if "--sandbox-check" in sys.argv[1:2]:
         return sandbox_check(library="--library" in sys.argv[2:3])
-    if os.geteuid() == 0 and os.environ.get("PARTITOR_ALLOW_ROOT") != "1" \
+    if hooks.PACK is not None:
+        apply_pack()
+    if hasattr(os, "geteuid") and os.geteuid() == 0 and os.environ.get("PARTITOR_ALLOW_ROOT") != "1" \
             and sys.argv[1:2] not in (["--version"], ["-h"], ["--help"]):
         _die("the engine does not run as root (it parses PDFs from the internet)",
              "Use /usr/local/sbin/partitor: it runs the engine as user partitor "

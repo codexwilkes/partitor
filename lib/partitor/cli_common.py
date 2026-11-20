@@ -8,6 +8,7 @@ import functools
 import time
 from pathlib import Path
 
+from . import hooks
 from .config import LAYOUT_DEFAULTS, PART_LAYOUT_KEY
 from .console import _die, _head, _note, _ok, _summary, _warn
 from .library import (
@@ -47,7 +48,7 @@ def _lib_or_die() -> tuple[Path, Path]:
     lib = root / "library"
     if not (root / "inbox").is_dir() or not lib.is_dir():
         _die(f"library folder not ready: {root} needs inbox/ and library/",
-             "Run: partitor-init (see docs/INSTALL.md).")
+             hooks.setup_hint())
     return root, lib
 
 

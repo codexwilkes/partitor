@@ -12,6 +12,8 @@
 0 console     *
 0 mapping     test_mapping.py
 0 model       *
+0 hooks       test_hooks.py
+0 outfile     test_hooks.py
 0 typography  test_render.py
 1 clef        test_clef.py
 1 parallel    test_parallel.py

@@ -81,7 +81,7 @@ for you. No questions.
 ```bash
 sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.8.97
+cd /opt/partitor && sudo git checkout --detach 0.9.0
 sudo bin/partitor-quick-install
 ```
 
@@ -111,6 +111,8 @@ Developers and people who build on partitor: see `CONTRIBUTING.md`.
   (26.04). Ubuntu 24.04: the pinned packages install as binary wheels on
   Python 3.12 and the tests pass there (checked on CPython 3.12.3; the
   installer itself is not run on 24.04 yet).
+- **Windows:** an experimental console build with an installer, not supported:
+  `platforms/windows/README.md`.
 - **macOS:** not in this release. A mode without the sandbox is planned, as
   community best effort.
 
