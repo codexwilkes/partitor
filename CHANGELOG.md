@@ -7,6 +7,12 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## [Unreleased]
+
+### Added
+- `.github/workflows/windows-release.yml`: builds the Windows setup program on a Windows runner and attaches it to
+  the release of a tag you give (a new release is a draft). It starts only by hand; no tag or push runs it.
+
 ## 0.9.0 — 2026-11-19
 
 ### Added

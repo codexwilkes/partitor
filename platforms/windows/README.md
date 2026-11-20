@@ -70,8 +70,21 @@ the version, change the pins in the same commit. The language files are the same
 packages `tesseract-ocr-<lang>` 1:4.1.0-2.
 
 The icon (`installer\partitor.ico`) is made from the neume of the author's logo (`installer\neume.png`).
-The design is the author's own. It is here as the icon of partitor; the AGPL licence of the
-code does not cover it. `installer\make-icon.py` makes the icon again (needs Pillow).
+Icon design: Nathan Wilkes. It is used as the icon of partitor; the AGPL licence of the code does not cover it.
+`installer\make-icon.py` makes the icon again (needs Pillow).
+
+## Publish the setup program (maintainers)
+
+The workflow `.github/workflows/windows-release.yml` builds the setup program on a Windows runner and
+attaches it to a release. (GitHub needs workflow files in that folder; this is the only Windows file outside
+`platforms/windows/`.) **No tag, push or pull request starts it.** Start it by hand:
+
+1. GitHub, Actions, `windows-release`, Run workflow.
+2. Give an existing tag, for example `0.9.0`. `VERSION` at that tag must be the same number.
+3. When it ends, the release of that tag has `partitor-<version>-setup.exe` and a `.sha256` file. A release
+   that did not exist is made as a **draft**: read it, then publish it on GitHub.
+
+A failure of this workflow never blocks a Linux release. You can still build by hand (above) and upload the file.
 
 ## Build the program
 

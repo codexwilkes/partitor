@@ -183,6 +183,35 @@ class IsccTests(unittest.TestCase):
         self.assertIsNone(bundle.find_iscc({}, lambda n: None))
 
 
+class WorkflowTests(unittest.TestCase):
+    """The Windows release workflow runs by hand only and cannot block Linux."""
+
+    def setUp(self):
+        import yaml
+        self.path = ROOT / ".github" / "workflows" / "windows-release.yml"
+        self.wf = yaml.safe_load(self.path.read_text(encoding="utf-8"))
+        self.on = self.wf.get("on", self.wf.get(True))     # YAML reads `on` as True
+
+    def test_it_starts_by_hand_only(self):
+        self.assertEqual(list(self.on), ["workflow_dispatch"])
+
+    def test_it_asks_for_a_tag(self):
+        self.assertTrue(self.on["workflow_dispatch"]["inputs"]["tag"]["required"])
+
+    def test_the_tag_is_not_pasted_into_a_script(self):
+        text = self.path.read_text(encoding="utf-8")
+        self.assertNotIn("run: ${{", text)
+        self.assertNotRegex(text, r"\$\{\{\s*inputs\.tag\s*\}\}[^\n]*\n(?=\s+(run|shell))")
+        for step in self.wf["jobs"]["build"]["steps"]:
+            self.assertNotIn("inputs.", step.get("run", ""))
+
+    def test_a_new_release_is_a_draft(self):
+        self.assertIn("--draft", self.path.read_text(encoding="utf-8"))
+
+    def test_it_builds_with_the_pack_script(self):
+        self.assertIn("platforms\\windows\\build-windows.py --installer", self.path.read_text(encoding="utf-8"))
+
+
 class ScriptTests(unittest.TestCase):
     """The Inno Setup script keeps the decisions of the maintainer."""
 

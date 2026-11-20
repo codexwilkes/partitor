@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+#
+# Windows release (experimental, not part of the Linux CI). Run it by hand: GitHub, Actions,
+# "windows-release", "Run workflow", and give an existing tag. It builds partitor.exe and the setup
+# program on a Windows runner (platforms/windows/build-windows.py --installer) and attaches the
+# setup file and its SHA-256 to the release of that tag. A release that does not exist yet is made as
+# a DRAFT; you publish it on GitHub when you are satisfied. No tag, push or pull request starts it.
+# A failure here never blocks a Linux release. Actions are pinned by version tag.
+name: windows-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and attach to, for example 0.9.0 (VERSION must equal it)"
+        required: true
+        type: string
+
+permissions:
+  contents: write            # to create the draft release and attach the files
+
+concurrency:
+  group: windows-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Windows setup program
+    runs-on: windows-2022
+    env:
+      TAG: ${{ inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: check the tag name
+        shell: pwsh
+        run: |
+          if ($env:TAG -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') { throw "tag must look like 0.9.0" }
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+      - name: VERSION equals the tag
+        shell: pwsh
+        run: |
+          $v = (Get-Content VERSION -Raw).Trim()
+          if ($v -ne $env:TAG) { throw "VERSION is $v, the tag is $env:TAG" }
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Inno Setup and 7-Zip (installed only when the runner lacks them)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          if (-not (Test-Path "$env:ProgramFiles\7-Zip\7z.exe")) { choco install 7zip -y --no-progress }
+      - name: build partitor.exe and the setup program
+        run: python platforms\windows\build-windows.py --installer
+      - name: SHA-256 of the setup program
+        shell: pwsh
+        run: |
+          $f = "dist\partitor-$env:TAG-setup.exe"
+          $h = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+          "$h  partitor-$env:TAG-setup.exe" | Set-Content -Encoding ascii "$f.sha256"
+          Get-Content "$f.sha256"
+      - name: attach to the release (a new release is a draft)
+        shell: pwsh
+        run: |
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:TAG --draft --verify-tag --title "partitor $env:TAG" --notes "Windows setup program (experimental, not signed). SHA-256 in the .sha256 file. See platforms/windows/README.md."
+          }
+          gh release upload $env:TAG "dist\partitor-$env:TAG-setup.exe" "dist\partitor-$env:TAG-setup.exe.sha256" --clobber
