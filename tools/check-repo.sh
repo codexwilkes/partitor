@@ -7,7 +7,7 @@
 #   - a score or scan: *.pdf, *.jpg, *.jpeg, *.tif, *.tiff (copyright; no samples ship)
 #   - a private network address (RFC 1918) or a *.invalid host
 #   - a file without an SPDX line (bin/, lib/, tests/, tools/, platforms/; lib/ includes lib/partitor/;
-#     the binary fixtures in tests/data/ are the one exception)
+#     the binary fixtures in tests/data/ and the icon files (*.png, *.ico) in platforms/ are the exceptions)
 #   - a broken module structure (tools/check-modules.py --static)
 # A private token list is checked by the maintainer, not here (it is itself personal).
 # Usage: tools/check-repo.sh   (run from anywhere inside the repo)
@@ -28,6 +28,7 @@ done < <(files)
 while IFS= read -r f; do
   case "$f" in
     tests/data/*) continue ;;                 # binary fixtures cannot hold a licence line
+    platforms/*.png|platforms/*.ico) continue ;;   # binary assets (the icon) cannot hold a licence line
     bin/*|lib/*|tests/*|tools/*|platforms/*)
       head -n 6 "$f" | grep -q 'SPDX-License-Identifier: AGPL-3.0-or-later' || bad "no SPDX line: $f" ;;
   esac

@@ -23,7 +23,7 @@ WF = os.path.join(ROOT, ".github", "workflows", "ci.yml")
 
 # Discovered tests (skipped ones count) at the last step. Raise it with every step that adds
 # tests; never lower it (CONTRIBUTING.md: the number of tests must not fall).
-MIN_TESTS = 1132
+MIN_TESTS = 1133
 
 
 def text(*parts):
@@ -37,6 +37,16 @@ class TestWorkflow(unittest.TestCase):
         self.wf = yaml.safe_load(text(".github", "workflows", "ci.yml"))
         # YAML 1.1 reads the key "on" as True
         self.on = self.wf.get("on", self.wf.get(True))
+
+    def test_repo_gate_passes_on_the_tracked_files(self):
+        """The CI gate (tools/check-repo.sh) on the tracked files; it failed on the icon files of 0.9.0."""
+        import shutil
+        import subprocess
+        if shutil.which("git") is None or not os.path.isdir(os.path.join(ROOT, ".git")) and not os.path.isfile(os.path.join(ROOT, ".git")):
+            self.skipTest("no git checkout")
+        r = subprocess.run(["bash", os.path.join(ROOT, "tools", "check-repo.sh")], cwd=ROOT,
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_triggers(self):
         self.assertIn("pull_request", self.on)
@@ -84,7 +94,8 @@ class TestWorkflow(unittest.TestCase):
     def test_repo_gate_skips_the_licence_line_for_binary_fixtures_only(self):
         gate = text("tools", "check-repo.sh")
         self.assertIn("tests/data/*) continue", gate)
-        self.assertEqual(gate.count("continue ;;"), 2)       # LICENSE/fonts and tests/data: no more
+        self.assertIn("platforms/*.png|platforms/*.ico) continue", gate)
+        self.assertEqual(gate.count("continue ;;"), 3)       # LICENSE/fonts, tests/data, platform icons: no more
         self.assertTrue(os.path.isfile(os.path.join(ROOT, "tests", "data", "lines-0.4.2.lines")))
 
     def test_wheels_only(self):

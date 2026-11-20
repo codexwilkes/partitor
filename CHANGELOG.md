@@ -30,6 +30,9 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
   stays in its pack unless it is better for every system. Platform docs live in `platforms/<os>/`; a test
   checks that `docs/` has no platform file and that each pack has a README.
 
+### Fixed
+- `tools/check-repo.sh` no longer asks for an SPDX line in the icon files (`*.png`, `*.ico`) of a platform pack.
+
 ### Changed
 - An output PDF or the parts folder that cannot be written ("permission denied") gives one ERROR line
   that names the file and a hint, not a traceback. On Windows this is also a file open in a viewer.
