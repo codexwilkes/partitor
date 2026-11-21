@@ -2,7 +2,7 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # Operating
 
-`operator-flow.html` is the step-by-step guide for a piece: drop, analyse, edit,
+`operator-flow.html` (built from `docs/operator/`) is the step-by-step guide for a piece: drop, analyse, edit,
 review, build. Open it in a browser. This page is the short reference.
 
 ## Commands

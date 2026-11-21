@@ -9,7 +9,22 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 ## [Unreleased]
 
+### Changed
+- `docs/operator-flow.html` is generated: do not edit it. The page keeps its look. The item-menu table is two
+  tables, and the choices example is a screen block.
+
+### Fixed
+- The operator guide did not list menu key `h` (short names of the staff labels in a group score).
+
 ### Added
+- Sources of the operator guide in `docs/operator/`: `guide.md` (the five stages), `problems.md` (the
+  "Common problems", one answer paragraph each), `operator.css` and `README.md` (the rules of the sources).
+- `tools/build-operator-doc.py`: builds `docs/operator-flow.html` from them. The version comes from `VERSION`.
+  `--check` fails when the committed file is old. It checks the rules (allowed HTML, no image, no external
+  link, section ids, one paragraph per answer) and names file and line. `tools/check-repo.sh` runs it; CI
+  installs `python3-markdown-it` and `python3-yaml` for it (developer packages only).
+- Tests: the generator, the no-image rule, and a test that compares the keys of `item_menu` with the item-menu
+  tables of the guide.
 - `.github/workflows/windows-release.yml`: builds the Windows setup program on a Windows runner and attaches it to
   the release of a tag you give (a new release is a draft). It starts only by hand; no tag or push runs it.
 

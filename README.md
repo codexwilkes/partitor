@@ -96,7 +96,7 @@ A NAS as library, other folders, upgrade and removal: `docs/INSTALL.md`.
 
 | File | About |
 |---|---|
-| `docs/operator-flow.html` | Step by step: from a PDF to printed parts |
+| `docs/operator-flow.html` | Step by step: from a PDF to printed parts (generated from `docs/operator/`) |
 | `docs/OPERATING.md` | Daily use, commands, problems |
 | `docs/PLAN-AND-FOLDOUTS.md` | Paper, staff size, page turns, fold-outs; print and assemble |
 | `docs/INSTALL.md` | Install, settings, upgrade, uninstall |

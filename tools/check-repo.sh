@@ -9,6 +9,7 @@
 #   - a file without an SPDX line (bin/, lib/, tests/, tools/, platforms/; lib/ includes lib/partitor/;
 #     the binary fixtures in tests/data/ and the icon files (*.png, *.ico) in platforms/ are the exceptions)
 #   - a broken module structure (tools/check-modules.py --static)
+#   - a stale docs/operator-flow.html (tools/build-operator-doc.py --check) or a version in it that is not VERSION
 # A private token list is checked by the maintainer, not here (it is itself personal).
 # Usage: tools/check-repo.sh   (run from anywhere inside the repo)
 set -euo pipefail
@@ -35,6 +36,19 @@ while IFS= read -r f; do
 done < <(files)
 if ! python3 tools/check-modules.py --static; then
   bad "module structure (tools/check-modules.py --static)"
+fi
+# The operator guide: generated from docs/operator/*.md. The version test needs no extra package.
+ver="$(tr -d '[:space:]' < VERSION)"
+if [ "$(grep -c "partitor ${ver}" docs/operator-flow.html)" != 2 ] \
+   || grep -v "partitor ${ver}" docs/operator-flow.html | grep -Eq 'partitor [0-9]+\.[0-9]+\.[0-9]+'; then
+  bad "docs/operator-flow.html does not carry VERSION ${ver} (run tools/build-operator-doc.py)"
+fi
+if python3 -c "import markdown_it, yaml" 2>/dev/null; then
+  python3 tools/build-operator-doc.py --check || bad "docs/operator-flow.html is not current (tools/build-operator-doc.py)"
+elif [ -n "${CI:-}" ]; then
+  bad "markdown-it-py or PyYAML missing in CI (apt install python3-markdown-it python3-yaml)"
+else
+  echo "check-repo: skip operator guide check (python3-markdown-it or python3-yaml missing)"
 fi
 (( fail )) && exit 1
 echo "check-repo: ok"

@@ -71,7 +71,7 @@ take 25-60 s; one per test made `test_render` the slowest module.
 ```bash
 cd /opt/partitor      # or your clone
 venv/bin/python3 -m unittest discover -s tests -v
-tools/check-repo.sh                           # also runs tools/check-modules.py --static
+tools/check-repo.sh                           # also runs tools/check-modules.py --static and tools/build-operator-doc.py --check
 shellcheck -S warning bin/partitor bin/partitor-init bin/partitor-install tools/check-repo.sh tools/bench-start.sh   # if installed
 ```
 
@@ -85,6 +85,14 @@ dies or the number of tests that ran differs from the number found. It splits by
 using the seconds in `tools/test-weights.txt` (a class not listed counts 0.05 s per test; the
 numbers only balance the load). It needs about 2 GB more memory than a serial run. More than 4
 processes was slower on 8 cores. CI stays serial (`unittest discover -s tests`).
+
+The operator guide `docs/operator-flow.html` is generated. Edit `docs/operator/guide.md`,
+`docs/operator/problems.md` or `docs/operator/operator.css` (rules: `docs/operator/README.md`), then run
+`tools/build-operator-doc.py` and commit the result with the sources. Run it again when `VERSION` changes.
+The tool needs `markdown-it-py` and `PyYAML` on the developer machine only
+(`sudo apt install python3-markdown-it python3-yaml`); users need nothing new.
+A new key in `item_menu` (`lib/partitor/cli_main.py`) needs a row in the item-menu table of `guide.md`:
+a test compares the two.
 
 Corpus tests (slow): `PARTITOR_CORPUS=/path/to/folder venv/bin/python3 -m
 unittest -v tests/test_analysis.py`. The folder holds your own PDFs with the

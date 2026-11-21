@@ -24,7 +24,10 @@ def read(*parts):
 def doc_files():
     out = [os.path.join(ROOT, n) for n in
            ("README.md", "SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md", "NOTICE")]
-    out += [os.path.join(DOCS, n) for n in sorted(os.listdir(DOCS))]
+    out += [os.path.join(DOCS, n) for n in sorted(os.listdir(DOCS))
+            if os.path.isfile(os.path.join(DOCS, n))]
+    op = os.path.join(DOCS, "operator")                   # the sources of the operator guide
+    out += [os.path.join(op, n) for n in sorted(os.listdir(op)) if n.endswith(".md")]
     return out
 
 
