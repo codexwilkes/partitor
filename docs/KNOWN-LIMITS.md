@@ -24,6 +24,7 @@ result. The proof PDF (`<id>-proof.pdf`) is the place to look first.
 | Barlines, bar count | good | A bar number that touches a cue bracket is not read. The count is checked against printed numbers; a mismatch goes to review. |
 | Footer, page edge | good | Marks more than 1 sp past the staff end stay (they could be real). |
 | Clefs | about 97 % on real scans | A rare clef (G1, C2, C5, F3, F5) can be read for a common one. G8 is sometimes missed; part mapping treats G2 and G8 as the same clef. |
+| OCR | English only | Tesseract reads the staff names and the bar numbers with its English data. A name in another language can be misread. Correct it by hand (`t` in the item menu). |
 | Part mapping | good | Systems with only unlabelled staves after a change in staff count ask the operator. A stray "Continuo" label read by OCR on an upper staff can make a system ask. |
 | Lyrics, text ownership | good | A single word can land on the wrong staff. |
 | Title below the top of the page | asks, never drops | The question about systems above a title (another piece) is asked only for the first page of the score, and only for a title that is centred, at least 12 sp wide and 1.8 sp high. A title that is left-aligned, small or on a later page is not found; use `analyse ID --drop p1.s1`. |

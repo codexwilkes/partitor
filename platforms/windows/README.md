@@ -25,7 +25,7 @@ loads them). The program itself has had a short smoke test.
   for `partitor.exe` (a file you built yourself usually does not). Click "More info", then "Run anyway". Code signing waits until the project
   has donations to pay for it.
 - **OCR can differ from Linux.** The installer bundles Tesseract 5.4.0. Linux (Ubuntu 24.04) has
-  5.3.4. The language data is the same files. On 2 of 10 real scan pages the two versions read a
+  5.3.4. The language data is the same file. On 2 of 10 real scan pages the two versions read a
   staff label differently (`[I]` against `[II]`, and `fay` against a staff number). Every
   Windows installation has the same OCR, but Windows and Linux may not. Check the staff names in
   `partitor show` after a scan. The program that you build from source uses an installed Tesseract
@@ -39,8 +39,8 @@ loads them). The program itself has had a short smoke test.
 
 Run `partitor-<version>-setup.exe`. It needs no administrator rights.
 
-- The program goes to `%LOCALAPPDATA%\Programs\partitor`. Tesseract and the language data (deu, eng,
-  fra, ita, lat, osd) are inside it.
+- The program goes to `%LOCALAPPDATA%\Programs\partitor`. Tesseract and its English language data
+  are inside it. partitor reads staff names and bar numbers in English only; other languages change nothing.
 - The wizard asks for the library folder. The default is `Documents\partitor`. A folder on a network
   share also works. The installer makes `inbox` and `library` in it and sets the user variable
   `PARTITOR_LIBRARY`.
@@ -64,10 +64,10 @@ py -3.12 platforms\windows\build-windows.py --installer
 
 The script builds the program (below), downloads the Tesseract installer and the language data, checks
 each file against the SHA-256 in `installer\bundle.py`, opens the Tesseract installer with 7-Zip into `dist\partitor\tesseract`
-(the installer is never run: no administrator prompt, nothing is installed on the build machine), checks that it runs and lists the six languages, then writes
+(the installer is never run: no administrator prompt, nothing is installed on the build machine), checks that it runs and lists the English language, then writes
 `dist\partitor-<version>-setup.exe`. The pins are `TESSERACT_SHA256` and `TESSDATA_SHA256`; to change
-the version, change the pins in the same commit. The language files are the same as the Ubuntu
-packages `tesseract-ocr-<lang>` 1:4.1.0-2.
+the version, change the pins in the same commit. The language file is the same as the Ubuntu
+package `tesseract-ocr-eng` 1:4.1.0-2.
 
 The icon (`installer\partitor.ico`) is made from the neume of the author's logo (`installer\neume.png`).
 Icon design: Nathan Wilkes. It is used as the icon of partitor; the AGPL licence of the code does not cover it.

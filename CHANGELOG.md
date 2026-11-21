@@ -29,6 +29,9 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
   the release of a tag you give (a new release is a draft). It starts only by hand; no tag or push runs it.
 
 ### Changed
+- Windows installer: bundles the English language data only (it had deu, eng, fra, ita, lat and osd). partitor calls
+  Tesseract without `-l`, so the other files were never used; the output does not change. A test fails if `ocr_line` gets `-l`.
+  The docs say: Tesseract reads staff names and bar numbers in English; `tesseract-ocr` is enough on Linux.
 - A missing library folder (a NAS that is off, a wrong path) now says `library folder not found` and tells you to check the
   connection. A folder without `inbox/` or `library/` says `library folder not set up` (it was `not ready` for both).
   The operator guide's "Common problems" has one answer for each message.

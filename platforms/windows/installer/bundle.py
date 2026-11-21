@@ -19,15 +19,11 @@ TESSERACT_URL = ("https://digi.bib.uni-mannheim.de/tesseract/"
                  f"tesseract-ocr-w64-setup-{TESSERACT_VERSION}.exe")
 TESSERACT_SHA256 = "c885fff6998e0608ba4bb8ab51436e1c6775c2bafc2559a19b423e18678b60c9"
 
-# tessdata_fast 4.1.0: the same files as the Ubuntu packages tesseract-ocr-<lang> 1:4.1.0-2.
+# tessdata_fast 4.1.0: the same file as the Ubuntu package tesseract-ocr-eng 1:4.1.0-2.
+# English only: partitor calls Tesseract without -l (lib/partitor/vision.py ocr_line), so no other language is used.
 TESSDATA_URL = "https://github.com/tesseract-ocr/tessdata_fast/raw/4.1.0/{lang}.traineddata"
 TESSDATA_SHA256 = {
-    "deu": "19d219bbb6672c869d20a9636c6816a81eb9a71796cb93ebe0cb1530e2cdb22d",
     "eng": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
-    "fra": "ced037562e8c80c13122dece28dd477d399af80911a28791a66a63ac1e3445ca",
-    "ita": "b8f89e1e785118dac4d51ae042c029a64edb5c3ee42ef73027a6d412748d8827",
-    "lat": "3859d8ba60404f4b79830622625bbc76fb4ee2808eac1ad360ffa77f0a533328",
-    "osd": "9cf5d576fcc47564f11265841e5ca839001e7e6f38ff7f7aacf46d15a96b00ff",
 }
 INNO_VERSION = "6.7.3"
 # The Tesseract server answers 403 to the default Python User-Agent.
@@ -93,7 +89,7 @@ def prune(stage: Path) -> None:
 
 def stage_tesseract(cache: Path, stage: Path, sevenzip: str, run=subprocess.run,
                     opener=urllib.request.urlopen) -> Path:
-    """Put the pinned Tesseract and the six language files into stage (the folder `tesseract` of
+    """Put the pinned Tesseract and the English language file into stage (the folder `tesseract` of
     the program folder). The NSIS installer of Tesseract is opened as an archive with 7-Zip; it is
     never run, so no administrator rights are needed and nothing is installed on this machine.
     Returns stage."""
@@ -113,7 +109,7 @@ def stage_tesseract(cache: Path, stage: Path, sevenzip: str, run=subprocess.run,
 
 
 def check_tesseract(stage: Path, run=subprocess.run) -> None:
-    """The staged program runs, has the pinned version and lists all six languages."""
+    """The staged program runs, has the pinned version and lists the English language."""
     out = run([str(stage / "tesseract.exe"), "--list-langs"], check=True, capture_output=True,
               text=True, env={**os.environ, "TESSDATA_PREFIX": str(stage / "tessdata")}).stdout
     missing = sorted(set(TESSDATA_SHA256) - set(out.split()))

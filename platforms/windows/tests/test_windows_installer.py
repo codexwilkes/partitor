@@ -35,8 +35,14 @@ class FetchTests(unittest.TestCase):
         for d in [bundle.TESSERACT_SHA256, *bundle.TESSDATA_SHA256.values()]:
             self.assertRegex(d, r"^[0-9a-f]{64}$")
 
-    def test_languages_are_the_linux_set(self):
-        self.assertEqual(set(bundle.TESSDATA_SHA256), {"deu", "eng", "fra", "ita", "lat", "osd"})
+    def test_language_is_english_only(self):
+        """partitor calls tesseract without -l (English); no other language file is bundled."""
+        self.assertEqual(set(bundle.TESSDATA_SHA256), {"eng"})
+
+    def test_vision_calls_tesseract_without_a_language(self):
+        """The reason for English only: if ocr_line gets -l, the bundle must change with it."""
+        src = (Path(__file__).resolve().parents[3] / "lib" / "partitor" / "vision.py").read_text(encoding="utf-8")
+        self.assertNotRegex(src, r'"-l"')
 
     def test_fetch_keeps_a_file_with_the_right_hash(self):
         data = b"abc"
@@ -113,7 +119,7 @@ class StageTests(unittest.TestCase):
         return bundle.stage_tesseract(self.root / "cache", stage, "7z", self.fake_run(stage, make_exe),
                                       opener_for(self.data))
 
-    def test_stage_unpacks_with_7zip_and_adds_the_six_languages(self):
+    def test_stage_unpacks_with_7zip_and_adds_the_english_language(self):
         stage = self.stage()
         self.assertTrue((stage / "tesseract.exe").is_file())
         for lang in bundle.TESSDATA_SHA256:
@@ -146,7 +152,7 @@ class StageTests(unittest.TestCase):
         bundle.check_tesseract(self.root, run)
 
     def test_check_refuses_a_missing_language(self):
-        run = lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, stdout="eng osd")  # noqa: E731
+        run = lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, stdout="osd")  # noqa: E731
         with self.assertRaises(bundle.BundleError):
             bundle.check_tesseract(self.root, run)
 

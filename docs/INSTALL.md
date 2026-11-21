@@ -45,6 +45,9 @@ to `partitor-init` (`--library PATH`, `--memory SIZE`). For a NAS (SMB library) 
    # SMB library: also cifs-utils
    ```
 
+   Tesseract reads the staff names and the bar numbers. partitor uses its English data (`eng`),
+   which `tesseract-ocr` includes. No other language package is needed.
+
 2. Get the code. The clone is the install: the venv lives inside it.
 
    ```bash
