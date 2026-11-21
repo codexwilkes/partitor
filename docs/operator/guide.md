@@ -4,10 +4,11 @@
 page_title: partitor Operator Flow
 title: From score to parts
 lede: >-
-  How to turn a score PDF into large-print parts for your ensemble. You work on
-  your phone or PC over SSH; partitor runs on your partitor host and keeps
-  everything in the library folder (local, or on a NAS). Only the build takes a
-  long time, so you make every change first, review it, and build once.
+  How to turn a score PDF into large-print parts for your ensemble. You work in
+  a terminal: on Linux (supported), over SSH from a phone or PC, or on the same
+  machine; on Windows in PowerShell and on macOS in Terminal (best effort).
+  partitor keeps everything in the library folder (local, or on a NAS). Only the
+  build takes a long time, so you make every change first, review it, and build once.
 stages:
   - {id: drop, num: 1, name: Drop, what: PDF into the inbox, long: false}
   - {id: analyse, num: 2, name: Analyse, what: "proof of who plays what, 1–5 min", long: true}
@@ -18,22 +19,64 @@ legend: >-
   Dashed: the steps that take time. You can go back from Review to Edit as
   often as you like; nothing is printed until you build.
 footer: >-
-  partitor {version}. Install: `INSTALL.md`. Storage: `STORAGE-LOCAL.md`,
+  partitor {version}. Install: `INSTALL.md`; Windows: `platforms/windows/README.md`. Storage: `STORAGE-LOCAL.md`,
   `STORAGE-SMB.md`. Every command: `COMMANDS.md`. Design: `DESIGN.md`.
 ---
 
 ## What you need {#before eyebrow="Before you start"}
 
-- An SSH app on your phone or PC, logged in to your partitor host as a user that can use `sudo`. Run `partitor` with `sudo` if you are not root.
-- Access to the library folder (see `STORAGE-LOCAL.md` or `STORAGE-SMB.md`): a folder you can open with your file manager, SFTP or a NAS app. It has two folders: `inbox` and `library`.
+On every system you need:
+
+- A library folder with two folders inside, `inbox` and `library`. You copy score PDFs into `inbox`; partitor makes everything else in `library`. See `STORAGE-LOCAL.md` or `STORAGE-SMB.md` for Linux.
 - A score PDF: a vector PDF (from notation software) or a scan. Scans at 300 dpi greyscale work best.
+
+What else you need depends on the system:
+
+- **Linux (Ubuntu LTS), supported.** A terminal on the partitor host, or an SSH app on your phone or PC, logged in as a user that can use `sudo`. Start partitor with `sudo partitor` (`partitor` if you are root).
+- **Windows, best effort (experimental).** The setup program from the Download page, and PowerShell. Start partitor with `partitor`.
+- **macOS, best effort (not supported).** Python, Tesseract and a copy of the source (steps below), and Terminal. Start partitor with `venv/bin/python lib/partitor-engine` in the source folder.
+
+Everything after this section is the same on all systems. Where the guide says “run `partitor`”, use the start command of your system.
+
+### Linux
+
+Follow `INSTALL.md` once (four commands). The library is `/var/lib/partitor/library`. Copy a PDF in with `cp score.pdf /var/lib/partitor/library/inbox/`, or with SFTP or your file manager. The engine runs in a sandbox and never as root.
+
+### Windows (PowerShell)
+
+Run `partitor-<version>-setup.exe` from the Download page. It needs no administrator rights, adds `partitor` to your PATH and asks for the library folder (default `Documents\partitor`). Open a new PowerShell window, then:
+
+```
+partitor
+```
+
+The Start menu entry “partitor” opens the same menu. Copy PDFs into `Documents\partitor\inbox` with File Explorer or `Copy-Item score.pdf $HOME\Documents\partitor\inbox\`. Paths in this guide use `/`; on Windows type `\`.
+
+Limits: one worker (builds are slower), no sandbox (open only PDFs you trust), and the installer is not signed. All limits: `platforms/windows/README.md`.
+
+### macOS (Terminal)
+
+There is no installer and no sandbox yet. The tests run on macOS in CI as a best-effort job; nobody supports this. Open only PDFs you trust. With Homebrew and a clone of the repository, run in Terminal (`ADDRESS` is the address in step 2 of `INSTALL.md`):
+
+```
+brew install python@3.12 tesseract
+git clone ADDRESS ~/partitor
+cd ~/partitor
+python3.12 -m venv venv
+venv/bin/pip install --only-binary=:all: -r requirements.txt
+mkdir -p ~/partitor-library/inbox ~/partitor-library/library
+export PARTITOR_LIBRARY=~/partitor-library
+venv/bin/python lib/partitor-engine
+```
+
+Check out the newest release tag first if you want a fixed version (`git checkout --detach TAG`). In a new Terminal window, run `export PARTITOR_LIBRARY=~/partitor-library` again, or put the line in `~/.zshrc`. Copy PDFs into `~/partitor-library/inbox` with Finder or `cp`.
 
 <p class="note"><b>One command.</b> Type <code>partitor</code> and press Enter. Everything else is a menu: you answer with a number or a letter. <kbd>Enter</kbd> accepts the value shown in [brackets]; <kbd>q</kbd> stops and keeps what is done.</p>
 
 ## Drop the PDF in the inbox {#drop eyebrow="Stage 1"}
 
 1. Copy the score PDF into the `inbox` folder of the library.
-2. On the partitor host, run `partitor`. The menu shows the pieces newest first, each under its own fixed number (the serial of its id: 12 is 2026-10-0012, the same number the commands take) and `n  new from inbox (1 waiting)`. With many pieces, the five changed last come first as <kbd>A</kbd>–<kbd>E</kbd>; `*` marks a piece with work pending. `/Bach` shows only matching pieces (composer, title, part), `/` shows all again, <kbd>+</kbd> and <kbd>-</kbd> turn the page.
+2. Run `partitor` (the start command of your system is in the first section). The menu shows the pieces newest first, each under its own fixed number (the serial of its id: 12 is 2026-10-0012, the same number the commands take) and `n  new from inbox (1 waiting)`. With many pieces, the five changed last come first as <kbd>A</kbd>–<kbd>E</kbd>; `*` marks a piece with work pending. `/Bach` shows only matching pieces (composer, title, part), `/` shows all again, <kbd>+</kbd> and <kbd>-</kbd> turn the page.
 3. Press <kbd>n</kbd>, then the number of the PDF, then the pages of the piece (<kbd>Enter</kbd> for all pages, or a range such as `8-9` when the PDF holds several pieces).
 
 The PDF moves out of the inbox into a new folder in the library, named by its id, for example `2026-10-0001` (year, month, number).
@@ -45,6 +88,8 @@ partitor reads every page: staves, systems, barlines, bar numbers, staff labels.
 ```
 library/2026-10-0001-bach-example-piece/2026-10-0001-proof.pdf
 ```
+
+On Windows the path has `\\` instead of `/`.
 
 - Each page of the proof is a page of the score.
 - Each system has its name in blue, for example `p8.s2` (page 8, system 2).

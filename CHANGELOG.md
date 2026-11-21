@@ -29,6 +29,9 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
   the release of a tag you give (a new release is a draft). It starts only by hand; no tag or push runs it.
 
 ### Changed
+- Operator guide: written for three systems. A table gives the start command of each: Linux (supported), Windows in PowerShell
+  and macOS in Terminal (best effort), with the steps for each. README, INSTALL and KNOWN-LIMITS say the same about Windows
+  and macOS.
 - Windows installer: bundles the English language data only (it had deu, eng, fra, ita, lat and osd). partitor calls
   Tesseract without `-l`, so the other files were never used; the output does not change. A test fails if `ocr_line` gets `-l`.
   The docs say: Tesseract reads staff names and bar numbers in English; `tesseract-ocr` is enough on Linux.

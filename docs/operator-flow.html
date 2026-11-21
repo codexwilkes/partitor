@@ -119,7 +119,7 @@ html { scroll-behavior: smooth; }
 <header>
   <span class="eyebrow">partitor 0.9.0</span>
   <h1>From score to parts</h1>
-  <p class="lede">How to turn a score PDF into large-print parts for your ensemble. You work on your phone or PC over SSH; partitor runs on your partitor host and keeps everything in the library folder (local, or on a NAS). Only the build takes a long time, so you make every change first, review it, and build once.</p>
+  <p class="lede">How to turn a score PDF into large-print parts for your ensemble. You work in a terminal: on Linux (supported), over SSH from a phone or PC, or on the same machine; on Windows in PowerShell and on macOS in Terminal (best effort). partitor keeps everything in the library folder (local, or on a NAS). Only the build takes a long time, so you make every change first, review it, and build once.</p>
 </header>
 
 <nav aria-label="Stages">
@@ -137,11 +137,38 @@ html { scroll-behavior: smooth; }
 
 <section id="before">
   <div class="sec-head"><span class="eyebrow">Before you start</span><h2>What you need</h2></div>
+<p>On every system you need:</p>
 <ul class="plain">
-<li>An SSH app on your phone or PC, logged in to your partitor host as a user that can use <code>sudo</code>. Run <code>partitor</code> with <code>sudo</code> if you are not root.</li>
-<li>Access to the library folder (see <code>STORAGE-LOCAL.md</code> or <code>STORAGE-SMB.md</code>): a folder you can open with your file manager, SFTP or a NAS app. It has two folders: <code>inbox</code> and <code>library</code>.</li>
+<li>A library folder with two folders inside, <code>inbox</code> and <code>library</code>. You copy score PDFs into <code>inbox</code>; partitor makes everything else in <code>library</code>. See <code>STORAGE-LOCAL.md</code> or <code>STORAGE-SMB.md</code> for Linux.</li>
 <li>A score PDF: a vector PDF (from notation software) or a scan. Scans at 300 dpi greyscale work best.</li>
 </ul>
+<p>What else you need depends on the system:</p>
+<ul class="plain">
+<li><strong>Linux (Ubuntu LTS), supported.</strong> A terminal on the partitor host, or an SSH app on your phone or PC, logged in as a user that can use <code>sudo</code>. Start partitor with <code>sudo partitor</code> (<code>partitor</code> if you are root).</li>
+<li><strong>Windows, best effort (experimental).</strong> The setup program from the Download page, and PowerShell. Start partitor with <code>partitor</code>.</li>
+<li><strong>macOS, best effort (not supported).</strong> Python, Tesseract and a copy of the source (steps below), and Terminal. Start partitor with <code>venv/bin/python lib/partitor-engine</code> in the source folder.</li>
+</ul>
+<p>Everything after this section is the same on all systems. Where the guide says “run <code>partitor</code>”, use the start command of your system.</p>
+<h3>Linux</h3>
+<p>Follow <code>INSTALL.md</code> once (four commands). The library is <code>/var/lib/partitor/library</code>. Copy a PDF in with <code>cp score.pdf /var/lib/partitor/library/inbox/</code>, or with SFTP or your file manager. The engine runs in a sandbox and never as root.</p>
+<h3>Windows (PowerShell)</h3>
+<p>Run <code>partitor-&lt;version&gt;-setup.exe</code> from the Download page. It needs no administrator rights, adds <code>partitor</code> to your PATH and asks for the library folder (default <code>Documents\partitor</code>). Open a new PowerShell window, then:</p>
+<pre><code>partitor
+</code></pre>
+<p>The Start menu entry “partitor” opens the same menu. Copy PDFs into <code>Documents\partitor\inbox</code> with File Explorer or <code>Copy-Item score.pdf $HOME\Documents\partitor\inbox\</code>. Paths in this guide use <code>/</code>; on Windows type <code>\</code>.</p>
+<p>Limits: one worker (builds are slower), no sandbox (open only PDFs you trust), and the installer is not signed. All limits: <code>platforms/windows/README.md</code>.</p>
+<h3>macOS (Terminal)</h3>
+<p>There is no installer and no sandbox yet. The tests run on macOS in CI as a best-effort job; nobody supports this. Open only PDFs you trust. With Homebrew and a clone of the repository, run in Terminal (<code>ADDRESS</code> is the address in step 2 of <code>INSTALL.md</code>):</p>
+<pre><code>brew install python@3.12 tesseract
+git clone ADDRESS ~/partitor
+cd ~/partitor
+python3.12 -m venv venv
+venv/bin/pip install --only-binary=:all: -r requirements.txt
+mkdir -p ~/partitor-library/inbox ~/partitor-library/library
+export PARTITOR_LIBRARY=~/partitor-library
+venv/bin/python lib/partitor-engine
+</code></pre>
+<p>Check out the newest release tag first if you want a fixed version (<code>git checkout --detach TAG</code>). In a new Terminal window, run <code>export PARTITOR_LIBRARY=~/partitor-library</code> again, or put the line in <code>~/.zshrc</code>. Copy PDFs into <code>~/partitor-library/inbox</code> with Finder or <code>cp</code>.</p>
 <p class="note"><b>One command.</b> Type <code>partitor</code> and press Enter. Everything else is a menu: you answer with a number or a letter. <kbd>Enter</kbd> accepts the value shown in [brackets]; <kbd>q</kbd> stops and keeps what is done.</p>
 </section>
 
@@ -151,7 +178,7 @@ html { scroll-behavior: smooth; }
   <div class="sec-head"><span class="eyebrow">Stage 1</span><h2>Drop the PDF in the inbox</h2></div>
 <ol class="steps">
 <li>Copy the score PDF into the <code>inbox</code> folder of the library.</li>
-<li>On the partitor host, run <code>partitor</code>. The menu shows the pieces newest first, each under its own fixed number (the serial of its id: 12 is 2026-10-0012, the same number the commands take) and <code>n  new from inbox (1 waiting)</code>. With many pieces, the five changed last come first as <kbd>A</kbd>–<kbd>E</kbd>; <code>*</code> marks a piece with work pending. <code>/Bach</code> shows only matching pieces (composer, title, part), <code>/</code> shows all again, <kbd>+</kbd> and <kbd>-</kbd> turn the page.</li>
+<li>Run <code>partitor</code> (the start command of your system is in the first section). The menu shows the pieces newest first, each under its own fixed number (the serial of its id: 12 is 2026-10-0012, the same number the commands take) and <code>n  new from inbox (1 waiting)</code>. With many pieces, the five changed last come first as <kbd>A</kbd>–<kbd>E</kbd>; <code>*</code> marks a piece with work pending. <code>/Bach</code> shows only matching pieces (composer, title, part), <code>/</code> shows all again, <kbd>+</kbd> and <kbd>-</kbd> turn the page.</li>
 <li>Press <kbd>n</kbd>, then the number of the PDF, then the pages of the piece (<kbd>Enter</kbd> for all pages, or a range such as <code>8-9</code> when the PDF holds several pieces).</li>
 </ol>
 <p>The PDF moves out of the inbox into a new folder in the library, named by its id, for example <code>2026-10-0001</code> (year, month, number).</p>
@@ -164,6 +191,7 @@ html { scroll-behavior: smooth; }
 <p>partitor reads every page: staves, systems, barlines, bar numbers, staff labels. It does not make any parts yet. When it finishes, open the proof in the item folder:</p>
 <pre><code>library/2026-10-0001-bach-example-piece/2026-10-0001-proof.pdf
 </code></pre>
+<p>On Windows the path has <code>\\</code> instead of <code>/</code>.</p>
 <ul class="plain">
 <li>Each page of the proof is a page of the score.</li>
 <li>Each system has its name in blue, for example <code>p8.s2</code> (page 8, system 2).</li>
@@ -423,7 +451,7 @@ html { scroll-behavior: smooth; }
 
 <footer>
   <div class="staff" role="presentation"></div>
-  <p>partitor 0.9.0. Install: <code>INSTALL.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Every command: <code>COMMANDS.md</code>. Design: <code>DESIGN.md</code>.</p>
+  <p>partitor 0.9.0. Install: <code>INSTALL.md</code>; Windows: <code>platforms/windows/README.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Every command: <code>COMMANDS.md</code>. Design: <code>DESIGN.md</code>.</p>
 </footer>
 </div>
 </body>

@@ -9,9 +9,11 @@ result. It is safe to run again.
 
 - Ubuntu 26.04 LTS with systemd (the tested platform). Ubuntu 24.04 should work:
   the pinned packages have wheels for its Python 3.12 and the tests pass there
-  (`KNOWN-LIMITS.md`). macOS and hosts without
-  systemd are not supported yet (`KNOWN-LIMITS.md`). An experimental Windows console build
-  exists: see `platforms/windows/README.md`. It is not supported.
+  (`KNOWN-LIMITS.md`). Hosts without
+  systemd are not supported (`KNOWN-LIMITS.md`). Windows and macOS are best effort:
+  an experimental Windows console build exists (`platforms/windows/README.md`), and
+  macOS runs the engine from the source without a sandbox. Steps for both are in the
+  operator guide (`docs/operator/guide.md`, "What you need").
 - Root access (`sudo`).
 - Internet access during the install (apt and PyPI).
 - Memory: not measured on small hosts. A detect or a build uses worker processes under a

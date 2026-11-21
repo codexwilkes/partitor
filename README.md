@@ -111,10 +111,12 @@ Developers and people who build on partitor: see `CONTRIBUTING.md`.
   (26.04). Ubuntu 24.04: the pinned packages install as binary wheels on
   Python 3.12 and the tests pass there (checked on CPython 3.12.3; the
   installer itself is not run on 24.04 yet).
-- **Windows:** an experimental console build with an installer, not supported:
-  `platforms/windows/README.md`.
-- **macOS:** not in this release. A mode without the sandbox is planned, as
-  community best effort.
+- **Windows:** best effort. An experimental console build with an installer,
+  not supported: `platforms/windows/README.md`. Steps for PowerShell are in the
+  operator guide (`docs/operator/guide.md`).
+- **macOS:** best effort. No installer and no sandbox: you run the engine from
+  the source in Terminal. The steps are in the operator guide. The tests run on
+  macOS in CI, and a failure there does not block a release.
 
 ## Support
 

@@ -66,8 +66,9 @@ per-system consistency.
   test suite passes on CPython 3.12.3. Not checked: the golden renders on 3.12,
   and the installer on a real 24.04 host. CI runs the tests on 24.04 with
   Python 3.12 and 3.13.
-- macOS, WSL2 without systemd: not supported in 0.8. The wrapper needs
-  `systemd-run`. A mode without the sandbox is planned (best effort).
+- macOS, WSL2 without systemd: the wrapper needs `systemd-run`, so it does not run there. On macOS
+  you can run the engine directly, without the sandbox (steps in the operator guide; best effort,
+  not supported; the CI tests run on macOS and a failure there does not block a release).
 
 Performance: a 70-page score takes minutes to analyse (about 30 minutes on a
 slow mini PC); a build of one piece takes minutes. `detect` and `build` analyse
