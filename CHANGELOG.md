@@ -10,6 +10,9 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 ## [Unreleased]
 
 ### Added
+- `docs/ARCHITECTURE.md`: how the program is built, with four diagrams as code (Mermaid): the runtime parts, the five stages, the module levels, the platform seam.
+  `tools/check-architecture.py` writes the module-level block from `tools/modules.txt` and fails (in `tools/check-repo.sh`) when the block is old,
+  a diagram uses syntax outside the subset the website draws, or a path named in the text does not exist. The website draws the diagrams itself.
 - `tools/build-cli-doc.py` writes `docs/COMMANDS.md` (every command and option) and `docs/cli.json` (the same data, and
   the menu keys, for tools) from the code. `--check` fails when a file is old. `lib/partitor/cli_main.py` has
   `build_parser()` and `plan_parser()` for it.

@@ -12,6 +12,7 @@
 #   - a stale docs/operator-flow.html (tools/build-operator-doc.py --check) or a version in it that is not VERSION
 #   - a version that differs from VERSION: the package, the tag example in README.md and docs/INSTALL.md, the newest CHANGELOG release
 #   - a stale docs/COMMANDS.md or docs/cli.json (tools/build-cli-doc.py --check)
+#   - a stale or wrong docs/ARCHITECTURE.md (tools/check-architecture.py)
 # A private token list is checked by the maintainer, not here (it is itself personal).
 # Usage: tools/check-repo.sh   (run from anywhere inside the repo)
 set -euo pipefail
@@ -56,6 +57,8 @@ logver="$(sed -n 's/^## \([0-9][0-9.]*[0-9a-z.-]*\) — .*/\1/p' CHANGELOG.md | 
 [ "$logver" = "$ver" ] || bad "the newest CHANGELOG release is ${logver:-none}, VERSION is ${ver}"
 # The command reference and the machine source of the CLI are generated from the code.
 python3 tools/build-cli-doc.py --check || bad "docs/COMMANDS.md or docs/cli.json is old (run tools/build-cli-doc.py)"
+# The architecture page: the module block is generated; diagrams use the drawable subset; paths exist.
+python3 tools/check-architecture.py || bad "docs/ARCHITECTURE.md is stale or wrong (tools/check-architecture.py)"
 # A python with the two developer packages: the first python3 on PATH, else the system one
 # (CI test jobs put setup-python first on PATH; the apt packages belong to /usr/bin/python3).
 docpy=""
