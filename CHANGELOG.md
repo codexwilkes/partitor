@@ -7,7 +7,7 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
-## [Unreleased]
+## 0.10.1 — 2026-11-21
 
 ### Fixed
 - The ambitus read the flag curl of a stem-down eighth note as a second, lower notehead (up to 3 steps below the real note). In a tall blob a run of rows below the first now counts as a head only if its widest row has 0.75 or more of the ink of the widest row above it; a flag is narrower (about 0.6). The ratio is relative to the head, so it holds at every scan size. Stacked chords and a head split by line removal still count both runs.
