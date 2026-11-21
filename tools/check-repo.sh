@@ -43,8 +43,14 @@ if [ "$(grep -c "partitor ${ver}" docs/operator-flow.html)" != 2 ] \
    || grep -v "partitor ${ver}" docs/operator-flow.html | grep -Eq 'partitor [0-9]+\.[0-9]+\.[0-9]+'; then
   bad "docs/operator-flow.html does not carry VERSION ${ver} (run tools/build-operator-doc.py)"
 fi
-if python3 -c "import markdown_it, yaml" 2>/dev/null; then
-  python3 tools/build-operator-doc.py --check || bad "docs/operator-flow.html is not current (tools/build-operator-doc.py)"
+# A python with the two developer packages: the first python3 on PATH, else the system one
+# (CI test jobs put setup-python first on PATH; the apt packages belong to /usr/bin/python3).
+docpy=""
+for cand in python3 /usr/bin/python3; do
+  if "$cand" -c "import markdown_it, yaml" 2>/dev/null; then docpy="$cand"; break; fi
+done
+if [ -n "$docpy" ]; then
+  "$docpy" tools/build-operator-doc.py --check || bad "docs/operator-flow.html is not current (tools/build-operator-doc.py)"
 elif [ -n "${CI:-}" ]; then
   bad "markdown-it-py or PyYAML missing in CI (apt install python3-markdown-it python3-yaml)"
 else
