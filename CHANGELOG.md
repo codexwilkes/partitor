@@ -7,7 +7,7 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
-## [Unreleased]
+## 0.10.0 — 2026-11-21
 
 ### Added
 - `docs/ARCHITECTURE.md`: how the program is built, with four diagrams as code (Mermaid): the runtime parts, the five stages, the module levels, the platform seam.
