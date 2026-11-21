@@ -17,6 +17,7 @@ engine itself is not caught here: it stops the test run.
 Run a test file by its path or with `unittest discover -s tests`; both find
 this module, because tests/ is put on sys.path.
 """
+import atexit
 import contextlib
 import os
 import shutil
@@ -25,6 +26,14 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
+
+# The tests never read the host's library (a sandbox install owns /var/lib/partitor, and an
+# unreadable folder stops every build). Without an own PARTITOR_LIBRARY, each run gets an
+# empty folder; a test that needs a library sets its own (mock.patch.dict, env=).
+if "PARTITOR_LIBRARY" not in os.environ:
+    _EMPTY_LIBRARY = tempfile.mkdtemp(prefix="partitor-test-library-")
+    os.environ["PARTITOR_LIBRARY"] = _EMPTY_LIBRARY
+    atexit.register(shutil.rmtree, _EMPTY_LIBRARY, True)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "..", "lib", "partitor-engine")

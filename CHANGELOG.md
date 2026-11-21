@@ -47,6 +47,7 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
   tables, and the choices example is a screen block.
 
 ### Fixed
+- The tests read the host's library folder (`/var/lib/partitor/library`) when `PARTITOR_LIBRARY` was not set, so a library the user cannot read stopped every build test. `tests/support.py` now sets an empty folder for the run; a test that needs a library sets its own.
 - The operator guide did not list menu key `h` (short names of the staff labels in a group score).
 
 ## 0.9.0 — 2026-11-19

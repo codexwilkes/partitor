@@ -204,5 +204,24 @@ class TestEngineStart(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TestLibraryIsolation(unittest.TestCase):
+    """The tests do not depend on the host's library folder."""
+
+    def test_the_library_is_an_empty_folder_of_the_run(self):
+        lib = os.environ.get("PARTITOR_LIBRARY", "")
+        self.assertNotEqual(lib, "/var/lib/partitor/library")
+        self.assertTrue(os.path.isdir(lib))
+        self.assertEqual(os.listdir(lib), [])
+
+    def test_an_unreadable_default_library_does_not_stop_a_build(self):
+        # the old failure: PARTITOR_LIBRARY unset and a default folder the user cannot read
+        r = subprocess.run([sys.executable, "-c",
+                            "import support, os; print(os.environ['PARTITOR_LIBRARY'])"],
+                           capture_output=True, text=True, cwd=support.HERE,
+                           env={k: v for k, v in os.environ.items() if k != "PARTITOR_LIBRARY"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(r.stdout.strip().startswith(tempfile.gettempdir()))
+
+
 if __name__ == "__main__":
     unittest.main()
