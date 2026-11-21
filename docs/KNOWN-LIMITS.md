@@ -23,7 +23,7 @@ result. The proof PDF (`<id>-proof.pdf`) is the place to look first.
 | Staves, systems | good | Page curl moves staff ends. |
 | Barlines, bar count | good | A bar number that touches a cue bracket is not read. The count is checked against printed numbers; a mismatch goes to review. |
 | Footer, page edge | good | Marks more than 1 sp past the staff end stay (they could be real). |
-| Clefs | about 97 % on real scans | A rare clef (G1, C2, C5, F3, F5) can be read for a common one. G8 is sometimes missed; part mapping treats G2 and G8 as the same clef. |
+| Clefs | about 97 % on real scans | A rare clef (G1, C2, C5, F3, F5) can be read for a common one. G8 is sometimes missed (an 8 that does not touch the clef's curl or sits under it is found; a faded or very small one may not be); part mapping treats G2 and G8 as the same clef. |
 | OCR | English only | Tesseract reads the staff names and the bar numbers with its English data. A name in another language can be misread. Correct it by hand (`t` in the item menu). |
 | Part mapping | good | Systems with only unlabelled staves after a change in staff count ask the operator. A stray "Continuo" label read by OCR on an upper staff can make a system ask. |
 | Lyrics, text ownership | good | A single word can land on the wrong staff. |
@@ -36,7 +36,7 @@ result. The proof PDF (`<id>-proof.pdf`) is the place to look first.
 
 The lowest and highest note of each part are printed on the first line. Every
 note counts, so a false notehead changes the range. Causes seen: a beam or flag
-start near a head, a staff-line remnant in an empty stretch, an accidental
+start near a head (the flag curl of a stem-down eighth is dropped by its width), a staff-line remnant in an empty stretch, an accidental
 counted as a head, a head on a line that is missed (the range narrows). Whole
 and half notes on a line can be missed.
 

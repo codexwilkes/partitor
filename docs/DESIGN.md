@@ -592,10 +592,17 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
       smoothed along the part first: a clef unlike both neighbouring systems,
       which agree, takes theirs; a part with G8 on a quarter or more of its
       staves is G8 where G2 was read. Accidentals are not read: letter names
-      only.
+      only. In a tall blob (chord) a run of rows counts as a head only if
+      its widest row has 0.9 sp of ink or more: the flag curl of a
+      stem-down eighth is narrower and is not a head.
     - Clef G8 (treble with an 8 below, vocal tenor): a piece with a hole,
       0.5-1.7 sp high, 1.2-4 sp below the staff, centred under the clef;
-      bottom line E3.
+      bottom line E3. An 8 that touches the clef's curl joins it into one
+      blob too wide for a digit: a second window, 1.7 sp below the line,
+      under the curl, takes the 8 alone. The ambitus of a G8 staff is the
+      sounding pitch (an octave below the written note) and is drawn in the
+      8vb clef, at the staff positions of the source; a range set by hand
+      is sounding pitch too.
     - `score.yaml` `ambitus: {part: {range: C4-F5, from}}`. `from`: `auto`
       (computed, refreshed on every save), `on` (computed for a continuo-like
       part), `operator` (`set ID "Part:ambitus=C4-F5"`, never overwritten),

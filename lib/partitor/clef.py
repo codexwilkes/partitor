@@ -616,29 +616,33 @@ def clef_signature(owner: np.ndarray, line_px: np.ndarray, st: Staff,
 def _octave_eight_below(owner: np.ndarray, st: Staff, idx: int, sp: float) -> bool:
     """A small '8' under a G clef (vocal tenor): a piece 0.5-1.7 sp high,
     0.3-1.2 sp wide, with a hole, 1.2-4 sp below the bottom line, centred
-    under the clef (0.8-2.6 sp after the staff start; lyrics start later)."""
+    under the clef (0.8-2.6 sp after the staff start; lyrics start later).
+    Some engravings let the 8 touch the clef's curl: the window then cuts
+    the curl and the blob is curl + 8, too wide. A second window starts
+    1.7 sp below the line, under the curl, and takes the 8 alone."""
     import cv2
     import numpy as np
     x0, x1 = max(0, int(st.x0 + 0.25 * sp)), int(st.x0 + 3.4 * sp)
-    y0, y1 = int(st.bottom + 1.2 * sp), min(owner.shape[0], int(st.bottom + 4.0 * sp))
-    if y1 <= y0:
-        return False
-    m = (owner[y0:y1, x0:x1] == idx).astype(np.uint8)
-    n, lab, stt, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
-    for j in range(1, n):
-        x, y, w, h, a = stt[j]
-        if not (0.5 * sp <= h <= 1.7 * sp and 0.3 * sp <= w <= 1.2 * sp):
+    for top in (1.2, 1.7):
+        y0, y1 = int(st.bottom + top * sp), min(owner.shape[0], int(st.bottom + 4.0 * sp))
+        if y1 <= y0:
             continue
-        cx = x0 + x + w / 2.0 - st.x0
-        if not 0.8 * sp <= cx <= 2.6 * sp:
-            continue
-        if y + h >= m.shape[0] - 1:
-            continue                              # runs on down: not a small digit
-        blob = (lab[y:y + h, x:x + w] == j).astype(np.uint8)
-        inv = 1 - blob
-        k_, _, _, _ = cv2.connectedComponentsWithStats(np.pad(inv, 1, constant_values=1), connectivity=4)
-        if k_ - 1 >= 2:                           # outside + at least one hole
-            return True
+        m = (owner[y0:y1, x0:x1] == idx).astype(np.uint8)
+        n, lab, stt, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+        for j in range(1, n):
+            x, y, w, h, a = stt[j]
+            if not (0.5 * sp <= h <= 1.7 * sp and 0.3 * sp <= w <= 1.2 * sp):
+                continue
+            cx = x0 + x + w / 2.0 - st.x0
+            if not 0.8 * sp <= cx <= 2.6 * sp:
+                continue
+            if y + h >= m.shape[0] - 1:
+                continue                              # runs on down: not a small digit
+            blob = (lab[y:y + h, x:x + w] == j).astype(np.uint8)
+            inv = 1 - blob
+            k_, _, _, _ = cv2.connectedComponentsWithStats(np.pad(inv, 1, constant_values=1), connectivity=4)
+            if k_ - 1 >= 2:                           # outside + at least one hole
+                return True
     return False
 
 

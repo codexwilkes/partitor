@@ -186,6 +186,45 @@ class TestClefsAndSpacing(unittest.TestCase):
         pt.draw_ambitus(page, 150, 100, "G8", 23, 30)
         self.assertGreater(len(page.get_drawings()), 5)
 
+    def _eight_staff(self, touching: bool, eight: bool = True):
+        """A staff (sp 13) with the ink of a G clef's curl and, below it, a
+        ring (the 8). touching: a neck joins the curl and the ring (an
+        engraving where the 8 touches the curl)."""
+        sp, x0 = 13, 40
+        owner = np.full((200, 160), -1, np.int32)
+        st = pt.Staff(0, 0, [60 + sp * k for k in range(5)], x0, 150)
+        bot = int(st.bottom)
+        owner[bot + int(0.6 * sp):bot + int(1.5 * sp), x0 + 18:x0 + 36] = 0   # the curl's ball
+        if eight:
+            cx, top = x0 + 27, bot + int(1.8 * sp)
+            cv2.circle(owner, (cx, top + 6), 5, 0, 2)                         # the 8: ring with a hole
+        if touching:
+            owner[bot + int(1.4 * sp):bot + int(1.85 * sp), x0 + 26:x0 + 29] = 0
+        return owner, st, sp
+
+    def test_eight_below_separate(self):
+        owner, st, sp = self._eight_staff(touching=False)
+        self.assertTrue(clef._octave_eight_below(owner, st, 0, sp))
+
+    def test_eight_below_touching_the_curl(self):
+        # the 8 joined to the curl: one blob in the first window, wider than a digit
+        owner, st, sp = self._eight_staff(touching=True)
+        self.assertTrue(clef._octave_eight_below(owner, st, 0, sp))
+
+    def test_eight_below_plain_treble(self):
+        # a plain treble clef (curl only): no 8
+        owner, st, sp = self._eight_staff(touching=False, eight=False)
+        self.assertFalse(clef._octave_eight_below(owner, st, 0, sp))
+
+    def test_treble8_ambitus_is_sounding_pitch(self):
+        # the same steps: treble 8 sounds an octave below the plain treble
+        def sysm(c):
+            return {"id": "p1.s1", "map": ["A"], "clefs": [c], "steps": [[4, 9]]}
+        _, n2 = pt.part_clef_steps({"parts": ["A"], "systems": [sysm("G2")]}, "A")
+        _, n8 = pt.part_clef_steps({"parts": ["A"], "systems": [sysm("G8")]}, "A")
+        self.assertEqual([pt.pitch_name(x) for x in n2], ["B4", "G5"])
+        self.assertEqual([pt.pitch_name(x) for x in n8], ["B3", "G4"])
+
     def test_ambitus_clef_smoothing(self):
         def sysm(i, clef, steps):
             return {"id": f"p{i}.s1", "map": ["T"], "clefs": [clef], "steps": [steps]}
