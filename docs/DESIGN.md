@@ -592,9 +592,11 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
       smoothed along the part first: a clef unlike both neighbouring systems,
       which agree, takes theirs; a part with G8 on a quarter or more of its
       staves is G8 where G2 was read. Accidentals are not read: letter names
-      only. In a tall blob (chord) a run of rows counts as a head only if
-      its widest row has 0.9 sp of ink or more: the flag curl of a
-      stem-down eighth is narrower and is not a head.
+      only. In a tall blob (chord) a run of rows below the first counts as a
+      head only if its widest row has 0.75 or more of the ink of the
+      widest row above it: the flag curl of a stem-down eighth is
+      narrower (0.6) and is not a head. The ratio is relative, so it holds
+      at every scan size; a head split by line removal keeps both runs.
     - Clef G8 (treble with an 8 below, vocal tenor): a piece with a hole,
       0.5-1.7 sp high, 1.2-4 sp below the staff, centred under the clef;
       bottom line E3. An 8 that touches the clef's curl joins it into one

@@ -458,7 +458,9 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
     lines, holes filled (half and whole notes), opened with an ellipse
     0.8 x 0.7 sp (stems, beams, slurs and text strokes go); blobs 0.7 sp
     or more high and 0.9-2.0 sp wide. A stacked chord gives a taller blob:
-    its top and bottom head count. A head 1 sp or more outside the staff
+    its top and bottom head count; a lower run counts only if its widest
+    row is 0.75 of the widest row above it or more (the flag curl of a
+    stem-down eighth is narrower and gave a false head 3 steps low). A head 1 sp or more outside the staff
     needs the ledger line nearest the staff beside it (lyrics and figures
     have none). A single head is 1.1 times as wide as high or more
     (letters and time-signature digits are not); printed bar numbers and
@@ -527,19 +529,30 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
             # a chord, or a head with ledger lines filled between them: a
             # head is a band of real ink 0.45 sp or more high (a ledger
             # line is a few rows; score C p1.s2 gave G1 for C2)
-            rows = (orig[y:y + h, x:x + w] & (lab[y:y + h, x:x + w] == j)).sum(axis=1) >= 0.4 * sp
-            runs, r0_ = [], None
+            rw = (orig[y:y + h, x:x + w] & (lab[y:y + h, x:x + w] == j)).sum(axis=1)
+            rows = rw >= 0.4 * sp
+            runs, r0_, dropped = [], None, False
             for r_, ok in enumerate(list(rows) + [False]):
                 if ok and r0_ is None:
                     r0_ = r_
                 elif not ok and r0_ is not None:
+                    # a lower run is no head if its widest row is under 0.75 of
+                    # the widest row above it: the flag curl of a stem-down
+                    # eighth (0.6 of its head) gave a false head 3 steps low;
+                    # the two parts of a head split by line removal are as
+                    # wide as each other
+                    wmax = int(rw[r0_:r_].max())
                     if r_ - r0_ >= 0.45 * sp:
-                        runs.append((r0_, r_))
+                        if runs and wmax < 0.75 * max(w_ for _, _, w_ in runs):
+                            dropped = True
+                        else:
+                            runs.append((r0_, r_, wmax))
                     r0_ = None
             if not runs:
                 continue
-            heads = [y + max(runs[0][0] + 0.5 * sp, (runs[0][0] + runs[0][1]) / 2.0),
-                     y + min(runs[-1][1] - 0.5 * sp, (runs[-1][0] + runs[-1][1]) / 2.0)]
+            heads = [y + max(runs[0][0] + 0.5 * sp, (runs[0][0] + runs[0][1]) / 2.0)]
+            if not (dropped and len(runs) == 1):   # a dropped flag leaves its head alone
+                heads.append(y + min(runs[-1][1] - 0.5 * sp, (runs[-1][0] + runs[-1][1]) / 2.0))
         else:
             heads = [y + h / 2.0]
         for yc in heads:
