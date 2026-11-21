@@ -170,7 +170,7 @@ html { scroll-behavior: smooth; }
 <li>Each staff shows the part it goes to. Follow one part down the pages to check that it continues without jumps.</li>
 </ul>
 <p class="note proof"><b>Red frame.</b> A system in a red frame is one partitor is not sure of. Its staves show <code>? name</code>, the suggestion. You answer these in stage 3.</p>
-<p>If the analysis itself is wrong (wrong pages, a staff missed), you can run it again later with <kbd>y</kbd> in the item menu, or <code>partitor analyse ID</code>. A failed analysis also leaves a proof, with the problem marked in red.</p>
+<p>If the analysis itself is wrong (wrong pages, a staff missed), you can run it again later with <kbd>y</kbd> in the item menu, or <code>partitor analyse ID</code>. <code>partitor analyse --all</code> runs it for every item, and asks nothing (open choices stay for the build). A failed analysis also leaves a proof, with the problem marked in red.</p>
 </section>
 
 <div class="staff" role="presentation"></div>
@@ -245,7 +245,7 @@ html { scroll-behavior: smooth; }
 <tbody>
 <tr>
 <td><kbd>m</kbd></td>
-<td>title, subtitle, composer (full and short); after a change it offers to rename the folder to match (<code>partitor rename ID</code> does the same)</td>
+<td>title, subtitle, composer (full and short; <code>partitor meta ID</code> from the command line); after a change it offers to rename the folder to match (<code>partitor rename ID</code> does the same)</td>
 </tr>
 <tr>
 <td><kbd>t</kbd></td>
@@ -303,11 +303,11 @@ html { scroll-behavior: smooth; }
 </tr>
 <tr>
 <td><kbd>f</kbd></td>
-<td>fit: which paper and staff size give the best page turns for a part (<code>f Trombones</code>; <code>f Trombones 4</code> picks option 4, then <kbd>r</kbd>). Read-only until you pick. Guide: <code>PLAN-AND-FOLDOUTS.md</code></td>
+<td>fit: which paper and staff size give the best page turns for a part (<code>f Trombones</code>; <code>f Trombones 4</code> picks option 4, then <kbd>r</kbd>). Read-only until you pick. <code>partitor plan ID --group AltTen=Alto,Tenor</code> tries a group the piece does not have. Guide: <code>PLAN-AND-FOLDOUTS.md</code></td>
 </tr>
 <tr>
 <td><kbd>l</kbd></td>
-<td>pages: one line for each page of a built part with the turn after it (<code>l Trombones</code>). Move a system to the next page: <code>partitor pages ID Trombones --move 26=1</code>. Guide: <code>PLAN-AND-FOLDOUTS.md</code></td>
+<td>pages: one line for each page of a built part with the turn after it (<code>l Trombones</code>). Move a system to the next page: <code>partitor pages ID Trombones --move 26=1</code>; add <code>--dry-run</code> to see the pages and save nothing; <code>partitor pages ID Trombones --clear</code> drops the manual page breaks and pins of that part. Guide: <code>PLAN-AND-FOLDOUTS.md</code></td>
 </tr>
 <tr>
 <td><kbd>x</kbd></td>
@@ -388,6 +388,7 @@ html { scroll-behavior: smooth; }
 <section id="build">
   <div class="sec-head"><span class="eyebrow">Stage 5 · takes minutes</span><h2>Build and print</h2></div>
 <p>Press <kbd>r</kbd>. partitor reads the pages again and writes one PDF per part, one per group, and a large-print copy of each. A long score takes several minutes (the pages are read by several workers at once); other services on the host keep running (the build runs at low priority).</p>
+<p>From the command line: <code>partitor rebuild ID</code> is the same as <kbd>r</kbd> (<code>partitor rebuild ID Trombones</code> builds only that part). <code>partitor set ID key=value --build</code> changes a setting and builds at once; without <code>--build</code> the change is saved, not built. <code>partitor plan ID Trombones</code> is the same as <kbd>f</kbd>. Every command and option is in <code>COMMANDS.md</code>.</p>
 <p>To change one part (a new gap, a corrected ambitus), edit it, then press <kbd>r</kbd> followed by its name or number, for example <kbd>r Trombones</kbd> or <kbd>r 2 4</kbd>. Only those parts are written again; the other files in <code>parts</code> are not touched. If a name in the list would change (title, composer, part number), partitor builds all parts and says why.</p>
 <p>The parts are in the item's <code>parts</code> folder. The name starts with the part so a player finds it first:</p>
 <pre><code>06-bass-trombone-Bach-Example--2026-10-0001.pdf
@@ -409,7 +410,8 @@ html { scroll-behavior: smooth; }
   <div class="tablewrap"><table>
     <thead><tr><th>You see</th><th>Do</th></tr></thead>
     <tbody>
-      <tr><td>“library folder not reachable”</td><td>The library folder or the NAS is not reachable. Check it, wait a minute, run <code>partitor</code> again. See <code>STORAGE-SMB.md</code>.</td></tr>
+      <tr><td>“library folder not found”</td><td>The folder does not exist. The NAS or the disk is off or not connected, or the path is wrong. Check it, wait a minute, run <code>partitor</code> again. See <code>STORAGE-SMB.md</code>.</td></tr>
+      <tr><td>“library folder not set up”</td><td>The folder exists but has no <code>inbox</code> and <code>library</code> inside. Run the set-up again (see <code>INSTALL.md</code>), or point partitor at the right folder.</td></tr>
       <tr><td>The wizard stopped (<kbd>q</kbd>, lost connection)</td><td>The item is kept. Open it from the menu and continue; <kbd>r</kbd> asks what is still open.</td></tr>
       <tr><td>A part is missing on some lines</td><td>Check the red systems on the proof; correct with <kbd>t</kbd> or analyse again with <kbd>y</kbd>.</td></tr>
       <tr><td>A page shows two systems (for example 4 and 13 staves) where the score has one</td><td>Answer <kbd>j</kbd> in the choices, or <code>partitor analyse ID --join p5:4</code>. The bar numbers of that page are then counted once.</td></tr>
@@ -421,7 +423,7 @@ html { scroll-behavior: smooth; }
 
 <footer>
   <div class="staff" role="presentation"></div>
-  <p>partitor 0.9.0. Install: <code>INSTALL.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Design: <code>DESIGN.md</code>.</p>
+  <p>partitor 0.9.0. Install: <code>INSTALL.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Every command: <code>COMMANDS.md</code>. Design: <code>DESIGN.md</code>.</p>
 </footer>
 </div>
 </body>

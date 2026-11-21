@@ -6,9 +6,13 @@ eyebrow: When something goes wrong
 columns: [You see, Do]
 ---
 
-## “library folder not reachable”
+## “library folder not found”
 
-The library folder or the NAS is not reachable. Check it, wait a minute, run `partitor` again. See `STORAGE-SMB.md`.
+The folder does not exist. The NAS or the disk is off or not connected, or the path is wrong. Check it, wait a minute, run `partitor` again. See `STORAGE-SMB.md`.
+
+## “library folder not set up”
+
+The folder exists but has no `inbox` and `library` inside. Run the set-up again (see `INSTALL.md`), or point partitor at the right folder.
 
 ## The wizard stopped (<kbd>q</kbd>, lost connection)
 

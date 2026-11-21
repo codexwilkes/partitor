@@ -46,8 +46,12 @@ def saved(item: Path, a: argparse.Namespace, start: float) -> int:
 def _lib_or_die() -> tuple[Path, Path]:
     root = library_root()
     lib = root / "library"
+    if not root.is_dir():                         # a NAS that is off, a wrong path: not a set-up problem
+        _die(f"library folder not found: {root}",
+             "Check that the folder or the NAS is connected, wait a minute, run partitor again. "
+             "See docs/STORAGE-SMB.md.")
     if not (root / "inbox").is_dir() or not lib.is_dir():
-        _die(f"library folder not ready: {root} needs inbox/ and library/",
+        _die(f"library folder not set up: {root} needs inbox/ and library/",
              hooks.setup_hint())
     return root, lib
 

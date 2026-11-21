@@ -9,14 +9,14 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 ## [Unreleased]
 
-### Changed
-- `docs/operator-flow.html` is generated: do not edit it. The page keeps its look. The item-menu table is two
-  tables, and the choices example is a screen block.
-
-### Fixed
-- The operator guide did not list menu key `h` (short names of the staff labels in a group score).
-
 ### Added
+- `tools/build-cli-doc.py` writes `docs/COMMANDS.md` (every command and option) and `docs/cli.json` (the same data, and
+  the menu keys, for tools) from the code. `--check` fails when a file is old. `lib/partitor/cli_main.py` has
+  `build_parser()` and `plan_parser()` for it.
+- `tools/check-repo.sh` fails when VERSION, the package, the tag example in README.md and docs/INSTALL.md, or the newest
+  CHANGELOG release differ, and when the generated command files are old.
+- Tests: `tests/test_cli_doc.py`; the two library-folder messages.
+- `docs/RELEASING.md`: what each version number means, pre-releases (`-beta.N`, `-rc.N`), what a tag must contain.
 - Sources of the operator guide in `docs/operator/`: `guide.md` (the five stages), `problems.md` (the
   "Common problems", one answer paragraph each), `operator.css` and `README.md` (the rules of the sources).
 - `tools/build-operator-doc.py`: builds `docs/operator-flow.html` from them. The version comes from `VERSION`.
@@ -27,6 +27,18 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
   tables of the guide.
 - `.github/workflows/windows-release.yml`: builds the Windows setup program on a Windows runner and attaches it to
   the release of a tag you give (a new release is a draft). It starts only by hand; no tag or push runs it.
+
+### Changed
+- A missing library folder (a NAS that is off, a wrong path) now says `library folder not found` and tells you to check the
+  connection. A folder without `inbox/` or `library/` says `library folder not set up` (it was `not ready` for both).
+  The operator guide's "Common problems" has one answer for each message.
+- README: the status line no longer names a version.
+- The operator guide names every command: `rebuild`, `plan`, `pages --dry-run`, `pages --clear`, `analyse --all`, `set --build`.
+- `docs/operator-flow.html` is generated: do not edit it. The page keeps its look. The item-menu table is two
+  tables, and the choices example is a screen block.
+
+### Fixed
+- The operator guide did not list menu key `h` (short names of the staff labels in a group score).
 
 ## 0.9.0 — 2026-11-19
 

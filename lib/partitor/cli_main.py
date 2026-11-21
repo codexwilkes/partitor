@@ -267,8 +267,8 @@ def sandbox_check(library: bool = False) -> int:
     return 0 if all(g for _, _, g in res) else 1
 
 
-def plan_args(argv: list[str]) -> argparse.Namespace:
-    """plan_args -> the arguments of `partitor plan`. The command has its own parser and is
+def plan_parser() -> argparse.ArgumentParser:
+    """plan_parser -> the parser of `partitor plan`. The command has its own parser and is
     listed in the main --help by a stub parser that is never run."""
     pn = argparse.ArgumentParser(
         prog="partitor plan",
@@ -284,7 +284,12 @@ def plan_args(argv: list[str]) -> argparse.Namespace:
                          "or numbers): built in a temporary copy and shown; repeat for more groups")
     pn.add_argument("--all", action="store_true",
                     help="show every option (default: the option as built and the best of each paper)")
-    return pn.parse_args(argv)
+    return pn
+
+
+def plan_args(argv: list[str]) -> argparse.Namespace:
+    """plan_args -> the arguments of `partitor plan`."""
+    return plan_parser().parse_args(argv)
 
 
 STOPPED_EXIT = 130          # Ctrl-C: the shell code of SIGINT (128 + 2)
@@ -337,18 +342,8 @@ def apply_pack() -> None:
         library.LIBRARY_DEFAULT = lib
 
 
-def _main() -> int:
-    if "--sandbox-check" in sys.argv[1:2]:
-        return sandbox_check(library="--library" in sys.argv[2:3])
-    if hooks.PACK is not None:
-        apply_pack()
-    if hasattr(os, "geteuid") and os.geteuid() == 0 and os.environ.get("PARTITOR_ALLOW_ROOT") != "1" \
-            and sys.argv[1:2] not in (["--version"], ["-h"], ["--help"]):
-        _die("the engine does not run as root (it parses PDFs from the internet)",
-             "Use /usr/local/sbin/partitor: it runs the engine as user partitor "
-             "in a sandbox.")
-    if sys.argv[1:2] == ["plan"]:
-        return cmd_plan(plan_args(sys.argv[2:]))
+def build_parser() -> argparse.ArgumentParser:
+    """build_parser -> the argument parser of every command. tools/build-cli-doc.py reads it."""
     p = argparse.ArgumentParser(prog="partitor", description="Split a score PDF into parts.")
     p.add_argument("--version", action="version", version=f"partitor {VERSION}")
     sub = p.add_subparsers(dest="cmd")
@@ -498,6 +493,22 @@ def _main() -> int:
                         "bold = thicker, heavy = the look of 0.8.30 (engraved)")
     b.add_argument("--jobs", help="worker processes: a number or auto (default: PARTITOR_JOBS, else auto)")
     b.add_argument("--only", nargs="+", metavar="NAME", help="build these parts or groups only")
+    return p
+
+
+def _main() -> int:
+    if "--sandbox-check" in sys.argv[1:2]:
+        return sandbox_check(library="--library" in sys.argv[2:3])
+    if hooks.PACK is not None:
+        apply_pack()
+    if hasattr(os, "geteuid") and os.geteuid() == 0 and os.environ.get("PARTITOR_ALLOW_ROOT") != "1" \
+            and sys.argv[1:2] not in (["--version"], ["-h"], ["--help"]):
+        _die("the engine does not run as root (it parses PDFs from the internet)",
+             "Use /usr/local/sbin/partitor: it runs the engine as user partitor "
+             "in a sandbox.")
+    if sys.argv[1:2] == ["plan"]:
+        return cmd_plan(plan_args(sys.argv[2:]))
+    p = build_parser()
     a = p.parse_args()
     if a.cmd in ("pieces", "detect", "build"):
         from . import build        # the image libraries load only for these commands

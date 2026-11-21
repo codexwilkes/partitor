@@ -19,7 +19,7 @@ legend: >-
   often as you like; nothing is printed until you build.
 footer: >-
   partitor {version}. Install: `INSTALL.md`. Storage: `STORAGE-LOCAL.md`,
-  `STORAGE-SMB.md`. Design: `DESIGN.md`.
+  `STORAGE-SMB.md`. Every command: `COMMANDS.md`. Design: `DESIGN.md`.
 ---
 
 ## What you need {#before eyebrow="Before you start"}
@@ -52,7 +52,7 @@ library/2026-10-0001-bach-example-piece/2026-10-0001-proof.pdf
 
 <p class="note proof"><b>Red frame.</b> A system in a red frame is one partitor is not sure of. Its staves show <code>? name</code>, the suggestion. You answer these in stage 3.</p>
 
-If the analysis itself is wrong (wrong pages, a staff missed), you can run it again later with <kbd>y</kbd> in the item menu, or `partitor analyse ID`. A failed analysis also leaves a proof, with the problem marked in red.
+If the analysis itself is wrong (wrong pages, a staff missed), you can run it again later with <kbd>y</kbd> in the item menu, or `partitor analyse ID`. `partitor analyse --all` runs it for every item, and asks nothing (open choices stay for the build). A failed analysis also leaves a proof, with the problem marked in red.
 
 ## Edit: names, choices, groups, layout {#edit eyebrow="Stage 3"}
 
@@ -107,7 +107,7 @@ Open it any time: `partitor`, then the item's number. The status line lists what
 
 | Key | Edit (saved, not built) |
 |---|---|
-| <kbd>m</kbd> | title, subtitle, composer (full and short); after a change it offers to rename the folder to match (`partitor rename ID` does the same) |
+| <kbd>m</kbd> | title, subtitle, composer (full and short; `partitor meta ID` from the command line); after a change it offers to rename the folder to match (`partitor rename ID` does the same) |
 | <kbd>t</kbd> | part names, not extracted, joined |
 | <kbd>g</kbd> | groups |
 | <kbd>n</kbd> | bar numbers and rehearsal marks (`m 95`: mark at bar 95 on/off; `m 95 110 120`: several; `m 22:1`: bar 1 of line 22; letters follow in bar order). `?` shows the help with an example; `v` draws the proof with the edits |
@@ -122,8 +122,8 @@ Open it any time: `partitor`, then the item's number. The status line lists what
 |---|---|
 | <kbd>v</kbd> | review (stage 4) |
 | <kbd>y</kbd> | analyse again (new proof; names, groups and settings kept; choices and bar numbers asked again, the previous answers offered) |
-| <kbd>f</kbd> | fit: which paper and staff size give the best page turns for a part (`f Trombones`; `f Trombones 4` picks option 4, then <kbd>r</kbd>). Read-only until you pick. Guide: `PLAN-AND-FOLDOUTS.md` |
-| <kbd>l</kbd> | pages: one line for each page of a built part with the turn after it (`l Trombones`). Move a system to the next page: `partitor pages ID Trombones --move 26=1`. Guide: `PLAN-AND-FOLDOUTS.md` |
+| <kbd>f</kbd> | fit: which paper and staff size give the best page turns for a part (`f Trombones`; `f Trombones 4` picks option 4, then <kbd>r</kbd>). Read-only until you pick. `partitor plan ID --group AltTen=Alto,Tenor` tries a group the piece does not have. Guide: `PLAN-AND-FOLDOUTS.md` |
+| <kbd>l</kbd> | pages: one line for each page of a built part with the turn after it (`l Trombones`). Move a system to the next page: `partitor pages ID Trombones --move 26=1`; add `--dry-run` to see the pages and save nothing; `partitor pages ID Trombones --clear` drops the manual page breaks and pins of that part. Guide: `PLAN-AND-FOLDOUTS.md` |
 | <kbd>x</kbd> | repage: new page breaks from the lines of the last build, no new analysis (`x Trombones`). A page turn falls only beside a multi-bar rest; a turn while playing is a warning with page and bar. Break a page by hand: <kbd>s</kbd>, `Trombones:breaks=45,60`, then <kbd>x Trombones</kbd>. Needs one build with this version or later |
 | <kbd>r</kbd> | build (stage 5). `r Trombones` or `r 2-4` builds only those parts or groups (numbers as in the file names); the other part files stay |
 | <kbd>b</kbd> | back to the list |
@@ -161,6 +161,8 @@ Check the parts list, the groups and the title. If something is wrong, go back t
 ## Build and print {#build eyebrow="Stage 5 · takes minutes"}
 
 Press <kbd>r</kbd>. partitor reads the pages again and writes one PDF per part, one per group, and a large-print copy of each. A long score takes several minutes (the pages are read by several workers at once); other services on the host keep running (the build runs at low priority).
+
+From the command line: `partitor rebuild ID` is the same as <kbd>r</kbd> (`partitor rebuild ID Trombones` builds only that part). `partitor set ID key=value --build` changes a setting and builds at once; without `--build` the change is saved, not built. `partitor plan ID Trombones` is the same as <kbd>f</kbd>. Every command and option is in `COMMANDS.md`.
 
 To change one part (a new gap, a corrected ambitus), edit it, then press <kbd>r</kbd> followed by its name or number, for example <kbd>r Trombones</kbd> or <kbd>r 2 4</kbd>. Only those parts are written again; the other files in `parts` are not touched. If a name in the list would change (title, composer, part number), partitor builds all parts and says why.
 

@@ -1517,11 +1517,20 @@ class TestLibrary(unittest.TestCase):
         self.assertTrue((self.share / "inbox" / "chorale.pdf").is_file())
         self.assertEqual(list((self.share / "library").iterdir()), [])
 
-    def test_library_folder_not_ready(self):
+    def test_library_folder_not_set_up(self):
         (self.share / "library").rmdir()
         r = self.run_cli("list")
         self.assertNotEqual(r.returncode, 0)
-        self.assertIn("library folder not ready", r.stderr)
+        self.assertIn("library folder not set up", r.stderr)
+        self.assertIn("partitor-init", r.stderr)
+
+    def test_library_folder_not_found(self):
+        shutil.rmtree(self.share)
+        r = self.run_cli("list")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("library folder not found", r.stderr)
+        self.assertIn("NAS", r.stderr)
+        self.assertNotIn("partitor-init", r.stderr)
 
     def test_engine_refuses_root(self):
         if os.geteuid() != 0:

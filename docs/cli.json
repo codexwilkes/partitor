@@ -1,0 +1,764 @@
+{
+ "version": "0.9.0",
+ "commands": [
+  {
+   "name": "menu",
+   "help": "recent items and new from inbox (default)",
+   "args": []
+  },
+  {
+   "name": "new",
+   "help": "wizard for an inbox PDF",
+   "args": [
+    {
+     "flags": [
+      "n"
+     ],
+     "help": "inbox number (default: ask)",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--jobs"
+     ],
+     "help": "worker processes of the analysis and the build: a number or auto (default: PARTITOR_JOBS, else auto)"
+    }
+   ]
+  },
+  {
+   "name": "list",
+   "help": "all library items, or those matching words",
+   "args": [
+    {
+     "flags": [
+      "words"
+     ],
+     "help": "e.g. Schein (composer, title, part, id)",
+     "positional": true
+    }
+   ]
+  },
+  {
+   "name": "show",
+   "help": "one item: status, parts, settings and what is not built yet",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    }
+   ]
+  },
+  {
+   "name": "plan",
+   "help": "choose paper, staff size and fold-outs of a part by its page turns (read-only until you pick an option; partitor plan --help)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "words"
+     ],
+     "help": "a part or group, then the option number to set; default: groups and parts with a bad turn",
+     "positional": true,
+     "metavar": "PART [N]"
+    },
+    {
+     "flags": [
+      "--group"
+     ],
+     "help": "try a group the item does not have, e.g. AltTen=Alto,Tenor (part names or numbers): built in a temporary copy and shown; repeat for more groups",
+     "metavar": "NAME=PARTS"
+    },
+    {
+     "flags": [
+      "--all"
+     ],
+     "help": "show every option (default: the option as built and the best of each paper)"
+    }
+   ]
+  },
+  {
+   "name": "rebuild",
+   "help": "build; with parts or groups: only those (the other part files stay)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "parts"
+     ],
+     "help": "numbers (3, 2-4), names (Trombones, Bass Trombone) or all; default: every part",
+     "positional": true,
+     "metavar": "PART"
+    },
+    {
+     "flags": [
+      "--jobs"
+     ],
+     "help": "worker processes: a number or auto (default: PARTITOR_JOBS, else auto)"
+    }
+   ]
+  },
+  {
+   "name": "pages",
+   "help": "the pages of a built part and the turn after each; --move PAGE=N moves a system to the next page",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "part"
+     ],
+     "help": "one part or group, name or number",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--move"
+     ],
+     "help": "move the last N systems of PAGE to the next page (N negative: bring the first systems of the next page up); the part is paged again",
+     "metavar": "PAGE=N"
+    },
+    {
+     "flags": [
+      "--clear"
+     ],
+     "help": "drop the manual page breaks and the pins of the part"
+    },
+    {
+     "flags": [
+      "--dry-run"
+     ],
+     "help": "show the pages after --move, save nothing"
+    }
+   ]
+  },
+  {
+   "name": "repage",
+   "help": "new page breaks from the saved lines: turns while resting, manual breaks (no analysis, no build)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "parts"
+     ],
+     "help": "numbers, names or all; default: every built part",
+     "positional": true,
+     "metavar": "PART"
+    }
+   ]
+  },
+  {
+   "name": "proof",
+   "help": "draw proof.pdf again (names, ambitus, bar numbers, letters)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    }
+   ]
+  },
+  {
+   "name": "expand",
+   "help": "one step larger: one more page, then more space between staves; saved, not built (--build: build too)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "part"
+     ],
+     "help": "one part or group only (default: all)",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--build"
+     ],
+     "help": "build after the edit"
+    }
+   ]
+  },
+  {
+   "name": "contract",
+   "help": "one step smaller: one page less, then less space between staves; saved, not built (--build: build too)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "part"
+     ],
+     "help": "one part or group only (default: all)",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--build"
+     ],
+     "help": "build after the edit"
+    }
+   ]
+  },
+  {
+   "name": "bars",
+   "help": "bar numbers and rehearsal marks (menu); saved, not built (--build: build too)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--build"
+     ],
+     "help": "build after the edit"
+    }
+   ]
+  },
+  {
+   "name": "parts",
+   "help": "part names, parts not extracted, parts joined (menu); saved, not built (--build: build too)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--build"
+     ],
+     "help": "build after the edit"
+    }
+   ]
+  },
+  {
+   "name": "groups",
+   "help": "group scores: several parts printed together (menu); saved, not built (--build: build too)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--build"
+     ],
+     "help": "build after the edit"
+    }
+   ]
+  },
+  {
+   "name": "meta",
+   "help": "title, subtitle and composer (menu); saved, not built (--build: build too)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--build"
+     ],
+     "help": "build after the edit"
+    }
+   ]
+  },
+  {
+   "name": "reid",
+   "help": "old YYYY-NNN item: new id YYYY-MM-NNNN (renames files)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012 (the old id)",
+     "positional": true
+    }
+   ]
+  },
+  {
+   "name": "rename",
+   "help": "folder name follows the title and composer",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    }
+   ]
+  },
+  {
+   "name": "analyse",
+   "help": "analyse the source again (proof, allocation)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012 (or --all)",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--yes"
+     ],
+     "help": "ask nothing; open choices stay for rebuild"
+    },
+    {
+     "flags": [
+      "--all"
+     ],
+     "help": "every library item, as --yes"
+    },
+    {
+     "flags": [
+      "--join"
+     ],
+     "help": "no system ends after staff N of source page P: two systems the analysis took apart are one (p5:4); saved, kept by every analysis; then analyse",
+     "metavar": "pP:N"
+    },
+    {
+     "flags": [
+      "--unjoin"
+     ],
+     "help": "take a join back",
+     "metavar": "pP:N"
+    },
+    {
+     "flags": [
+      "--drop"
+     ],
+     "help": "leave a whole system out (a title, a piece of another work above the music): p1.s1; no part reads it, it counts no bars, every analysis keeps it; not analysed, not built",
+     "metavar": "pP.sN"
+    },
+    {
+     "flags": [
+      "--undrop"
+     ],
+     "help": "put a dropped system back (choices ask for its parts)",
+     "metavar": "pP.sN"
+    }
+   ]
+  },
+  {
+   "name": "set",
+   "help": "change settings; saved, not built (--build: build too)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "pairs"
+     ],
+     "help": "title=..., gap=11, pages=3, ...; one part: \"Continuo:pages=4\"; none: list every key with its value and default",
+     "positional": true,
+     "metavar": "key=value"
+    },
+    {
+     "flags": [
+      "--build"
+     ],
+     "help": "build after the change"
+    }
+   ]
+  },
+  {
+   "name": "log",
+   "help": "print a run log (needs PARTITOR_LOG_DIR; docs/OPERATING.md)",
+   "args": [
+    {
+     "flags": [
+      "which"
+     ],
+     "help": "1 = the newest log (default), 2 = the one before, or a file name",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--tail"
+     ],
+     "help": "only the last N lines",
+     "metavar": "N"
+    },
+    {
+     "flags": [
+      "--list"
+     ],
+     "help": "one line per run (the newest 20)"
+    }
+   ]
+  },
+  {
+   "name": "pieces",
+   "help": "list the pieces of a PDF: runs of music pages (no library, no files written)",
+   "args": [
+    {
+     "flags": [
+      "pdf"
+     ],
+     "help": "the score PDF",
+     "positional": true
+    }
+   ]
+  },
+  {
+   "name": "detect",
+   "help": "analyse a PDF without the library: writes layout.yaml and the preview (then edit it, then build)",
+   "args": [
+    {
+     "flags": [
+      "pdf"
+     ],
+     "help": "the score PDF",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--pages"
+     ],
+     "help": "pages to analyse: N or A-B (default: all)"
+    },
+    {
+     "flags": [
+      "--parts"
+     ],
+     "help": "part names, comma separated, top staff first (default: read from the printed labels)"
+    },
+    {
+     "flags": [
+      "--title"
+     ],
+     "help": "title (default: read from the PDF)"
+    },
+    {
+     "flags": [
+      "--subtitle"
+     ],
+     "help": "subtitle"
+    },
+    {
+     "flags": [
+      "--composer"
+     ],
+     "help": "composer (default: read from the PDF)"
+    },
+    {
+     "flags": [
+      "--dpi"
+     ],
+     "help": "analysis resolution (400)"
+    },
+    {
+     "flags": [
+      "--page-header-sp"
+     ],
+     "help": "text above a page's first staff farther than this, in staff spaces, is dropped (page title, running header)"
+    },
+    {
+     "flags": [
+      "--out"
+     ],
+     "help": "output folder (default: <pdf name>.partitor next to the PDF)"
+    },
+    {
+     "flags": [
+      "--force"
+     ],
+     "help": "overwrite an existing layout.yaml"
+    },
+    {
+     "flags": [
+      "--jobs"
+     ],
+     "help": "worker processes for the page analysis: a number or auto (default: PARTITOR_JOBS, else auto)"
+    }
+   ]
+  },
+  {
+   "name": "build",
+   "help": "build the parts of a PDF from its layout.yaml (no library); options override the layout",
+   "args": [
+    {
+     "flags": [
+      "pdf"
+     ],
+     "help": "the score PDF (run detect first)",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--pages"
+     ],
+     "help": "pages to build: N or A-B (as in detect)"
+    },
+    {
+     "flags": [
+      "--out"
+     ],
+     "help": "folder of layout.yaml and the parts (default: <pdf name>.partitor next to the PDF)"
+    },
+    {
+     "flags": [
+      "--paper"
+     ],
+     "help": "paper size (letter)",
+     "choices": [
+      "a4",
+      "ledger",
+      "letter"
+     ]
+    },
+    {
+     "flags": [
+      "--scale"
+     ],
+     "help": "largest size, 1 = source size (default: up to --max-staff-mm)"
+    },
+    {
+     "flags": [
+      "--gap"
+     ],
+     "help": "staff spaces between staves, the widest (10)"
+    },
+    {
+     "flags": [
+      "--min-gap"
+     ],
+     "help": "smallest space between staves, to save a page turn (7)"
+    },
+    {
+     "flags": [
+      "--clearance"
+     ],
+     "help": "least space between the ink of two lines, in staff spaces (1)"
+    },
+    {
+     "flags": [
+      "--page-count"
+     ],
+     "help": "force this many pages"
+    },
+    {
+     "flags": [
+      "--min-staff-mm"
+     ],
+     "help": "smallest staff height, mm (5)"
+    },
+    {
+     "flags": [
+      "--ink"
+     ],
+     "help": "ink strength (normal)",
+     "choices": [
+      "normal",
+      "darker"
+     ]
+    },
+    {
+     "flags": [
+      "--bar-numbers"
+     ],
+     "help": "bar number at each line start, or none (start)",
+     "choices": [
+      "start",
+      "none"
+     ]
+    },
+    {
+     "flags": [
+      "--bar-raise"
+     ],
+     "help": "least height of a bar number above the staff, staff spaces (1)"
+    },
+    {
+     "flags": [
+      "--bar-size"
+     ],
+     "help": "bar number size, staff spaces (2)"
+    },
+    {
+     "flags": [
+      "--margin-top"
+     ],
+     "help": "top margin, mm (15)"
+    },
+    {
+     "flags": [
+      "--margin-bottom"
+     ],
+     "help": "bottom margin, mm (15)"
+    },
+    {
+     "flags": [
+      "--margin-side"
+     ],
+     "help": "side margin, mm (15)"
+    },
+    {
+     "flags": [
+      "--gutter"
+     ],
+     "help": "mm added at the spine in double-sided print (5)"
+    },
+    {
+     "flags": [
+      "--duplex"
+     ],
+     "help": "double-sided print; auto = over 2 pages (auto)",
+     "choices": [
+      "auto",
+      "on",
+      "off"
+     ]
+    },
+    {
+     "flags": [
+      "--large"
+     ],
+     "help": "also a large-print copy per part (on)",
+     "choices": [
+      "on",
+      "off"
+     ]
+    },
+    {
+     "flags": [
+      "--reflow"
+     ],
+     "help": "cut new lines at barlines for a larger staff (off; on hold)",
+     "choices": [
+      "on",
+      "off"
+     ]
+    },
+    {
+     "flags": [
+      "--max-staff-mm"
+     ],
+     "help": "largest staff height, mm (8)"
+    },
+    {
+     "flags": [
+      "--title-page"
+     ],
+     "help": "title page for 3+ pages of music printed double-sided (auto)",
+     "choices": [
+      "auto",
+      "off"
+     ]
+    },
+    {
+     "flags": [
+      "--rests"
+     ],
+     "help": "compress = empty staves and rest-only bars become multi-bar rests (compress)",
+     "choices": [
+      "compress",
+      "keep"
+     ]
+    },
+    {
+     "flags": [
+      "--rest-bar"
+     ],
+     "help": "H-bar of a multi-bar rest: engraved = thin serifs (as in Bravura), bold = thicker, heavy = the look of 0.8.30 (engraved)",
+     "choices": [
+      "engraved",
+      "bold",
+      "heavy"
+     ]
+    },
+    {
+     "flags": [
+      "--jobs"
+     ],
+     "help": "worker processes: a number or auto (default: PARTITOR_JOBS, else auto)"
+    },
+    {
+     "flags": [
+      "--only"
+     ],
+     "help": "build these parts or groups only",
+     "metavar": "NAME"
+    }
+   ]
+  }
+ ],
+ "menu_keys": [
+  "a",
+  "b",
+  "c",
+  "e",
+  "f",
+  "g",
+  "h",
+  "k",
+  "l",
+  "m",
+  "n",
+  "p",
+  "r",
+  "s",
+  "t",
+  "v",
+  "x",
+  "y"
+ ]
+}

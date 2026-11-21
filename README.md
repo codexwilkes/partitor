@@ -9,7 +9,7 @@ systems, asks you which staff is which part, and writes one PDF per part. It
 was made for amateur players with older eyes: you decide how big the music is,
 and the parts are laid out so that you can read them on a stand.
 
-Status: early public release (0.8). It works for the author, on one setup. Read
+Status: early public release. It works for the author, on one setup. Read
 `docs/KNOWN-LIMITS.md` before you rely on it.
 
 ## What you get

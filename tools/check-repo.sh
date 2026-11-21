@@ -10,6 +10,8 @@
 #     the binary fixtures in tests/data/ and the icon files (*.png, *.ico) in platforms/ are the exceptions)
 #   - a broken module structure (tools/check-modules.py --static)
 #   - a stale docs/operator-flow.html (tools/build-operator-doc.py --check) or a version in it that is not VERSION
+#   - a version that differs from VERSION: the package, the tag example in README.md and docs/INSTALL.md, the newest CHANGELOG release
+#   - a stale docs/COMMANDS.md or docs/cli.json (tools/build-cli-doc.py --check)
 # A private token list is checked by the maintainer, not here (it is itself personal).
 # Usage: tools/check-repo.sh   (run from anywhere inside the repo)
 set -euo pipefail
@@ -43,6 +45,17 @@ if [ "$(grep -c "partitor ${ver}" docs/operator-flow.html)" != 2 ] \
    || grep -v "partitor ${ver}" docs/operator-flow.html | grep -Eq 'partitor [0-9]+\.[0-9]+\.[0-9]+'; then
   bad "docs/operator-flow.html does not carry VERSION ${ver} (run tools/build-operator-doc.py)"
 fi
+# One version: VERSION, the package, the tag example of README and INSTALL, the newest CHANGELOG release.
+pkgver="$(sed -n 's/^VERSION = "\(.*\)"$/\1/p' lib/partitor/__init__.py)"
+[ "$pkgver" = "$ver" ] || bad "lib/partitor/__init__.py has VERSION ${pkgver:-none}, the file VERSION has ${ver}"
+for doc in README.md docs/INSTALL.md; do
+  tagver="$(sed -n 's/.*git checkout --detach \([^ ]*\).*/\1/p' "$doc" | head -n 1)"
+  [ "$tagver" = "$ver" ] || bad "${doc} names tag ${tagver:-none} in its checkout example, VERSION is ${ver}"
+done
+logver="$(sed -n 's/^## \([0-9][0-9.]*[0-9a-z.-]*\) — .*/\1/p' CHANGELOG.md | head -n 1)"
+[ "$logver" = "$ver" ] || bad "the newest CHANGELOG release is ${logver:-none}, VERSION is ${ver}"
+# The command reference and the machine source of the CLI are generated from the code.
+python3 tools/build-cli-doc.py --check || bad "docs/COMMANDS.md or docs/cli.json is old (run tools/build-cli-doc.py)"
 # A python with the two developer packages: the first python3 on PATH, else the system one
 # (CI test jobs put setup-python first on PATH; the apt packages belong to /usr/bin/python3).
 docpy=""
