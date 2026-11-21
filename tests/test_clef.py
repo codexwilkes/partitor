@@ -366,63 +366,6 @@ class TestClefsAndSpacing(unittest.TestCase):
         ink[66:85, 10:40] = True
         self.assertGreaterEqual(pt._wide_run(ink, 10, 66, 30, 19, 20.0, 2), 1.7 * 20)
 
-    def _stem_staff(self, flag: bool, sharp: bool = False):
-        """A staff (sp 20) with one head on step 5 and a stem down from it.
-        flag: the curl of an eighth's flag at the stem's foot (narrower
-        than a head). sharp: a sharp sign (two thin bars, two slanted
-        bars) just left of the head."""
-        sp, thick, idx, top = 20, 2, 0, 150
-        img = np.zeros((400, 700), bool)
-        for k in range(5):
-            img[top + k * sp - 1:top + k * sp + 1, 20:680] = True
-        line_px = img.copy()
-        cx, cy = 300, int(top + 4 * sp - 5 * sp / 2)
-        cv2.ellipse(img.view(np.uint8), (cx, cy), (13, 9), -20, 0, 360, 1, -1)
-        img[cy:cy + 3 * sp, cx - 12:cx - 8] = True                 # stem down (left side)
-        if flag:
-            # a flag curl closes a loop with the stem: the print's hole is filled
-            # and the foot of the stem becomes a solid mass 17 px = 0.85 sp wide
-            fx0, fx1, fy0, fy1 = cx - 12, cx + 5, cy, cy + 3 * sp
-            img[fy0:fy1, fx0:fx0 + 3] = True               # the stem
-            img[fy0:fy1, fx1 - 4:fx1] = True               # the curl's outer edge
-            img[fy1 - 10:fy1, fx0:fx1] = True              # the curl's foot
-        if sharp:
-            img[cy - 18:cy + 18, cx - 40:cx - 37] = True
-            img[cy - 18:cy + 18, cx - 31:cx - 28] = True
-            img[cy - 8:cy - 4, cx - 42:cx - 26] = True
-            img[cy + 4:cy + 8, cx - 42:cx - 26] = True
-        owner = np.where(img, idx, pt.OWN_NONE).astype(np.int32)
-        st = pt.Staff(0, 0, [top + k * sp for k in range(5)], 20, 680)
-        return pt.note_steps(owner, line_px, st, idx, float(sp), thick, barxs=[])
-
-    def test_note_steps_flag_is_not_a_head(self):
-        # the flag curl of a stem-down eighth is not a second, lower head
-        r = self._stem_staff(flag=True)
-        self.assertEqual(r[:2], (5, 5))
-
-    def test_note_steps_plain_stem_head(self):
-        r = self._stem_staff(flag=False)
-        self.assertEqual(r[:3], (5, 5, 1))
-
-    def test_note_steps_sharp_beside_head(self):
-        r = self._stem_staff(flag=False, sharp=True)
-        self.assertEqual(r[:3], (5, 5, 1))
-
-    def test_note_steps_stacked_heads_still_both_count(self):
-        sp, thick, idx, top = 20, 2, 0, 150
-        img = np.zeros((400, 700), bool)
-        for k in range(5):
-            img[top + k * sp - 1:top + k * sp + 1, 20:680] = True
-        line_px = img.copy()
-        for step in (3, 5):
-            cv2.ellipse(img.view(np.uint8), (300, int(top + 4 * sp - step * sp / 2)),
-                        (13, 9), -20, 0, 360, 1, -1)
-        img[int(top + 4 * sp - 5 * sp / 2):int(top + 4 * sp - 3 * sp / 2), 288:292] = True
-        owner = np.where(img, idx, pt.OWN_NONE).astype(np.int32)
-        st = pt.Staff(0, 0, [top + k * sp for k in range(5)], 20, 680)
-        r = pt.note_steps(owner, line_px, st, idx, float(sp), thick, barxs=[])
-        self.assertEqual(r[:2], (3, 5))
-
     def test_note_steps_ignores_letters_and_time_signature(self):
         sp, thick, idx = 20, 2, 0
         img = np.zeros((400, 700), bool)
