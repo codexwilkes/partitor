@@ -12,6 +12,8 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 ### Changed
 - Operator guide: repeated wording removed (the 8 mm staff limit is stated once in the Ledger entry), and the
   opening paragraph is shorter. No change in behaviour.
+- Operator guide: new sub-headings "The proof", "The review screen" and "The part files", so that a site can place
+  figures after the first paragraph of stages 2, 4 and 5.
 
 ## 0.10.2 — 2026-11-21
 

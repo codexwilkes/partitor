@@ -83,7 +83,11 @@ The PDF moves out of the inbox into a new folder in the library, named by its id
 
 ## Analyse and check the proof {#analyse eyebrow="Stage 2 · takes 1–5 minutes"}
 
-partitor reads every page: staves, systems, barlines, bar numbers, staff labels. It does not make any parts yet. When it finishes, open the proof in the item folder:
+partitor reads every page: staves, systems, barlines, bar numbers, staff labels. It does not make any parts yet.
+
+### The proof
+
+When it finishes, open the proof in the item folder:
 
 ```
 library/2026-10-0001-bach-example-piece/2026-10-0001-proof.pdf
@@ -177,6 +181,8 @@ Open it any time: `partitor`, then the item's number. The status line lists what
 
 Press <kbd>v</kbd> in the item menu (or `partitor show ID`). The wizard also shows this screen before it asks “Build now?”.
 
+### The review screen
+
 <div class="screen"><b>2026-10-0001 · Example piece · 7 parts · ready to build</b>
   status:    ready to build
   title:     Example piece
@@ -210,6 +216,8 @@ Press <kbd>r</kbd>. partitor reads the pages again and writes one PDF per part, 
 From the command line: `partitor rebuild ID` is the same as <kbd>r</kbd> (`partitor rebuild ID Trombones` builds only that part). `partitor set ID key=value --build` changes a setting and builds at once; without `--build` the change is saved, not built. `partitor plan ID Trombones` is the same as <kbd>f</kbd>. Every command and option is in `COMMANDS.md`.
 
 To change one part (a new gap, a corrected ambitus), edit it, then press <kbd>r</kbd> followed by its name or number, for example <kbd>r Trombones</kbd> or <kbd>r 2 4</kbd>. Only those parts are written again; the other files in `parts` are not touched. If a name in the list would change (title, composer, part number), partitor builds all parts and says why.
+
+### The part files
 
 The parts are in the item's `parts` folder. The name starts with the part so a player finds it first:
 
