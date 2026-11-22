@@ -552,7 +552,9 @@ def bar_mismatches(systems: list[dict], rules: dict | None) -> list[dict]:
     printed, key}], one per change of the difference. systems: effective.
     Movements with a pickup, incipit or split bar rule are left out (their
     numbers differ from the count on purpose). Answers already given
-    (bar_rules.bars_ack, the key of each) are left out."""
+    (bar_rules.bars_ack, the key of each) are left out, and so is a
+    system with a number set by hand (bar_rules.fix); the lines after it
+    follow that number, as in the build."""
     rules = rules or {}
     pick = zero_first(rules)
     split = {str(k).split(":")[0] for k in rules.get("split") or []}
@@ -561,14 +563,21 @@ def bar_mismatches(systems: list[dict], rules: dict | None) -> list[dict]:
             for e in systems]
     ack = set(rules.get("bars_ack") or [])
     out: list[dict] = []
-    starts = assign_bars(recs)[0] if recs else []
+    starts = list(assign_bars(recs)[0]) if recs else []
+    fix = {str(k): int(v) for k, v in (rules.get("fix") or {}).items()}
     for seg in _movements(systems):
         if any(systems[k]["id"] in pick or systems[k]["id"] in split for k in seg):
             continue
-        plain, delta = 1, 0
+        plain, delta, shift = 1, 0, 0
         for j, k in enumerate(seg):
+            sid = systems[k]["id"]
+            if sid in fix:                  # `f N=B`: the operator set this number
+                shift = fix[sid] - int(starts[k])
+            starts[k] = int(starts[k]) + shift
             d = int(starts[k]) - plain
-            if d != delta:
+            if sid in fix:
+                delta = d                   # settled: later lines follow it
+            elif d != delta:
                 m = {"id": systems[k]["id"], "prev": systems[seg[j - 1]]["id"] if j else None,
                      "counted": plain, "printed": int(starts[k])}
                 m["key"] = f"{m['id']}:{m['counted']}:{m['printed']}"

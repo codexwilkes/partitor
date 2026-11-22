@@ -9,6 +9,9 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 ## Unreleased
 
+### Fixed
+- The bar gate ignored `f N=B` in `partitor bars`: the build still stopped on a mismatch between the barline count and the printed bar numbers until `k N` was used. A line with a number set by `f` is now settled, and the lines after it follow that number. A mismatch elsewhere is still reported.
+
 ### Changed
 - Operator guide: repeated wording removed (the 8 mm staff limit is stated once in the Ledger entry), and the
   opening paragraph is shorter. No change in behaviour.

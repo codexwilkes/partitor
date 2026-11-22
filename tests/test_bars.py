@@ -257,6 +257,16 @@ class TestBarEdits(unittest.TestCase):
         r4 = {**rules, "bars_ack": [ms[0]["key"]]}
         self.assertEqual(len(pt.bar_mismatches(pt.effective_systems(sy2, r4), r4)), 1)
 
+    def test_mismatch_settled_by_a_fix(self):
+        sy, rules = self.systems(), {"pickup": [], "split": [], "fix": {}}
+        ms = pt.bar_mismatches(pt.effective_systems(sy, rules), rules)
+        self.assertEqual(len(ms), 1)
+        for val in (25, 26):                          # printed number or the barline count
+            r = {**rules, "fix": {ms[0]["id"]: val}}
+            self.assertEqual(pt.bar_mismatches(pt.effective_systems(sy, r), r), [])
+        r = {**rules, "fix": {"p4.s1": 10}}           # a fix elsewhere does not hide it
+        self.assertEqual(len(pt.bar_mismatches(pt.effective_systems(sy, r), r)), 1)
+
     def test_mismatch_left_out_with_a_pickup_rule(self):
         sy = [{"id": "a", "bars": 3, "widths": [10, 40, 40], "restart": True},
               {"id": "b", "bars": 3, "widths": [40, 40, 40], "anchors": [[0, 3]]}]
