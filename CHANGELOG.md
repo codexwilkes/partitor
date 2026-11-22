@@ -28,6 +28,9 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
   are kept by `analyse` again when the part names are the same. Parts without cues are built as before.
 - DESIGN §13, `KNOWN-LIMITS.md` (cue lines) and the operator guide describe the rules and the limits.
 
+### Fixed
+- A damaged saved-lines file (`*.lines`) could make the program wait for ever: with some flipped bits pickle did not end. The file is now read in full first, so gzip checks it and refuses it (rebuild the part) before pickle reads it. A test flips bits over the end of a file and needs an answer at once.
+
 ## 0.10.3 — 2026-11-22
 
 ### Fixed

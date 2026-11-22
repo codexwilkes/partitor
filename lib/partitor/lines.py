@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import gzip
+import io
 import os
 import pickle
 import zlib
@@ -847,9 +848,9 @@ def load_lines(path: Path) -> dict:
         raise ValueError(f"no saved lines ({path.name}): rebuild the part once")
     try:
         with gzip.open(path, "rb") as f:
-            d = _LinesUnpickler(f).load()
-            while f.read(1 << 20):          # to the end of the stream: gzip checks its CRC there
-                pass
+            raw = f.read()      # the whole stream first: gzip checks its CRC at the end, so a damaged
+        #                         file is refused before pickle reads it (pickle did not end on some)
+        d = _LinesUnpickler(io.BytesIO(raw)).load()
     except (OSError, EOFError, zlib.error, MemoryError, pickle.UnpicklingError, AttributeError,
             ValueError, ImportError, IndexError, TypeError, KeyError) as e:
         raise ValueError(f"saved lines cannot be read ({path.name}: {e}): rebuild the part")

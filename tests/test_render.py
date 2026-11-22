@@ -1586,6 +1586,36 @@ class TestLinesFileCompatibility(unittest.TestCase):
                     continue                                # refused: the wanted result
                 self.assertTrue(all(np.array_equal(x.img, img) for x in d["strips"]), trial)
 
+    def test_a_damaged_file_is_refused_at_once_wherever_the_bit_is(self):
+        import signal
+        img = np.random.default_rng(3).integers(0, 2, (80, 900)).astype(bool)
+        st = pt.Strip(img, 5, 20, 40, 5.0, np.zeros_like(img))
+
+        def stuck(*_a):
+            raise AssertionError("load_lines did not end")
+        old = signal.signal(signal.SIGALRM, stuck)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                f = Path(tmp, "a.lines")
+                pt.save_lines(f, "A", 400, {}, {"gap": 10.0}, [st, st])
+                raw = f.read_bytes()
+                for i in range(max(40, len(raw) - 1200), len(raw) - 8):    # the end of the stream, where pickle once hung
+                    for bit in (0, 5, 6, 7):
+                        b = bytearray(raw)
+                        b[i] ^= 1 << bit
+                        f.write_bytes(bytes(b))
+                        signal.alarm(5)
+                        try:
+                            d = pt.load_lines(f)
+                        except ValueError:
+                            pass                                # refused: the wanted result
+                        else:                                   # a bit that changes nothing (padding): the same strips
+                            self.assertTrue(all(np.array_equal(x.img, img) for x in d["strips"]), i)
+                        finally:
+                            signal.alarm(0)
+        finally:
+            signal.signal(signal.SIGALRM, old)
+
     def _two_strips(self):
         img = np.zeros((40, 300), bool)
         return [pt.Strip(img, 5, 20, 30, 5.0, np.zeros_like(img), bar_no=n) for n in (12, 17)]
