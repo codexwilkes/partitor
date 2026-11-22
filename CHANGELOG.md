@@ -7,7 +7,7 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
-## Unreleased
+## 0.10.3 — 2026-11-22
 
 ### Fixed
 - The ambitus missed every head on a ledger line when the line spacing of the staff differed from the line thickness plus gap by about 3 % (400 dpi score, Alto C6 missed, the range ended at G5). The ledger lines are now placed from the staff's own lines. The ambitus of such a staff is higher, as in the source.
