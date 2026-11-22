@@ -406,6 +406,26 @@ class TestClefsAndSpacing(unittest.TestCase):
         r = self._stem_staff(flag=True, step=6)
         self.assertEqual(r[:3], (6, 6, 1))
 
+    def test_note_steps_ledger_heads_when_sp_differs_from_staff_spacing(self):
+        # sp (line thickness + gap) is 3-5 % off the real line spacing: the ledger
+        # lines must be placed from the staff's own lines (cb-003 Alto: C6 missed)
+        spacing, thick, idx, top = 20, 2, 0, 150
+        img = np.zeros((400, 700), bool)
+        for k in range(5):
+            img[top + k * spacing - 1:top + k * spacing + 1, 20:680] = True
+        line_px = img.copy()
+        bot = top + 4 * spacing
+        for step in (10, 12):                       # two ledger lines above the staff
+            y = bot - step * spacing // 2
+            img[y - 1:y + 1, 270:330] = True
+        cy = bot - 12 * spacing // 2
+        cv2.ellipse(img.view(np.uint8), (300, cy), (13, 9), -20, 0, 360, 1, -1)
+        img[cy:cy + 3 * spacing, 288:292] = True    # stem down
+        owner = np.where(img, idx, pt.OWN_NONE).astype(np.int32)
+        st = pt.Staff(0, 0, [top + k * spacing for k in range(5)], 20, 680)
+        r = pt.note_steps(owner, line_px, st, idx, 21.0, thick, barxs=[])
+        self.assertEqual(r[:3], (12, 12, 1))
+
     def test_note_steps_plain_stem_head(self):
         r = self._stem_staff(flag=False)
         self.assertEqual(r[:3], (5, 5, 1))

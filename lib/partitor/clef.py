@@ -508,7 +508,10 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
     xlo = xhi = 0
     count = 0
     cands: list[tuple[float, float, int]] = []
-    half = sp / 2.0
+    # half a line spacing from the staff's own lines: sp (line thickness +
+    # gap) can differ from it by 3 % and put a ledger line 4 px off at step 12
+    # (cb-003 Alto: every head on a ledger line was missed)
+    half = (st.bottom - st.top) / 8.0 if st.bottom - st.top > 2 * sp else sp / 2.0
     for j in range(1, n):
         x, y, w, h, a = stt[j]
         if not (0.9 * sp <= w <= 2.0 * sp and 0.7 * sp <= h <= 6.0 * sp):

@@ -10,6 +10,7 @@ development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 ## Unreleased
 
 ### Fixed
+- The ambitus missed every head on a ledger line when the line spacing of the staff differed from the line thickness plus gap by about 3 % (400 dpi score, Alto C6 missed, the range ended at G5). The ledger lines are now placed from the staff's own lines. The ambitus of such a staff is higher, as in the source.
 - The ambitus read the flag curl of a stem-down eighth as a head when staff-line removal cut the real head in two (a head on a staff line): each half was too short to count, so the curl gave two false heads and the range ended too low (Tenor Trombone II, low A2 for a head on the second line). Two runs of ink rows that are a gap of up to thick + 2 rows apart now join if together they are no higher than 1.3 sp. Stacked heads (2 sp) stay two.
 - The bar gate ignored `f N=B` in `partitor bars`: the build still stopped on a mismatch between the barline count and the printed bar numbers until `k N` was used. A line with a number set by `f` is now settled, and the lines after it follow that number. A mismatch elsewhere is still reported.
 
