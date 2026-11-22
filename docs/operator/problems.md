@@ -10,6 +10,10 @@ columns: [You see, Do]
 
 The folder does not exist. The NAS or the disk is off or not connected, or the path is wrong. Check it, wait a minute, run `partitor` again. See `STORAGE-SMB.md`.
 
+## “library folder not readable”
+
+The folder exists, but your user may not enter it (folder mode or group). Give your user read access (see `INSTALL.md`: the group `partitor`), log in again after a change of group, run `partitor` again.
+
 ## “library folder not set up”
 
 The folder exists but has no `inbox` and `library` inside. Run the set-up again (see `INSTALL.md`), or point partitor at the right folder.

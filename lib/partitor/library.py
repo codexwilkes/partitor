@@ -195,9 +195,14 @@ LOGO_FILE = "logo.png"      # the library's own logo, next to inbox/ and library
 
 def library_logo(root: Path) -> Path | None:
     """library_logo -> the logo file of the library at root (DESIGN.md §5.5);
-    None when there is none."""
+    None when there is none. A folder this user may not read (0.10.2): one warning, no logo,
+    no traceback; the library commands stop earlier with "library folder not readable"."""
     p = Path(root, LOGO_FILE)
-    return p if p.is_file() else None
+    try:
+        return p if p.is_file() else None
+    except PermissionError:
+        _warn(f"library folder not readable: {root}; the logo.png in it is not used")
+        return None
 
 
 def item_dirs(lib: Path) -> list[Path]:

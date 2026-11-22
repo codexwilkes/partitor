@@ -7,6 +7,15 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.10.2 — 2026-11-21
+
+### Fixed
+- A library folder that the user may not read (for example `/var/lib/partitor` at mode 750 for another
+  group) stopped every library command with a Python traceback (`PermissionError`). The commands now say
+  "library folder not readable" with a hint (folder mode and group). A build that reads the library logo
+  from such a folder gives one warning and goes on without the logo. The problem table in the operator
+  guide lists the new message.
+
 ## 0.10.1 — 2026-11-21
 
 ### Fixed

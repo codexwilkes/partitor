@@ -117,7 +117,7 @@ html { scroll-behavior: smooth; }
 
 <div class="wrap">
 <header>
-  <span class="eyebrow">partitor 0.10.1</span>
+  <span class="eyebrow">partitor 0.10.2</span>
   <h1>From score to parts</h1>
   <p class="lede">How to turn a score PDF into large-print parts for your ensemble. You work in a terminal: on Linux (supported), over SSH from a phone or PC, or on the same machine; on Windows in PowerShell and on macOS in Terminal (best effort). partitor keeps everything in the library folder (local, or on a NAS). Only the build takes a long time, so you make every change first, review it, and build once.</p>
 </header>
@@ -439,6 +439,7 @@ venv/bin/python lib/partitor-engine
     <thead><tr><th>You see</th><th>Do</th></tr></thead>
     <tbody>
       <tr><td>“library folder not found”</td><td>The folder does not exist. The NAS or the disk is off or not connected, or the path is wrong. Check it, wait a minute, run <code>partitor</code> again. See <code>STORAGE-SMB.md</code>.</td></tr>
+      <tr><td>“library folder not readable”</td><td>The folder exists, but your user may not enter it (folder mode or group). Give your user read access (see <code>INSTALL.md</code>: the group <code>partitor</code>), log in again after a change of group, run <code>partitor</code> again.</td></tr>
       <tr><td>“library folder not set up”</td><td>The folder exists but has no <code>inbox</code> and <code>library</code> inside. Run the set-up again (see <code>INSTALL.md</code>), or point partitor at the right folder.</td></tr>
       <tr><td>The wizard stopped (<kbd>q</kbd>, lost connection)</td><td>The item is kept. Open it from the menu and continue; <kbd>r</kbd> asks what is still open.</td></tr>
       <tr><td>A part is missing on some lines</td><td>Check the red systems on the proof; correct with <kbd>t</kbd> or analyse again with <kbd>y</kbd>.</td></tr>
@@ -451,7 +452,7 @@ venv/bin/python lib/partitor-engine
 
 <footer>
   <div class="staff" role="presentation"></div>
-  <p>partitor 0.10.1. Install: <code>INSTALL.md</code>; Windows: <code>platforms/windows/README.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Every command: <code>COMMANDS.md</code>. Design: <code>DESIGN.md</code>.</p>
+  <p>partitor 0.10.2. Install: <code>INSTALL.md</code>; Windows: <code>platforms/windows/README.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Every command: <code>COMMANDS.md</code>. Design: <code>DESIGN.md</code>.</p>
 </footer>
 </div>
 </body>

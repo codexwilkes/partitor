@@ -1787,6 +1787,19 @@ class TestLogoInLibrary(unittest.TestCase):
     """0.6.0: the logo may be a file `logo.png` in the library folder (DESIGN.md §5.5).
     `build` finds it and gives it to `render` as opts["_logo_file"]; PARTITOR_LOGO wins."""
 
+    def test_unreadable_library_folder_gives_a_warning_not_a_traceback(self):
+        """0.10.2: library_logo on a folder this user may not enter: None and one warning."""
+        d = Path(self.tmp.name, "locked")
+        d.mkdir()
+        d.chmod(0)
+        self.addCleanup(d.chmod, 0o755)
+        if os.access(d, os.R_OK | os.X_OK):
+            self.skipTest("this user ignores the folder mode (root)")
+        pt._reset_counts()
+        self.assertIsNone(pt.library_logo(d))
+        self.assertEqual(len(pt._WARNINGS), 1)
+        self.assertIn("library folder not readable", pt._WARNINGS[0])
+
     def test_the_layout_help_names_both_logo_sources(self):
         """The `logo` line of the layout help (copied into every layout.yaml and score.yaml)
         names PARTITOR_LOGO and the library file."""

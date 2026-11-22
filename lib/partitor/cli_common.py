@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import os
 import time
 from pathlib import Path
 
@@ -50,6 +51,10 @@ def _lib_or_die() -> tuple[Path, Path]:
         _die(f"library folder not found: {root}",
              "Check that the folder or the NAS is connected, wait a minute, run partitor again. "
              "See docs/STORAGE-SMB.md.")
+    if not os.access(root, os.R_OK | os.X_OK):    # exists, but this user may not enter it (0.10.2)
+        _die(f"library folder not readable: {root}",
+             "Your user needs read access to it: check the folder mode and group (docs/INSTALL.md), "
+             "log in again after a change of group, run partitor again.")
     if not (root / "inbox").is_dir() or not lib.is_dir():
         _die(f"library folder not set up: {root} needs inbox/ and library/",
              hooks.setup_hint())

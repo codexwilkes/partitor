@@ -884,6 +884,8 @@ as a rest to turn in; a group line counts as rest only when every staff rests.
   the library file). `logo=off` removes it per piece; it is not a per-part key,
   and there is no per-piece logo file. `partitor-install` warns in advance when
   the file cannot be used (§9).
+  A library folder the user may not read (0.10.2): the library commands stop with
+  "library folder not readable"; `library_logo` itself gives one warning and returns no logo.
   - Channel: `render` (level 3) cannot import `library` (level 4). `build` and
     `repage` look up `library_logo(library_root())` and pass the file to `render`
     in the option `_logo_file`. Options that start with `_` are not stored in

@@ -1532,6 +1532,20 @@ class TestLibrary(unittest.TestCase):
         self.assertIn("NAS", r.stderr)
         self.assertNotIn("partitor-init", r.stderr)
 
+    def test_library_folder_not_readable(self):
+        """0.10.2: a library folder the user may not enter gave a PermissionError traceback."""
+        self.share.chmod(0)
+        try:
+            if os.access(self.share, os.R_OK | os.X_OK):
+                self.skipTest("this user ignores the folder mode (root)")
+            r = self.run_cli("list")
+        finally:
+            self.share.chmod(0o755)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("library folder not readable", r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+        self.assertNotIn("not set up", r.stderr)
+
     def test_engine_refuses_root(self):
         if os.geteuid() != 0:
             self.skipTest("not root")
