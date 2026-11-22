@@ -7,6 +7,12 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## Unreleased
+
+### Changed
+- Operator guide: repeated wording removed (the 8 mm staff limit is stated once in the Ledger entry), and the
+  opening paragraph is shorter. No change in behaviour.
+
 ## 0.10.2 — 2026-11-21
 
 ### Fixed
