@@ -531,6 +531,28 @@ def note_steps(owner: np.ndarray, line_px: np.ndarray, st: "Staff", idx: int,
             # line is a few rows; score C p1.s2 gave G1 for C2)
             rw = (orig[y:y + h, x:x + w] & (lab[y:y + h, x:x + w] == j)).sum(axis=1)
             rows = rw >= 0.4 * sp
+            # a head cut by a removed staff line is two short runs: join two
+            # runs a gap of thick + 2 rows or less apart if together they are
+            # no higher than one head (1.3 sp; two stacked heads are 2 sp).
+            # cb-003 Tenor II: both halves were under 0.45 sp, the head was
+            # lost and the flag curl of the eighth counted as two heads
+            # (low A2 for a head on the 2nd line).
+            raw, k_ = [], 0
+            while k_ < len(rows):
+                if rows[k_]:
+                    e_ = k_
+                    while e_ < len(rows) and rows[e_]:
+                        e_ += 1
+                    if raw and k_ - raw[-1][1] <= thick + 2 and e_ - raw[-1][0] <= 1.3 * sp:
+                        raw[-1] = (raw[-1][0], e_)
+                    else:
+                        raw.append((k_, e_))
+                    k_ = e_
+                else:
+                    k_ += 1
+            rows = np.zeros(len(rows), bool)
+            for a_, b_ in raw:
+                rows[a_:b_] = True
             runs, r0_, dropped = [], None, False
             for r_, ok in enumerate(list(rows) + [False]):
                 if ok and r0_ is None:

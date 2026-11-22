@@ -36,7 +36,7 @@ result. The proof PDF (`<id>-proof.pdf`) is the place to look first.
 
 The lowest and highest note of each part are printed on the first line. Every
 note counts, so a false notehead changes the range. Causes seen: a beam or flag
-start near a head (the flag curl of a stem-down eighth is dropped by its width), a staff-line remnant in an empty stretch, an accidental
+start near a head (the flag curl of a stem-down eighth is dropped by its width, also when a staff line cuts its head in two), a staff-line remnant in an empty stretch, an accidental
 counted as a head, a head on a line that is missed (the range narrows). Whole
 and half notes on a line can be missed.
 

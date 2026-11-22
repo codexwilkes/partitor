@@ -366,8 +366,8 @@ class TestClefsAndSpacing(unittest.TestCase):
         ink[66:85, 10:40] = True
         self.assertGreaterEqual(pt._wide_run(ink, 10, 66, 30, 19, 20.0, 2), 1.7 * 20)
 
-    def _stem_staff(self, flag: bool, sharp: bool = False):
-        """A staff (sp 20) with one head on step 5 and a stem down from it.
+    def _stem_staff(self, flag: bool, sharp: bool = False, step: int = 5):
+        """A staff (sp 20) with one head on `step` (5) and a stem down from it.
         flag: the curl of an eighth's flag at the stem's foot (narrower
         than a head). sharp: a sharp sign (two thin bars, two slanted
         bars) just left of the head."""
@@ -376,7 +376,7 @@ class TestClefsAndSpacing(unittest.TestCase):
         for k in range(5):
             img[top + k * sp - 1:top + k * sp + 1, 20:680] = True
         line_px = img.copy()
-        cx, cy = 300, int(top + 4 * sp - 5 * sp / 2)
+        cx, cy = 300, int(top + 4 * sp - step * sp / 2)
         cv2.ellipse(img.view(np.uint8), (cx, cy), (13, 9), -20, 0, 360, 1, -1)
         img[cy:cy + 3 * sp, cx - 12:cx - 8] = True                 # stem down (left side)
         if flag:
@@ -399,6 +399,12 @@ class TestClefsAndSpacing(unittest.TestCase):
         # the flag curl of a stem-down eighth is not a second, lower head
         r = self._stem_staff(flag=True)
         self.assertEqual(r[:2], (5, 5))
+
+    def test_note_steps_head_cut_by_a_staff_line_keeps_its_flag_out(self):
+        # a head on a line is cut by the removed line into two short runs (8 rows,
+        # under 0.45 sp each): the head still counts, the flag curl does not
+        r = self._stem_staff(flag=True, step=6)
+        self.assertEqual(r[:3], (6, 6, 1))
 
     def test_note_steps_plain_stem_head(self):
         r = self._stem_staff(flag=False)
