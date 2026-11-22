@@ -100,6 +100,8 @@ class Strip:
     staff_labels: list = field(default_factory=list)  # [(name, top row, bottom row)] group staves
     name_labels: list = field(default_factory=list)  # [(full name, top row, bottom row)] left of the ambitus (group first line, only when there is room)
     ambitus_marks: list = field(default_factory=list)  # [(x left, bottom-line row, clef, lo, hi, lo alt, hi alt)]
+    cue_todo: list = field(default_factory=list)       # cues to draw once the line is final: [(CueImg, scale, bar number, label, prefix width px)] (cueplace)
+    cue_labels: list = field(default_factory=list)     # [(x left, baseline row, font size px, text)]: the name of the voice above a cue (cueplace.draw_cue)
 
 
 @dataclass

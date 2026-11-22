@@ -15,7 +15,7 @@ import numpy as np
 import pymupdf
 import yaml
 
-from . import VERSION, analysis, config, lines, parallel, reflow, render, stagecache, vision
+from . import VERSION, analysis, config, cueplace, cues, lines, parallel, reflow, render, stagecache, vision
 from .analysis import (
     check_page, iter_pages, parse_joins, parse_pages, preview_page, write_preview_index,
 )
@@ -431,6 +431,14 @@ def cmd_build(a: argparse.Namespace) -> int:
     want_groups = [g for g in groups if not only or g in only]
     # parts whose staves this build reads: the parts and the members of the groups
     consumers = set(want_parts) | {x for g in want_groups for x in groups[g]}
+    # cue lines (§13): the voices a cue shows are read too, also when they are not built
+    cue_specs, cue_notes = cues.parse_cues(lay.get("cues"), list(part_strips), groups)
+    for t_ in cue_notes:
+        _warn(t_)
+    cue_srcs = {sp_.src for t_, sps_ in cue_specs.items() if t_ in want_parts or t_ in want_groups
+                for sp_ in sps_ if sp_.src}
+    cue_extra = [p for p in part_strips if p in cue_srcs and p not in want_parts]
+    consumers |= set(cue_extra)
     plays = (lay.get("layout") or {}).get(PART_LAYOUT_KEY) or {}
 
     def own_opts(name: str) -> dict:
@@ -490,7 +498,7 @@ def cmd_build(a: argparse.Namespace) -> int:
         page. res None: the page was not analysed (a part-only build: none of
         the wanted parts has a staff on it and no movement starts there, so
         only multi-bar rests are needed)."""
-        ap: dict[str, list] = {p: [] for p in want_parts}
+        ap: dict[str, list] = {p: [] for p in (*want_parts, *cue_extra)}
         ag: dict[str, list] = {g: [] for g in want_groups}
         ids: list[str] = []
         if res is not None:
@@ -720,6 +728,27 @@ def cmd_build(a: argparse.Namespace) -> int:
                 ).to_dict()
             except Exception as e:            # noqa: BLE001  (plan data never stops a build)
                 _warn(f"plan data:  {name}: {e}")
+        cue_here = cue_specs.get(name) or []
+        if cue_here and opts.get("reflow") == "on":
+            _warn(f"cue:  {name}: cues are not made with reflow=on; left out")
+            cue_here = []
+        if cue_here:
+            pre_c = find_prefixes(strips)
+            starts_c = [p_[0] if p_ is not None else (s_.rest_src[1] if s_.rest_src is not None
+                                                     else cueplace.guess_music_x(s_))
+                        for p_, s_ in zip(pre_c, strips)]
+            srcs_c = {}
+            for sp_ in cue_here:
+                if sp_.src and sp_.src not in srcs_c:
+                    items_ = part_strips[sp_.src]
+                    real_ = [x for x in items_ if isinstance(x, Strip)]
+                    pre_s = find_prefixes(real_) if real_ else []
+                    srcs_c[sp_.src] = (items_, {id(x): (q[0] if q is not None
+                                                        else cueplace.guess_music_x(x))
+                                                for x, q in zip(real_, pre_s)})
+            strips, cue_w = cueplace.apply_cues(strips, starts_c, cue_here, srcs_c, name)
+            for w_ in cue_w:
+                _warn(f"cue:  {w_}")
         h_max = 4.0 * strips[0].sp * 72.0 / dpi * fit_scale(strips, dpi, opts) * 25.4 / 72.0
         h_width = 4.0 * strips[0].sp * 72.0 / dpi * fit_scale(
             strips, dpi, {**opts, "scale": 1e9}) * 25.4 / 72.0   # page width only
@@ -752,6 +781,10 @@ def cmd_build(a: argparse.Namespace) -> int:
             # widen the lines)
             strips = finish_lines(strips, name, group, extra.get("ambitus"),
                                   extra.get("ambitus_map"), extra.get("short_map"))
+            if cue_here:                      # at the final width: justify would smear a cue
+                strips, cue_w = cueplace.draw_cues(strips)
+                for w_ in cue_w:
+                    _warn(f"cue:  {name}: {w_}")
             sc, g, n_est = choose_layout(strips, dpi, opts)
         o = {**opts, "scale": sc, "gap": g}
         # pins of `pages --move` (0.8.39): they hold for the lines they were made for only

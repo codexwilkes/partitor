@@ -135,8 +135,10 @@ name. The 29 modules and their import levels:
 | 1 | `runlog` | Run log of one CLI run (off by default) |
 | 2 | `ownership` | Ink ownership, safety gate |
 | 2 | `lines` | Line fitting, multi-bar rests, saved lines |
+| 2 | `cues` | Cue lines: syntax, crop, split of a rest, table of long rests |
 | 2 | `stagecache` | Stage cache of the page analysis |
 | 3 | `analysis` | Page loop, preview |
+| 3 | `cueplace` | Cue lines in the lines of a part: split of a rest, drawing |
 | 3 | `render` | Packing, part drawing |
 | 4 | `partplan` | Part planning: options of a part (paper, staff size, page turns) |
 | 4 | `library` | Item folder, ids, load and save, `step_size` |
@@ -145,6 +147,7 @@ name. The 29 modules and their import levels:
 | 6 | `cli_common` | Shared CLI helpers |
 | 7 | `cli_bars` | `bars` command |
 | 7 | `cli_parts` | `parts`, `groups` commands |
+| 7 | `cli_cues` | `cues`, `cue` commands |
 | 8 | `cli_items` | Item commands |
 | 9 | `cli_main` | Menu, `main` |
 

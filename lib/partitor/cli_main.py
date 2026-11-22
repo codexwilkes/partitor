@@ -19,6 +19,7 @@ from .cli_items import (
     cmd_analyse, cmd_contract, cmd_expand, cmd_list, cmd_meta, cmd_new, cmd_proof, cmd_reid,
     cmd_pages, cmd_plan, cmd_rename, cmd_repage, cmd_show, item_matches, list_page_size,
 )
+from .cli_cues import CUE_OPTIONS, cmd_cue, cmd_cues
 from .cli_parts import ambitus_menu, ask_part, cmd_groups, cmd_parts, short_menu
 from .config import LAYOUT_DEFAULTS, PAGE_HEADER_SP, PAPER
 from .console import Abort, BOLD, RST, YLW, _die, _warn, ask
@@ -45,6 +46,7 @@ def item_menu(item: Path) -> None:
               "n bar numbers and marks")
         print("                            e expand  c contract  p pages  a paper  k ambitus"
               "  h short names  s set")
+        print("                            u cue lines (small staves above a rest: u Trombones)")
         print("  v review   y analyse again   r build (r Trombones, r 2-4: only those)")
         print("  f fit (paper, staff size, page turns: f Trombones)   "
               "l pages (see and move page turns: l Trombones)")
@@ -88,6 +90,8 @@ def item_menu(item: Path) -> None:
                 cmd_parts(ns)
             elif k == "g":
                 cmd_groups(ns)
+            elif k == "u":
+                cmd_cues(argparse.Namespace(id=data["id"], build=False, part=rest.strip() or None))
             elif k == "m":
                 cmd_meta(ns)
             elif k == "y":
@@ -396,6 +400,21 @@ def build_parser() -> argparse.ArgumentParser:
         if name in ("expand", "contract"):
             sp_.add_argument("part", nargs="?", help="one part or group only (default: all)")
         sp_.add_argument("--build", action="store_true", help="build after the edit")
+    cu = sub.add_parser("cues", help="cue lines of one part: small staves of another voice above a rest "
+                        "(menu; saved, not built)", description="Cue lines of one part or group (a menu).\n\n"
+                        + CUE_OPTIONS, formatter_class=argparse.RawDescriptionHelpFormatter)
+    cu.add_argument("id", help="12 or 2026-10-0012")
+    cu.add_argument("part", nargs="?", help="one part or group (default: choose in the menu)")
+    cu.add_argument("--build", action="store_true", help="build after the edit")
+    c1 = sub.add_parser("cue", help="the same cue lines for several parts: cue ID 3=97-98 --parts Tenore,5 "
+                        "(saved, not built)", description="The same cue lines for several parts or groups. "
+                        'A line is VOICE=BARS and options, or "word"=BAR.\n\n' + CUE_OPTIONS,
+                        formatter_class=argparse.RawDescriptionHelpFormatter)
+    c1.add_argument("id", help="12 or 2026-10-0012")
+    c1.add_argument("lines", nargs="+", metavar="LINE", help='3=97-98 (voice and bars; options after, in one '
+                    'quoted line: "3=97-98 fit sync=3") or "Canto"=97 (a word)')
+    c1.add_argument("--parts", required=True, help="parts or groups: names or numbers, comma separated")
+    c1.add_argument("--build", action="store_true", help="build after the edit")
     sub.add_parser("reid", help="old YYYY-NNN item: new id YYYY-MM-NNNN (renames files)"
                    ).add_argument("id", help="12 or 2026-10-0012 (the old id)")
     sub.add_parser("rename", help="folder name follows the title and composer"
@@ -518,7 +537,7 @@ def _main() -> int:
             "set": cmd_set, "expand": cmd_expand, "contract": cmd_contract,
             "rebuild": cli_items.cmd_rebuild, "pages": cmd_pages, "repage": cmd_repage, "bars": cmd_bars, "parts": cmd_parts,
             "proof": cmd_proof,
-            "groups": cmd_groups, "meta": cmd_meta, "analyse": cmd_analyse,
+            "groups": cmd_groups, "cues": cmd_cues, "cue": cmd_cue, "meta": cmd_meta, "analyse": cmd_analyse,
             "reid": cmd_reid, "rename": cmd_rename,
             "log": lambda a: runlog.show_log(a.which, a.tail, a.list)}
     return cmds[a.cmd or "menu"](a)

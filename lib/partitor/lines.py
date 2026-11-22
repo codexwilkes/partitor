@@ -119,6 +119,9 @@ def justify(s: Strip, target: int) -> Strip:
     runs = [(a, b) for a, b in runs
             if not (b - a < sp and bar(range(a - 3, a)) and bar(range(b, b + 4)))]
     hspans = _hbar_spans(s)               # the H-bars of merged rests take most of the extra space
+    for pa, pb in _cue_spans(s):          # the bars under a cue keep the width of the cue: its barlines meet the part's
+        runs = [(a, b) for a, b in runs if not pa <= (a + b) // 2 < pb]
+        hspans = [(a, b) for a, b in hspans if not pa <= (a + b) // 2 < pb]
     if not runs and not hspans:
         return s
     counts = np.ones(s.img.shape[1], np.int64)
@@ -149,6 +152,19 @@ def justify(s: Strip, target: int) -> Strip:
 
 
 HBAR_WEIGHT = 3         # justify: an H-bar takes this many shares of the extra space, a blank gap one
+
+
+def _cue_spans(s: Strip) -> list[tuple[int, int]]:
+    """_cue_spans -> [(left barline x, right barline x)] of the bars under the cues of a line
+    that are still to be drawn (Strip.cue_todo, cueplace): justify gives them no extra space."""
+    out = []
+    for img, _scale, number, _label, pre_w, _fit, _sync in s.cue_todo:
+        if img is None or number not in s.bar_nums:
+            continue
+        i = s.bar_nums.index(number)
+        if i < len(s.bars_x) and i < len(s.rest_counts) and s.rest_counts[i] > 0:
+            out.append((int(s.bars_x[i - 1]) if i > 0 else int(s.staff_x0) + pre_w, int(s.bars_x[i])))
+    return out
 
 
 def _hbar_spans(s: Strip) -> list[tuple[int, int]]:
@@ -506,18 +522,19 @@ def staff_lines(s: Strip) -> list[list[float]]:
     return out
 
 
-def _only_measure_rests(s: Strip, lines: list[list[float]], xa: int, xb: int) -> bool:
+def _only_measure_rests(s: Strip, lines: list[list[float]], xa: int, xb: int, text_ok: bool = False) -> bool:
     """True when columns xa..xb of the line hold, on every staff, one filled
     rest block (a whole, half or breve rest, with the dot of a dotted rest) and
     nothing else but staff lines. Any other ink (note, stem, rest of another
     length, text, a number) makes it False: a bar is merged only when this is
-    certain."""
+    certain. text_ok: text and numbers outside the staves do not count (a cue asks whether
+    the part plays; a printed voice name between the staves is no note)."""
     sp = s.sp
     tops = [int(round(ln[0])) for ln in lines]
     if xb - xa < 2 * sp or not tops:
         return False
     for m in (s.num_mask, s.hdr):
-        if m is not None and m[:, xa:xb].any():
+        if not text_ok and m is not None and m[:, xa:xb].any():
             return False
     reg = s.img[:, xa:xb].copy()
     y0, y1 = tops[0], min(reg.shape[0], tops[-1] + int(round(4 * sp)) + 1)
@@ -532,7 +549,7 @@ def _only_measure_rests(s: Strip, lines: list[list[float]], xa: int, xb: int) ->
     near = np.zeros(reg.shape[0], bool)
     for t in tops:                             # rows of each staff, with the edge of a line
         near[max(0, t - th):min(len(near), t + int(round(4 * sp)) + th + 1)] = True
-    if reg[~near].any():                       # ink above, below or between the staves
+    if not text_ok and reg[~near].any():       # ink above, below or between the staves
         return False
     for t in tops:
         y0, y1 = max(0, t - th), min(reg.shape[0], t + int(round(4 * sp)) + th + 1)
@@ -564,11 +581,13 @@ def _only_measure_rests(s: Strip, lines: list[list[float]], xa: int, xb: int) ->
     return True
 
 
-def rest_only_bars(s: Strip, pre_x: int | None) -> list[bool]:
+def rest_only_bars(s: Strip, pre_x: int | None, need_end: bool = True, text_ok: bool = False) -> list[bool]:
     """rest_only_bars -> per bar of a line: True when it holds only measure rests on every
     staff (see _only_measure_rests). pre_x: where the music of bar 0 starts (None: bar 0 is
-    never judged). [] for a line that is not read: a rest line, no final barline, no staff."""
-    if s.rest_src is not None or not s.ends_at_bar or not s.bars_x:
+    never judged). [] for a line that is not read: a rest line, no final barline, no staff.
+    need_end False: a line that does not end at a barline is read too (a cue only asks which of
+    its bars are rests; merge_rest_bars asks for need_end)."""
+    if s.rest_src is not None or (need_end and not s.ends_at_bar) or not s.bars_x:
         return []
     lines = staff_lines(s)
     if not lines or abs(lines[0][0] - s.staff_top) > max(2, int(0.2 * s.sp)):   # (the line centre is off by a pixel)
@@ -585,7 +604,7 @@ def rest_only_bars(s: Strip, pre_x: int | None) -> list[bool]:
         if xa is None or any(lo <= mx < bx for mx, _ in s.marks):
             ok.append(False)
             continue
-        ok.append(_only_measure_rests(s, lines, xa, bx - e))
+        ok.append(_only_measure_rests(s, lines, xa, bx - e, text_ok))
     return ok
 
 
@@ -777,7 +796,7 @@ LINES_FORMAT = 1
 # written before the field loads (the lines have none of it); any other
 # difference in the fields still means "rebuild the part".
 _FIELD_DEFAULTS = {"name_labels": list, "rest_labels": list, "rest_in": int, "rest_out": int, "rest_counts": list,
-                   "rest_bar": lambda: "engraved"}
+                   "rest_bar": lambda: "engraved", "cue_labels": list, "cue_todo": list}
 _NP_OK = {"_reconstruct", "ndarray", "dtype", "scalar", "_frombuffer"}
 
 

@@ -58,6 +58,12 @@ def reanalyse(item: Path) -> int:
     if data.get("built"):
         keep["pending"] = list(data.get("pending") or []) + ["analysed again"]
     merge_item_keys(item, keep, again=True)
+    if data.get("cues"):
+        if load_item(item).get("cues"):
+            _warn("cues:  kept by bar number; check them against the new analysis: partitor cues " + data["id"])
+        else:
+            _warn("cues:  dropped, because the part names are not the same any more; they were: "
+                  + "; ".join(f"{t}: {len(v)}" for t, v in data["cues"].items()))
     proof_from_preview(item)
     _reset_counts()
     return 0

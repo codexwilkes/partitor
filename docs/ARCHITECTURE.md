@@ -89,6 +89,7 @@ flowchart TB
   subgraph L7["Level 7"]
     cli_bars["cli_bars"]
     cli_parts["cli_parts"]
+    cli_cues["cli_cues"]
   end
   subgraph L6["Level 6"]
     cli_common["cli_common"]
@@ -102,12 +103,14 @@ flowchart TB
     library["library"]
   end
   subgraph L3["Level 3"]
+    cueplace["cueplace"]
     analysis["analysis"]
     render["render"]
   end
   subgraph L2["Level 2"]
     lines["lines"]
     ownership["ownership"]
+    cues["cues"]
     stagecache["stagecache"]
   end
   subgraph L1["Level 1"]
@@ -134,8 +137,8 @@ flowchart TB
   cli_bars ~~~ cli_common
   cli_common ~~~ build
   build ~~~ partplan
-  partplan ~~~ analysis
-  analysis ~~~ lines
+  partplan ~~~ cueplace
+  cueplace ~~~ lines
   lines ~~~ clef
   clef ~~~ bars
 ```

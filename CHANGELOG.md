@@ -7,6 +7,27 @@ engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
 
+## 0.11.0 — 2026-11-22
+
+### Added
+- Cue lines. A part with a long rest can show where another voice enters: a small staff of that voice
+  above the rest, or a word such as "Canto" at a bar. Menu key `u` (`partitor cues ID [PART]`) shows the
+  long rests of the part and takes lines like `3=97-98` (part 3, bars 97 to 98) or `"Canto"=97`; options
+  `noclef`, `nolabel`, `label=`, `size=` (0.3 to 1, default 0.6 of the staff; 1, full size, when `fit` or `sync` is set and no size is typed), `anchor=N`, `fit`, `sync=N`. `partitor cue ID LINE...
+  --parts LIST` puts the same line in several parts. The cue stands above the staff (above the top staff
+  of a group), with the clef and key of the source and the name of the voice, and keeps the lyric. The bars
+  under it become one multi-bar rest as wide as the cue, so that its barlines meet those of the part; the
+  rest before and after it stays as it was. A cue may run on over bars where the part plays (the cue of bar
+  24 and 25 when the part enters at 25): the barline before the first bar the part plays (or the bar
+  named by `anchor=N`) is the anchor, where the cue and the part meet at the size of the cue; the bars of the
+  part after it are not changed, and the cue's last barline falls where it falls. `fit` stretches the cue
+  bars from the anchor on sideways to the bars of the part under them (the height stays; the notes are
+  squashed or stretched), so that the barlines meet. `sync=N` (it implies `fit`) also puts the N-th note
+  with a stem of that cue bar over the first note of the part's top staff in its bar, so that the entrance lines
+  up: the bar is stretched in two pieces, before and after that note. Bars before the anchor must rest. Where a faint scan does not let the program confirm a rest the cue is placed and the build says so. Cues
+  are kept by `analyse` again when the part names are the same. Parts without cues are built as before.
+- DESIGN §13, `KNOWN-LIMITS.md` (cue lines) and the operator guide describe the rules and the limits.
+
 ## 0.10.3 — 2026-11-22
 
 ### Fixed

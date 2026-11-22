@@ -1,5 +1,5 @@
 {
- "version": "0.10.3",
+ "version": "0.11.0",
  "commands": [
   {
    "name": "menu",
@@ -304,6 +304,65 @@
      ],
      "help": "12 or 2026-10-0012",
      "positional": true
+    },
+    {
+     "flags": [
+      "--build"
+     ],
+     "help": "build after the edit"
+    }
+   ]
+  },
+  {
+   "name": "cues",
+   "help": "cue lines of one part: small staves of another voice above a rest (menu; saved, not built)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "part"
+     ],
+     "help": "one part or group (default: choose in the menu)",
+     "positional": true
+    },
+    {
+     "flags": [
+      "--build"
+     ],
+     "help": "build after the edit"
+    }
+   ]
+  },
+  {
+   "name": "cue",
+   "help": "the same cue lines for several parts: cue ID 3=97-98 --parts Tenore,5 (saved, not built)",
+   "args": [
+    {
+     "flags": [
+      "id"
+     ],
+     "help": "12 or 2026-10-0012",
+     "positional": true
+    },
+    {
+     "flags": [
+      "lines"
+     ],
+     "help": "3=97-98 (voice and bars; options after, in one quoted line: \"3=97-98 fit sync=3\") or \"Canto\"=97 (a word)",
+     "positional": true,
+     "metavar": "LINE"
+    },
+    {
+     "flags": [
+      "--parts"
+     ],
+     "help": "parts or groups: names or numbers, comma separated"
     },
     {
      "flags": [
@@ -757,6 +816,7 @@
   "r",
   "s",
   "t",
+  "u",
   "v",
   "x",
   "y"

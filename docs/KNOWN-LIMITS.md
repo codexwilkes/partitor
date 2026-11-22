@@ -58,6 +58,27 @@ per-system consistency.
 - Margins and sizes are estimates from test prints on a few printers. Check the
   first print of every part.
 
+## Cue lines
+
+- A cue is whole bars of one voice, with its own clef and key at a small size (0.6 of the staff by
+  default). It is never drawn in the staff, only above it, and above the top staff of a group. There is no
+  transposition and no note reading: the cue is an image of the source. A voice with several staves is not
+  taken.
+- The bars under a cue are shown as one multi-bar rest, also when they were printed bar by bar.
+- Cues are not made with `reflow=on` (the build says so). `partitor plan` does not count the height a
+  cue adds; the build does, and the page turns are planned with it.
+- The bars of the part under a cue, before its anchor, must be rests. Where a faint scan does not allow the
+  program to read that, the cue is placed on your word and the build warns: look at the part before you
+  print it. After the anchor the cue runs over the bars as they are; only the anchor barline meets one of
+  the part, unless `fit` stretches the cue (the notes of the cue are then squashed or stretched). `sync=N` lines up one note of the cue with the
+  first note of the part; it counts notes with a stem only (a whole note is not found) and reads the top
+  staff of a group.
+- A bar that a line break cuts keeps its number on both lines; a cue reads it where it first stands.
+- No separate proof for cues: build the part (the set before is kept in `parts.prev`) and look at it.
+  The size is a factor of the staff: check the print of the large-print copy and of the small one.
+- An upbeat before the entry is not cropped (whole bars only). The table of long rests does not name the
+  voice that sounds next.
+
 ## Platform
 
 - Tested: Ubuntu 26.04 LTS (CPython 3.14, x86-64) with systemd. This is the

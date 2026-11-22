@@ -1154,7 +1154,9 @@ partitor plan <id> [part] [N]             options of a part; with N: set option 
 partitor plan <id> --group Name=A,B       try a group of parts in a temporary copy (read-only)
 partitor pages <id> <part> [--move PAGE=N]  pages and turns (§5.9)
 partitor analyse <id> [--yes] [--join pP:N] [--unjoin pP:N] [--drop pP.sN] [--undrop pP.sN] | analyse --all
-partitor bars | parts | groups | meta | proof <id>
+partitor bars | parts | groups | cues | meta | proof <id>
+partitor cues <id> [part]                 cue lines of a part or group (menu; §13)
+partitor cue <id> LINE... --parts LIST    the same cue lines for several parts (§13)
 partitor log [N|FILE] [--tail N] [--list]  print a run log of PARTITOR_LOG_DIR (§12.5; 0.8.67)
 ```
 
@@ -1431,7 +1433,7 @@ See `KNOWN-LIMITS.md`.
 
 ## 12. Code map
 
-The engine is the package `lib/partitor/`, in 24 modules (the split took the releases
+The engine is the package `lib/partitor/`, in 27 modules (the split took the releases
 `0.5.0-dev.1` to `0.5.0`). `lib/partitor-engine` is a launcher: it puts `lib/` on the path and
 starts `partitor.cli_main.main`; `python -m partitor` starts the same function. Every step of
 the split kept the output identical (`tools/g0_golden.py check`). The development history of the
@@ -1461,8 +1463,10 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 1 | `runlog` | Run log of one CLI run, off by default (§12.5) |
 | 2 | `ownership` | Ink ownership, safety gate, barline detect |
 | 2 | `lines` | Line fitting, labels, multi-bar rests, saved lines |
+| 2 | `cues` | Cue lines: the cue line syntax, `split_rest`, the crop of a cue, the table of long rests (§13) |
 | 2 | `stagecache` | Stage cache of the page analysis (§12.4) |
 | 3 | `analysis` | Page loop, preview, cache read and write around `analyse_page` |
+| 3 | `cueplace` | Cue lines in the lines of a part: split of a rest, drawing of a cue (§13) |
 | 3 | `render` | Packing, page plan, part drawing |
 | 4 | `partplan` | Part planning: the options table of `plan` (§5.8) |
 | 4 | `library` | Item folder, ids, load and save, parts folder swap, `step_size` |
@@ -1471,6 +1475,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 6 | `cli_common` | Shared CLI helpers, `set` |
 | 7 | `cli_bars` | `bars` command |
 | 7 | `cli_parts` | `parts`, `groups`, ambitus menu |
+| 7 | `cli_cues` | `cues` and `cue` commands (§13) |
 | 8 | `cli_items` | Item commands |
 | 9 | `cli_main` | Menu, `main`, sandbox check |
 
@@ -1490,6 +1495,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | §4.3 item 13 (ambitus) | `clef` |
 | §4.3 items 7, 11 (multi-work, group outputs) | `build`, `strips` |
 | §4.4 parallel | `parallel` |
+| §13 cue lines | `cues`, `cueplace`, `cli_cues` |
 | §12.4 stage cache | `stagecache`, `analysis` |
 | §12.5 run log | `runlog`, `console`, `cli_main` |
 | §5.1 to 5.4, 5.6 layout | `render` |
@@ -1698,3 +1704,78 @@ Policy of the maintainer (keep it):
   (`platforms/<os>/tests/`) run on Linux with mocks; `tests/test_packs.py` loads them, so they
   count in `MIN_TESTS`. A pack's own docs and build script live in its folder
   (`platforms/windows/README.md`).
+
+---
+
+## 13. Cue lines
+
+A part with a long rest can show where another voice enters: a small staff of that voice above the rest
+(a cue), or a word at a bar (a text mark). Nothing is made unless the item has the key `cues`. A part
+without cues is built exactly as before (the G0 and real-page checks show no difference).
+
+**The key `cues`** (`score.yaml`, §3): `{part or group: [entry, ...]}`. An entry is
+`{src: Canto, bars: [23, 24], clef: true, label: null, size: 0.6, anchor: 24, fit: false, sync: 3}` (`clef`, `label`, `size`, `anchor`, `fit` and `sync` are
+optional; `label: ""` shows no name; `size` is a factor of the staff, 0.3 to 1; absent: 0.6, or 1 with `fit` or `sync`, `cues.cue_size`) or `{text: Canto, bar: 57}`.
+`cues.parse_cues` reads it; an entry that is wrong is left out and named in a warning. `analyse` again keeps
+the key when the part names are the same and says so (the bars are read by number: look at them again);
+else it says that they were dropped. Set with the menu key `u` (`partitor cues ID [PART]`) or
+`partitor cue ID LINE... --parts LIST`; the line is `VOICE=BARS [noclef] [nolabel] [size=N] [label=T] [anchor=N] [fit] [sync=N]`
+or `"word"=BAR` (`cues.parse_cue_line`). Saved, not built: `pending` names `PART:cues`.
+
+**Rules.**
+- Whole bars. The numbers are those printed in the part. A number that stands twice (a bar cut by a
+  line break) is read where it first stands.
+- One voice per cue. The voice is a part with one staff. A part does not cue itself, nor a group its own
+  member.
+- The cue is a crop of the source line (`cues.crop_cue`) at its bars as one piece, with the clef and key
+  of the source in front when the bars do not start the line. The printed name of the voice above the staff,
+  bar numbers and rehearsal letters are left out; a lyric under the staff stays. The source is the
+  analysis of the page, so a part of a build reads the staves of the voices of its cues too.
+- Where it stands: above the staff (above the top staff of a group), `CUE_CLEAR_SP` (1 sp) clear of it
+  and above any ink in its columns and above the count of a multi-bar rest. The name of the voice stands
+  just above its first bar, small and italic. The bar number and the rehearsal letters stand above the cue.
+  Never in the staff.
+- The size is `size` times the staff of the part. Its floor is the choice of the operator: look at the
+  print of the small and of the large-print copy.
+
+**Bars under a cue.** The bars of the part under a cue become one bar of their own: a multi-bar rest
+(a whole rest for one bar) as wide as the cue, so that the first and the last barline of the cue lie on
+barlines of the part (to 2 px). A cue of several bars has no barline of the part under its inner barlines,
+so none can disagree. The clef of the cue may hang over the barline to the left (`noclef` leaves it out).
+The bars before and after the cue stay a rest each (`cues.split_rest`, `cueplace.respan`); the counts add up
+to the original count and every number stays right. Rest bars that were printed one by one (not merged)
+become that one bar; a printed word between the staves stays where it was. `justify` gives these bars no
+extra space (`lines._cue_spans`), the other rests and gaps take it. A rest line (no staff of the part in
+those systems) becomes a line with bars. A text mark splits the rest in the same way, so that its bar starts
+at a barline. Bars of one cue that stand on two lines of the source are one cue (`cues.join_cues`); a cue over
+the end of a line of the part is one cue for each line.
+
+**Order in the build** (`build.emit`): the lines of the part are made as before (`fill_rests`,
+`merge_rest_bars`, `coalesce_rest_lines`); `cueplace.apply_cues` splits the rests and notes each cue
+(`Strip.cue_todo`); `finish_lines` justifies and indents; `cueplace.draw_cues` draws the cues at the final
+width (justify would smear a cue drawn earlier) and adds the rows above the staff (`Strip.cue_labels` holds
+the names, drawn by `render`); then the layout and the page plan see the lines with their cues. `partitor
+plan` uses the lines before this, so its estimates do not count the height of a cue.
+
+**Anchor, fit, bars with notes.** The anchor is the bar of the cue whose left barline is pinned to the
+barline of the part (`CueSpec.anchor`; default: the first bar of the cue that the part plays, else none).
+The bars of the cue before it must be rests of the part and become the piece described above (`cueplace.
+apply_cues`); from the anchor on, the part is not changed. The cue is one picture drawn from the barline
+before its first bar, at the scale of its size, so its anchor barline meets the part's to 2 px. The bar
+piece under a cue is at least `CUE_BAR_MIN_SP` (4 sp) wide, so a narrow cue still meets it. With `fit`
+(`Strip.cue_todo`, sixth item: the index of the first bar to fit; seventh: `sync`) `cueplace.draw_cues` gives each cue bar
+from the anchor on the width of the bar of the part under it (`fit_widths`; it stops at a bar the part
+shows inside a merged rest or on another line) and `scaled_cue` scales that bar sideways to this width
+at the height of the scale. With `sync` (implies `fit`) `cueplace.sync_split` reads the notes with a stem (`cueplace.note_xs`: a run of ink of 2.2 sp in the height of a staff, not on a barline, stems within 0.8 sp are one note; the head is read at the end of the stem with more ink beside it) of the first fitted bar of the cue and of the part's bar on its top staff: the sync-th note of the cue and the first of the part. `scaled_cue` then scales the bar in two pieces, before and after that note, so that they stand over each other; a note that is not found is a warning and the bar is fitted without it. `lines._cue_spans` protects only the rest bars from `justify`.
+
+**Checks and failures.** A bar of the part before the anchor must hold no note: `cueplace._plays` (a column with ink in
+two or more spaces of one staff) refuses the cue, "plays here". When `lines.rest_only_bars` cannot confirm
+a rest (a faint scan, a printed word between the staves) and nothing reads as a note, the cue is placed on
+the operator's word and the build says so. Every other failure (a bar that the voice does not have, a
+voice with several staves, the clef not found, a cue that would start left of the line, text over the
+rest, `reflow=on`) leaves that cue out and names it in a warning with the bars; the build goes on.
+
+**Not in this release.** A cue in the staff; the choice of a staff of a group other than the top one; the
+bulk forms `--parts resting` and `--parts all`; an upbeat before the entry; the voice that sounds next as a
+hint in the table; a proof of the cues apart from the built part.
+

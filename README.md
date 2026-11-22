@@ -25,6 +25,8 @@ Status: early public release. It works for the author, on one setup. Read
 - The lowest and highest note of the part is printed on the first line, so you
   can see at once if the part fits your instrument or your voice.
 - Multi-bar rests are joined, so lines are shorter and the part has fewer pages.
+- Cue lines: in a part with a long rest you can add a small staff of another voice above the rest, or a word
+  such as "Canto", so that you see where the entry comes (`partitor cues`). Nothing is added unless you ask.
 
 **Page turns**
 - Pages end where you can rest, not in the middle of a passage. You turn at a
@@ -81,7 +83,7 @@ for you. No questions.
 ```bash
 sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.10.3
+cd /opt/partitor && sudo git checkout --detach 0.11.0
 sudo bin/partitor-quick-install
 ```
 

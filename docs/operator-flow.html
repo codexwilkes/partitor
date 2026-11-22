@@ -117,7 +117,7 @@ html { scroll-behavior: smooth; }
 
 <div class="wrap">
 <header>
-  <span class="eyebrow">partitor 0.10.3</span>
+  <span class="eyebrow">partitor 0.11.0</span>
   <h1>From score to parts</h1>
   <p class="lede">How to turn a score PDF into large-print parts for your ensemble. You work in a terminal: on Linux (supported), over SSH from a phone or PC or on the same machine; on Windows, in PowerShell; on macOS, in Terminal (best effort). partitor keeps everything in the library folder (local, or on a NAS). Only the build takes long, so make every change first, review it, and build once.</p>
 </header>
@@ -263,6 +263,16 @@ venv/bin/python lib/partitor-engine
 <p>When a piece starts with a short bar, the wizard asks: <kbd>p</kbd> a pickup (<kbd>Enter</kbd>), <kbd>i</kbd> an incipit (the original notation of the opening: it stays in the part, has no number, and the next bar is 1) or <kbd>n</kbd> neither. When a repeat splits a bar, it asks <kbd>Y</kbd>/<kbd>n</kbd>. Check a few numbers against the proof. Correct later with <kbd>n</kbd>: <code>p 1</code> pickup on or off, <code>i 1</code> incipit on or off, <code>s 22 1</code> bar 1 of line 22 completes the bar before it (a half bar over a line break; both halves keep one number), <code>f 3=16</code> line 3 starts at bar 16, <code>j 4 1</code> join a false barline, <code>b 4</code> list the bars of line 4. The proof shows the barline ticks, the bar numbers (magenta) and the rehearsal letters (boxed): press <kbd>v</kbd>, open the proof, and press <kbd>Enter</kbd> to save. <code>partitor proof 12</code> draws it again from the saved file.</p>
 <h3>Groups (optional)</h3>
 <p>A group prints several parts together as a small score, for example the four trombones. Press <kbd>n</kbd> at “Build now?”, then <kbd>g</kbd> in the item menu, and type <code>Trombones=2,4,5,6</code> (part numbers). <code>Trombones=</code> deletes the group. The group becomes one more PDF; staves of other parts leave no gap, and each staff is labelled.</p>
+<h3>Cue lines (optional)</h3>
+<p>A singer or player with a long rest can see where another voice enters: a small staff of that voice above the rest, or a word such as &quot;Canto&quot;. Nothing is added unless you ask. Press <kbd>u</kbd> in the item menu (<code>u Trombones</code> for one part or group), pick the part that gets the cue, and read the table of its long rests. Then type a line:</p>
+<ul class="plain">
+<li><code>3=97-98</code>: the music of part 3 (a number of the parts list, or its name) in bars 97 to 98. The cue is the same bars of the source. One bar: <code>3=97</code>.</li>
+<li><code>&quot;Canto&quot;=97</code>: only the word, at bar 97.</li>
+<li>Options after the bars: <code>noclef</code> (no clef at the start), <code>nolabel</code> (no name above), <code>label=Text</code>, <code>size=0.5</code> (from 0.3 to 1; 0.6 is the default, and 1, full size, when <code>fit</code> or <code>sync</code> is set), <code>anchor=25</code>, <code>fit</code> and <code>sync=3</code> (see below).</li>
+<li><code>x 2</code> takes cue 2 away. <kbd>Enter</kbd> ends.</li>
+</ul>
+<p>The cue stands above the staff (above the top staff of a group). The bars under it become one multi-bar rest of their own, as wide as the cue, so that the barlines of the cue and of the part meet; the rest before and after it stays as it was.</p>
+<p>A cue may run on over a bar where the part plays: <code>Canto=24-25</code> when the part enters in bar 25. Where the part starts to play (or at the bar you name with <code>anchor=25</code>) the barline of the cue meets the barline of the part, at the size of the cue; the bars of the part after it are not changed, and the last barline of the cue stands where it falls. The bars before the anchor must be rests. Add <code>fit</code> to stretch the cue bars after the anchor sideways to the bars of the part: the barlines then meet. A fitted cue is drawn at full size unless you type <code>size=</code>, so that the stretch is small and the notes keep their shape (at 0.6 the stretch is about 1.7 times and the shapes look squashed; <code>size=0.8</code> is a compromise). It is a musical choice: use it per cue. <code>sync=3</code> (it implies <code>fit</code>) goes further: the 3rd note with a stem of the cue bar, counted from its left barline, is put over the first note of the part in that bar (the top staff of a group), so that the entrance lines up; the bar is stretched in two pieces, before and after that note. Rests and whole notes are not counted; two stems that stand together are one note. If the note is not found the build says so and fits the bar without it. Build the part (<kbd>r</kbd>) and look at it: partitor warns when it cannot confirm that the part rests in a bar, or when the cue stands above ink. The set before is kept until the next good build. The same line for several parts: <code>partitor cue ID 3=97-98 --parts Tenore,5</code>.</p>
 <h3>The item menu</h3>
 <p>Open it any time: <code>partitor</code>, then the item's number. The status line lists what has changed since the last build.</p>
 <div class="tablewrap"><table>
@@ -308,6 +318,10 @@ venv/bin/python lib/partitor-engine
 <tr>
 <td><kbd>h</kbd></td>
 <td>short names: the short form of each staff label in a group score. Pick a part, type its short form or <code>auto</code> (the rule); Enter keeps it</td>
+</tr>
+<tr>
+<td><kbd>u</kbd></td>
+<td>cue lines: a small staff of another voice, or a word, above a rest (<code>u Trombones</code>; see Cue lines above)</td>
 </tr>
 <tr>
 <td><kbd>s</kbd></td>
@@ -456,7 +470,7 @@ venv/bin/python lib/partitor-engine
 
 <footer>
   <div class="staff" role="presentation"></div>
-  <p>partitor 0.10.3. Install: <code>INSTALL.md</code>; Windows: <code>platforms/windows/README.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Every command: <code>COMMANDS.md</code>. Design: <code>DESIGN.md</code>.</p>
+  <p>partitor 0.11.0. Install: <code>INSTALL.md</code>; Windows: <code>platforms/windows/README.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Every command: <code>COMMANDS.md</code>. Design: <code>DESIGN.md</code>.</p>
 </footer>
 </div>
 </body>

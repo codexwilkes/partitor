@@ -867,6 +867,8 @@ def draw_face(page: pymupdf.Page, pg: list, strips: list[Strip], name: str, meta
                      letter, "sansbold", fs * k)
         for rb in rest_boxes(s):
             put_text(page, (x + rb[0] * k, top + y + rb[3] * k), rb[5], rb[6], rb[4] * k)
+        for cx_, base_, fs_, text_ in s.cue_labels:      # the voice of a cue, small and italic
+            put_text(page, (x + cx_ * k, top + y + base_ * k), text_, "italic", fs_ * k)
         for xl_, bot_, clef_, lo_, hi_, *alt_ in s.ambitus_marks:
             draw_ambitus(page, x + xl_ * k, top + y + bot_ * k, clef_, lo_, hi_,
                          *alt_, sp=s.sp * k)

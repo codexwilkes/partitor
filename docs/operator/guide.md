@@ -150,6 +150,19 @@ When a piece starts with a short bar, the wizard asks: <kbd>p</kbd> a pickup (<k
 
 A group prints several parts together as a small score, for example the four trombones. Press <kbd>n</kbd> at “Build now?”, then <kbd>g</kbd> in the item menu, and type `Trombones=2,4,5,6` (part numbers). `Trombones=` deletes the group. The group becomes one more PDF; staves of other parts leave no gap, and each staff is labelled.
 
+### Cue lines (optional)
+
+A singer or player with a long rest can see where another voice enters: a small staff of that voice above the rest, or a word such as "Canto". Nothing is added unless you ask. Press <kbd>u</kbd> in the item menu (`u Trombones` for one part or group), pick the part that gets the cue, and read the table of its long rests. Then type a line:
+
+- `3=97-98`: the music of part 3 (a number of the parts list, or its name) in bars 97 to 98. The cue is the same bars of the source. One bar: `3=97`.
+- `"Canto"=97`: only the word, at bar 97.
+- Options after the bars: `noclef` (no clef at the start), `nolabel` (no name above), `label=Text`, `size=0.5` (from 0.3 to 1; 0.6 is the default, and 1, full size, when `fit` or `sync` is set), `anchor=25`, `fit` and `sync=3` (see below).
+- `x 2` takes cue 2 away. <kbd>Enter</kbd> ends.
+
+The cue stands above the staff (above the top staff of a group). The bars under it become one multi-bar rest of their own, as wide as the cue, so that the barlines of the cue and of the part meet; the rest before and after it stays as it was.
+
+A cue may run on over a bar where the part plays: `Canto=24-25` when the part enters in bar 25. Where the part starts to play (or at the bar you name with `anchor=25`) the barline of the cue meets the barline of the part, at the size of the cue; the bars of the part after it are not changed, and the last barline of the cue stands where it falls. The bars before the anchor must be rests. Add `fit` to stretch the cue bars after the anchor sideways to the bars of the part: the barlines then meet. A fitted cue is drawn at full size unless you type `size=`, so that the stretch is small and the notes keep their shape (at 0.6 the stretch is about 1.7 times and the shapes look squashed; `size=0.8` is a compromise). It is a musical choice: use it per cue. `sync=3` (it implies `fit`) goes further: the 3rd note with a stem of the cue bar, counted from its left barline, is put over the first note of the part in that bar (the top staff of a group), so that the entrance lines up; the bar is stretched in two pieces, before and after that note. Rests and whole notes are not counted; two stems that stand together are one note. If the note is not found the build says so and fits the bar without it. Build the part (<kbd>r</kbd>) and look at it: partitor warns when it cannot confirm that the part rests in a bar, or when the cue stands above ink. The set before is kept until the next good build. The same line for several parts: `partitor cue ID 3=97-98 --parts Tenore,5`.
+
 ### The item menu
 
 Open it any time: `partitor`, then the item's number. The status line lists what has changed since the last build.
@@ -165,6 +178,7 @@ Open it any time: `partitor`, then the item's number. The status line lists what
 | <kbd>a</kbd> | paper: Letter → A4 → Ledger (17×11 landscape) → Letter |
 | <kbd>k</kbd> | ambitus: pick a part, type its range (`F3-A4`), `auto`, `off` or `on`; Enter keeps it |
 | <kbd>h</kbd> | short names: the short form of each staff label in a group score. Pick a part, type its short form or `auto` (the rule); Enter keeps it |
+| <kbd>u</kbd> | cue lines: a small staff of another voice, or a word, above a rest (`u Trombones`; see Cue lines above) |
 | <kbd>s</kbd> | any setting as `key=value`, e.g. `gap=11`, `reflow=on`, `large=off` |
 
 | Key | Other |

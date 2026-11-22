@@ -688,7 +688,7 @@ def merge_item_keys(item: Path, keep: dict, again: bool = False) -> dict:
     if keep.get("systems_drop"):         # dropped systems stay dropped (the ids of the new analysis)
         drop_systems(data, list(keep["systems_drop"]))
     if keep.get("parts") == data.get("parts"):
-        for k in ("groups", SKIP_KEY):
+        for k in ("groups", SKIP_KEY, "cues"):         # (cues: by bar number; the build checks them)
             if keep.get(k):
                 data[k] = keep[k]
     save_item(item, data)

@@ -24,6 +24,8 @@
 1 vision      test_analysis.py
 2 lines       test_layout.py,test_render.py
 2 ownership   test_analysis.py exempt
+2 cues        test_cues.py
+3 cueplace    test_cues.py
 2 stagecache  test_stagecache.py
 3 analysis    test_analysis.py
 3 render      test_render.py,test_clef.py
@@ -34,5 +36,6 @@
 6 cli_common  test_cli.py,test_library.py,test_bars.py,test_clef.py,test_layout.py,test_render.py
 7 cli_bars    test_cli.py,test_library.py,test_bars.py
 7 cli_parts   test_cli.py,test_library.py,test_clef.py,test_render.py
+7 cli_cues    test_cues.py,test_cli.py
 8 cli_items   test_cli.py,test_library.py,test_layout.py,test_render.py
 9 cli_main    test_cli.py,test_library.py,test_support.py,test_render.py
