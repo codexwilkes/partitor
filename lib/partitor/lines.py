@@ -120,9 +120,13 @@ def justify(s: Strip, target: int) -> Strip:
     runs = [(a, b) for a, b in runs
             if not (b - a < sp and bar(range(a - 3, a)) and bar(range(b, b + 4)))]
     hspans = _hbar_spans(s)               # the H-bars of merged rests take most of the extra space
-    for pa, pb in _cue_spans(s):          # the bars under a cue keep the width of the cue: its barlines meet the part's
+    spans = _cue_spans(s)
+    kept_runs, kept_hspans = runs, hspans
+    for pa, pb in spans:                  # the bars under a cue keep the width of the cue: its barlines meet the part's
         runs = [(a, b) for a, b in runs if not pa <= (a + b) // 2 < pb]
         hspans = [(a, b) for a, b in hspans if not pa <= (a + b) // 2 < pb]
+    if spans and not runs and not hspans:  # no other room in the line: the bar under the cue takes the space
+        runs, hspans = kept_runs, kept_hspans     # (draw_cues pads the cue to it, the barlines still meet)
     if not runs and not hspans:
         return s
     counts = np.ones(s.img.shape[1], np.int64)

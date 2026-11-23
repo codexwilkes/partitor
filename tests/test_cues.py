@@ -989,6 +989,56 @@ class TestJustifyKeepsTheCueBars(unittest.TestCase):
         self.assertGreater(lines.staff_end(j), lines.staff_end(c) + 100)       # it was stretched ...
         self.assertEqual(width(j), width(c))                                   # ... but not under the cue
 
+    def test_a_line_with_no_other_room_gives_the_space_to_the_cue_bar(self):
+        # every other column holds ink: the bar under the cue is the only place that can take space
+        s, pre = rest_line(merge=False)
+        s.rest_counts = []
+        src, spre = make_source()
+        src.bar_nums = [11, 12, 13, 14, 15]
+        out, _ = cueplace.apply_cues([s], [pre], [cues.CueSpec("Canto", 11, 12)],
+                                     {"Canto": ([src], {id(src): spre})}, "Alto")
+        c = out[0]
+        pa, pb = lines._cue_spans(c)[0]
+        c.img[int(c.staff_top - 10), 5:pa - 1] = True                      # ink in every column outside the cue bar
+        c.img[int(c.staff_top - 10), pb + 3:lines.staff_end(c) - 2] = True
+        want = lines.staff_end(c) - int(c.staff_x0) + 120
+        j = lines.justify(c, want)
+        self.assertGreater(lines.staff_end(j), lines.staff_end(c) + 100)   # justified all the same
+        self.assertGreater(int(j.bars_x[1]), int(c.bars_x[1]) + 100)       # by the bar under the cue
+
+    def test_a_cue_bar_wider_than_the_cue_keeps_the_cue_barline_on_the_part_barline(self):
+        s, pre = rest_line(merge=False)
+        s.rest_counts = []
+        src, spre = make_source()
+        src.bar_nums = [11, 12, 13, 14, 15]
+        out, _ = cueplace.apply_cues([s], [pre], [cues.CueSpec("Canto", 11, 12)],
+                                     {"Canto": ([src], {id(src): spre})}, "Alto")
+        c = out[0]
+        pa, pb = lines._cue_spans(c)[0]
+        c.img[int(c.staff_top - 10), 5:pa - 1] = True
+        c.img[int(c.staff_top - 10), pb + 3:lines.staff_end(c) - 2] = True
+        j = lines.justify(c, lines.staff_end(c) - int(c.staff_x0) + 120)
+        drawn, _ = cueplace.draw_cues([j])
+        d = drawn[0]
+        top = d.img.shape[0] - j.img.shape[0]
+        cue_rows = d.img[:top + int(j.staff_top) - 14]                       # (above the ink row of this test)
+        right = int(np.flatnonzero(cue_rows.any(axis=0)).max())
+        self.assertLessEqual(abs(right - int(d.bars_x[1])), 2)               # the last barline of the cue is the part's
+
+    def test_a_cue_over_a_bar_the_part_plays_keeps_its_clef_inside_the_staff(self):
+        s, pre = rest_line(note_bar=0)              # bar 10 plays: the cue stands above it, no rest is covered
+        src, spre = make_source()
+        src.bar_nums = [10, 11, 12, 13, 14]
+        out, warns = cueplace.apply_cues([s], [8], [cues.CueSpec("Canto", 10, 11)],
+                                         {"Canto": ([src], {id(src): spre})}, "Alto")
+        self.assertEqual(len(out[0].cue_todo), 1)
+        drawn, dwarns = cueplace.draw_cues(out)
+        self.assertFalse([w for w in dwarns if "left of the system" in w], dwarns)     # the music starts at 8 px only
+        d = drawn[0]
+        top = d.img.shape[0] - s.img.shape[0]
+        self.assertTrue(d.img[:top + int(s.staff_top) - 8, int(s.staff_x0):].any())     # the cue is there ...
+        self.assertTrue(len(d.cue_labels) == 1 and d.cue_labels[0][0] >= int(s.staff_x0))  # ... right of the staff start
+
     def test_a_line_without_cues_is_justified_as_before(self):
         s, pre = rest_line()
         self.assertEqual(lines._cue_spans(s), [])

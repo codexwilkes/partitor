@@ -6,6 +6,13 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.15.1 — 2026-11-23
+
+### Fixed
+- A cue on a system that is not right-justified: when the bars of a system that the cue does not cover have no blank gap to widen, the system stayed short of the right margin. The bar under the cue now takes the space, and the cue is padded in its last bar, so that its barline stays on the barline of the part.
+- A cue over bars that the part plays was left out ("bar 58 is not in the systems"), when its system ends inside a bar (no closing barline): the bars of that system had no numbers. They are numbered now (`strips.group_bars`).
+- A cue over bars that the part plays, at the start of a system, no longer hangs its clef out to the left of the staff.
+
 ## 0.15.0 — 2026-11-23
 
 ### Changed

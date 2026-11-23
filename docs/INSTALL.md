@@ -29,7 +29,7 @@ For a player who wants the defaults (a local library, no questions):
 ```bash
 sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.15.0   # a release tag, not main
+cd /opt/partitor && sudo git checkout --detach 0.15.1   # a release tag, not main
 sudo bin/partitor-quick-install
 ```
 

@@ -162,7 +162,8 @@ def group_bars(res: PageResult, idx: list[int], gsys: int, nums: list
     if nums:
         if len(nums) != len(allb) and len(kept) != len(allb):
             return [], [], "bar numbers do not match the barlines"
-        if len(nums) == len(allb):
+        if len(nums) == len(allb) or (len(nums) == len(allb) + 1 and len(kept) == len(allb)):
+            # (one number more than barlines: the line ends inside a bar; the barlines still carry the numbers)
             numbers = [int(nums[(kept[j - 1] + 1) if j else 0]) for j in range(len(kept))]
     return [int(allb[k]) for k in kept], numbers, ""
 

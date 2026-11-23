@@ -1305,6 +1305,17 @@ class TestGroupReflow(unittest.TestCase):
             self.assertEqual(pt.group_bars(res, grp, g0, [1, 2])[2],
                              "bar numbers do not match the barlines")
 
+    def test_group_bars_numbers_a_line_whose_last_bar_has_no_closing_barline(self):
+        # the system has one more bar than barlines (it ends mid-bar): the barlines still carry the numbers
+        with tempfile.TemporaryDirectory() as d:
+            pdf = os.path.join(d, "s.pdf")
+            make_score_pdf(pdf, lyrics=False)
+            res = pt.analyse_page(pymupdf.open(pdf)[0], 0, 400, 0)
+            grp = [st.idx for st in res.systems[0]]
+            g0 = res.staves[grp[0]].system
+            bx, nn, why = pt.group_bars(res, grp, g0, [1, 2, 3, 4])
+            self.assertEqual((len(bx), nn, why), (3, [1, 2, 3], ""))
+
     def test_pages_and_page_turns_treat_group_lines_as_ordinary_lines(self):
         opts = {**pt.LAYOUT_DEFAULTS, "scale": 1.0}
         ls = self.lines() * 6

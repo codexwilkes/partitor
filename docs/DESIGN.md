@@ -1747,7 +1747,11 @@ so none can disagree. The clef of the cue may hang over the barline to the left 
 The bars before and after the cue stay a rest each (`cues.split_rest`, `cueplace.respan`); the counts add up
 to the original count and every number stays right. Rest bars that were printed one by one (not merged)
 become that one bar; a printed word between the staves stays where it was. `justify` gives these bars no
-extra space (`lines._cue_spans`), the other rests and gaps take it. A rest line (no staff of the part in
+extra space (`lines._cue_spans`), the other rests and gaps take it. When a system has no other room (every
+other column holds ink), the bar under the cue takes the space and `cueplace.fill_bar` pads the last bar of the
+cue with bare staff before its barline (`cueplace.pad_cue`), so that its barline still falls on the barline of the
+part and the notes keep their shape. A cue over bars the part plays, at the start of a system, is moved right
+until its clef is inside the staff. A rest line (no staff of the part in
 those systems) becomes a line with bars. A text mark splits the rest in the same way, so that its bar starts
 at a barline. Bars of one cue that stand on two lines of the source are one cue (`cues.join_cues`); a cue over
 the end of a line of the part is one cue for each line.

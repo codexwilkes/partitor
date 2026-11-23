@@ -478,6 +478,38 @@ def apply_cues(strips: list[Strip], starts: list[int | None], specs: list[CueSpe
     return strips, warns
 
 
+def pad_cue(cue: CueImg, k: int, extra: int) -> CueImg:
+    """pad_cue -> the cue with `extra` columns of bare staff put in bar k, just before its
+    barline: the bar gets longer, the notes keep their shape and place, and the bars after it
+    move to the right."""
+    top, h4 = int(cue.staff_row), int(4 * cue.sp)
+    e = int(cue.bars[k])
+    ins = e
+    while ins > 0 and cue.img[top:top + h4 + 1, ins - 1].mean() > 0.9:      # a thick or double barline
+        ins -= 1
+    x0 = int(cue.bars[k - 1]) + 1 if k > 0 else int(cue.clef_px)
+    ink = cue.img[:, x0:max(x0 + 1, ins)].sum(axis=0)
+    col = cue.img[:, x0 + np.argsort(ink, kind="stable")[:5]].any(axis=1)  # the staff lines only
+    img = np.concatenate([cue.img[:, :ins], np.repeat(col[:, None], extra, axis=1), cue.img[:, ins:]], axis=1)
+    bars = tuple(int(b) + (extra if j >= k else 0) for j, b in enumerate(cue.bars))
+    return dc_replace(cue, img=img, bars=bars)
+
+
+def fill_bar(s: Strip, cue: CueImg, scale: float, number: int, ax: int) -> CueImg:
+    """fill_bar -> the cue, its bars under the rest piece that starts at bar `number` (column ax)
+    padded when that piece is wider than they are, so that the barline of the cue falls on the
+    barline of the part (justify may have widened the piece: a line with no other room)."""
+    i = s.bar_nums.index(number) if number in s.bar_nums else -1
+    n = s.rest_counts[i] if 0 <= i < len(s.rest_counts) else 0
+    if n <= 0 or i >= len(s.bars_x) or n > len(cue.bars):
+        return cue
+    have = int(s.bars_x[i]) - ax
+    want = int(np.ceil((cue.bars[n - 1] + 1 - cue.clef_px) * scale))
+    if have - want < 2:
+        return cue
+    return pad_cue(cue, n - 1, int(round((have - want) / scale)))
+
+
 def draw_cues(strips: list[Strip]) -> tuple[list[Strip], list[str]]:
     """draw_cues -> (the lines with their cues drawn, warnings): the cues apply_cues
     noted, at the final geometry (after justify and indent)."""
@@ -491,13 +523,18 @@ def draw_cues(strips: list[Strip]) -> tuple[list[Strip], list[str]]:
                 if img is None:
                     s = draw_label(s, ax, label)
                     continue
+                img = fill_bar(s, img, scale, number, ax)
                 widths = fit_widths(s, number, len(img.bars), fit_from, ax) if fit_from is not None else None
                 split = None
                 if sync and widths:
                     split, why = sync_split(s, img, number, fit_from, widths, sync)
                     if why:
                         warns.append(f"cue {label} bar {number}: sync={sync}: {why}; the bar is fitted without it")
-                s, w = draw_cue(s, img, ax, scale, label, fit_from, widths, split)
+                start = ax
+                if fit_from is None and not (i >= 0 and i < len(s.rest_counts) and s.rest_counts[i] > 0):
+                    # a cue over bars the part plays: its clef must not hang out to the left of the staff
+                    start = max(ax, int(s.staff_x0) + int(round(img.clef_px * scale)) + 2)
+                s, w = draw_cue(s, img, start, scale, label, fit_from, widths, split)
                 warns += [f"cue {label} bar {number}: {x}" for x in w]
             except CueError as e:
                 warns.append(f"cue {label} bar {number}: {e}; the cue is left out")
