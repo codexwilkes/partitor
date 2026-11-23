@@ -257,6 +257,18 @@ class TestBarEdits(unittest.TestCase):
         r4 = {**rules, "bars_ack": [ms[0]["key"]]}
         self.assertEqual(len(pt.bar_mismatches(pt.effective_systems(sy2, r4), r4)), 1)
 
+    def test_a_split_bar_later_in_the_movement_does_not_hide_an_earlier_mismatch(self):
+        sy = self.systems() + [{"id": "p6.s1", "bars": 3, "widths": [40.0, 40.0, 40.0]}]
+        rules = {"pickup": [], "split": ["p6.s1:1"], "fix": {}}
+        ms = pt.bar_mismatches(pt.effective_systems(sy, rules), rules)
+        self.assertEqual([(m["id"], m["counted"], m["printed"]) for m in ms], [("p5.s1", 26, 25)])
+        # nothing from the system with the split on: its numbers differ from the count on purpose
+        rules2 = {"pickup": [], "split": ["p4.s1:1"], "fix": {}}
+        self.assertEqual(pt.bar_mismatches(pt.effective_systems(sy, rules2), rules2), [])
+        # a pickup still leaves the whole movement out
+        rules3 = {"pickup": ["p3.s1"], "split": [], "fix": {}}
+        self.assertEqual(pt.bar_mismatches(pt.effective_systems(sy, rules3), rules3), [])
+
     def test_mismatch_settled_by_a_fix(self):
         sy, rules = self.systems(), {"pickup": [], "split": [], "fix": {}}
         ms = pt.bar_mismatches(pt.effective_systems(sy, rules), rules)

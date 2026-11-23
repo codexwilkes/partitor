@@ -550,8 +550,9 @@ def bar_mismatches(systems: list[dict], rules: dict | None) -> list[dict]:
     """bar_mismatches -> the places where the printed bar numbers of the
     source disagree with the count of barlines: [{id, prev, counted,
     printed, key}], one per change of the difference. systems: effective.
-    Movements with a pickup, incipit or split bar rule are left out (their
-    numbers differ from the count on purpose). Answers already given
+    A movement with a pickup or incipit rule is left out (all its numbers
+    differ from the count on purpose); in a movement with a split bar rule
+    the systems before the first split are checked. Answers already given
     (bar_rules.bars_ack, the key of each) are left out, and so is a
     system with a number set by hand (bar_rules.fix); the lines after it
     follow that number, as in the build."""
@@ -566,8 +567,10 @@ def bar_mismatches(systems: list[dict], rules: dict | None) -> list[dict]:
     starts = list(assign_bars(recs)[0]) if recs else []
     fix = {str(k): int(v) for k, v in (rules.get("fix") or {}).items()}
     for seg in _movements(systems):
-        if any(systems[k]["id"] in pick or systems[k]["id"] in split for k in seg):
+        if any(systems[k]["id"] in pick for k in seg):
             continue
+        cut = next((j for j, k in enumerate(seg) if systems[k]["id"] in split), len(seg))
+        seg = seg[:cut]                       # from a split bar on the numbers differ from the count on purpose
         plain, delta, shift = 1, 0, 0
         for j, k in enumerate(seg):
             sid = systems[k]["id"]

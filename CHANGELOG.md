@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.16.1 — 2026-11-23
+
+### Fixed
+- The check of the barline count against the printed numbers skipped a whole movement when it had a split bar, so false barlines before the split went unreported (a piece with a split bar near its end was not checked at all). It now checks the systems before the first split bar. A movement with a pickup or an incipit is still left out.
+
 ## 0.16.0 — 2026-11-23
 
 ### Added
