@@ -46,6 +46,7 @@ def _proof_pages(data: dict) -> list[int]:
 
 
 PROOF_BAR = (0.62, 0.0, 0.62)       # bar numbers and barline ticks (magenta)
+PROOF_ALERT = (0.85, 0.0, 0.0)      # a bar number that differs from the number printed in the source (red)
 PROOF_LETTER = (0.85, 0.38, 0.0)    # rehearsal letters (orange)
 NAME_FS = 13.0     # part name above a staff (pt)
 BAR_FS = 11.0      # bar numbers
@@ -53,13 +54,17 @@ LETTER_FS = 12.0   # rehearsal letters
 ID_FS = 14.0       # system id (p3.s1)
 
 
-def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list) -> None:
+def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list, prev_last: int | None = None) -> None:
     """Draw the bars of one system on a proof page: a tick at each barline
     above the top staff, the bar number after it (magenta; '48 cont.' for a
     bar that completes the bar before it) and a boxed rehearsal letter
     (orange). Barlines: the system's widths (staff spaces from the staff
     start, bar edits applied) times the staff space. The first bar's number
-    stands right of the part name above the staff."""
+    stands right of the part name above the staff. A number is red when it differs
+    from the one the source prints at that bar ('(printed N)'), and the first
+    number of a system is red when it does not follow the last one of the
+    system before it ('(after N)', prev_last): the places where the count of
+    barlines is probably wrong."""
     import pymupdf
     g = e["geom"]
     nums = e.get("bar_nums") or []
@@ -71,6 +76,7 @@ def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list) -> Non
     sp = (bot - top) / 4.0
     ty = top * f                                  # top line of the top staff
     letters = {int(m[0]): m[1] for m in e.get("marks") or []}
+    printed = {int(a[0]): int(a[1]) for a in ef.get("anchors") or []}     # bar index -> the number the source prints there
     split = set(rules.get("split") or [])
     incipit = set(rules.get("incipit") or [])
     maps = e.get("map") or []
@@ -84,6 +90,13 @@ def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list) -> Non
         if i > 0:                                 # tick at the barline before bar i
             page.draw_line((left, ty - 9), (left, ty - 1), color=PROOF_BAR, width=1.0)
         lab = str(n) + (" cont." if f"{e['id']}:{i}" in split else "")
+        off = i in printed and printed[i] != n
+        if off:
+            lab += f" (printed {printed[i]})"             # the count and the source disagree here
+        elif i == 0 and prev_last is not None and n not in (prev_last, prev_last + 1) \
+                and e["id"] not in incipit and e["id"] not in (rules.get("pickup") or []):
+            off = True
+            lab += f" (after {prev_last})"                # the system before ended at another number
         if i == 0 and e["id"] in incipit:
             lab = "inc."                           # an incipit has no number
         x = left + 2 + (name_w if i == 0 else 0)
@@ -98,7 +111,8 @@ def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list) -> Non
         lw = pymupdf.get_text_length(lab, fontname="hebo", fontsize=BAR_FS)
         page.draw_rect(pymupdf.Rect(x - 1, ty - 11 - BAR_FS, x + lw + 1, ty - 10), color=None,
                        fill=(1, 1, 1), fill_opacity=0.6)
-        page.insert_text((x, ty - 12.0), lab, fontsize=BAR_FS, fontname="hebo", color=PROOF_BAR)
+        page.insert_text((x, ty - 12.0), lab, fontsize=BAR_FS, fontname="hebo",
+                         color=PROOF_ALERT if off else PROOF_BAR)
 
 
 def annotate_proof(item: Path, data: dict | None = None) -> None:
@@ -142,6 +156,17 @@ def annotate_proof(item: Path, data: dict | None = None) -> None:
     amb_line = "ambitus: " + "  ·  ".join(
         f"{p_} {a_.get('range') or 'none'}" + (" (by hand)" if a_.get("from") == "operator" else "")
         for p_, a_ in amb.items() if a_.get("from") != "off")
+    prev_last: dict[str, int] = {}              # system id -> the last number of the system before it (same movement)
+    last = None
+    for e in data.get("systems") or []:
+        nums_ = e.get("bar_nums") or []
+        if e.get("restart"):
+            last = None
+        if system_dropped(e) or not nums_:
+            continue
+        if last is not None:
+            prev_last[e["id"]] = last
+        last = int(nums_[-1])
     for k, sp_page in enumerate(src):
         imgs = sp_page.get_images(full=True)
         if not imgs:
@@ -153,7 +178,7 @@ def annotate_proof(item: Path, data: dict | None = None) -> None:
         need = [e for e in by_page.get(pno, []) if "?" in (e.get("map") or [])]
         head = (f"source page {pno}" + (f"  -  {len(need)} system(s) to choose (red)"
                                          if need else "")
-                + "  |  bars: magenta numbers, boxed letters")
+                + "  |  bars: magenta numbers (red: not the printed number), boxed letters")
         hw = pymupdf.get_text_length(head, fontname="hebo", fontsize=12)
         hfs = min(12.0, 12.0 * (page.rect.width - 16) / max(hw, 1.0))
         page.insert_text((8, 16), head, fontsize=hfs, fontname="hebo",
@@ -178,9 +203,14 @@ def annotate_proof(item: Path, data: dict | None = None) -> None:
             page.insert_text((max(2.0, sts[0][0] - 3.2 * hgt), sts[0][1] - 0.5 * hgt),
                              e["id"] + (" dropped" if system_dropped(e) else ""),
                              fontsize=ID_FS, fontname="hebo", color=col)
+            nb = len(eff_.get(e["id"], e).get("widths") or [])
+            if nb and not system_dropped(e):               # how many bars the program counts here
+                page.insert_text((max(2.0, sts[0][0] - 3.2 * hgt), sts[0][1] + 0.6 * hgt),
+                                 f"{nb} bar" + ("s" if nb != 1 else ""), fontsize=9.0, fontname="helv",
+                                 color=PROOF_BAR)
             maps = e.get("map") or []
             sug = e.get("suggest") or []
-            proof_bars(page, e, eff_.get(e["id"], e), rules_, f, sts)
+            proof_bars(page, e, eff_.get(e["id"], e), rules_, f, sts, prev_last.get(e["id"]))
             for j, (x0, t, b) in enumerate(sts):
                 name = maps[j] if j < len(maps) else "?"
                 if name == "?":

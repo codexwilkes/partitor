@@ -461,6 +461,38 @@ class TestProofBars(unittest.TestCase):
             self.assertIn("9", p2.split())
             self.assertNotIn("B", p2.split())                    # the automatic letter was dropped
 
+    def test_a_number_that_differs_from_the_printed_one_is_red(self):
+        with tempfile.TemporaryDirectory() as d:
+            item = self.make_item(d, {})
+            data = pt.load_item(item)
+            data["systems"][1]["anchors"] = [[0, 9]]            # the source prints 9, the count says 4 (too far to be trusted)
+            pt.annotate_proof(item, data)
+            p1 = self.texts(item)[0]
+            self.assertIn("(printed 9)", p1)
+            doc = pymupdf.open(pt.item_file(item, "proof.pdf"))
+            reds = [s for b in doc[0].get_text("dict")["blocks"] for ln in b.get("lines", [])
+                    for s in ln["spans"] if "printed 9" in s["text"]]
+            self.assertEqual(reds[0]["color"], 0xD90000)         # red
+
+    def test_a_system_that_does_not_follow_the_one_before_is_marked(self):
+        with tempfile.TemporaryDirectory() as d:
+            item = self.make_item(d, {"fix": {"p1.s2": 9}})      # p1.s1 ends at 2; p1.s2 starts at 9
+            data = pt.load_item(item)
+            data["systems"][1]["anchors"] = []                   # (no printed number to compare with)
+            pt.annotate_proof(item, data)
+            self.assertIn("(after 2)", self.texts(item)[0])
+            item2 = self.make_item(tempfile.mkdtemp(dir=d), {})
+            pt.annotate_proof(item2)
+            self.assertNotIn("(after", self.texts(item2)[0])    # the count follows on page 1: nothing marked
+
+    def test_the_bar_count_of_each_system_is_written_next_to_its_name(self):
+        with tempfile.TemporaryDirectory() as d:
+            item = self.make_item(d, {})
+            pt.annotate_proof(item)
+            p1, p2 = self.texts(item)
+            self.assertIn("3 bars", p1)                           # p1.s1 and p1.s2
+            self.assertIn("4 bars", p2)                           # p2.s1
+
     def test_ticks_stand_at_the_barlines(self):
         with tempfile.TemporaryDirectory() as d:
             item = self.make_item(d, {})

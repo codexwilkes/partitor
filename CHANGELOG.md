@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.16.0 — 2026-11-23
+
+### Added
+- The proof shows where the count of bars is probably wrong. The number of a bar is red when the source prints another number at that bar (`78 (printed 75)`), and the first number of a system is red when it does not follow the last number of the system before it (`5 (after 6)`). Under the name of each system the proof says how many bars partitor counts in it, so a system with too many bars is seen at once. The header of each proof page says what red means.
+
 ## 0.15.2 — 2026-11-23
 
 ### Fixed

@@ -49,7 +49,7 @@ A dropped system counts no bars. The proof marks it “dropped”. Every later a
 | `?` | help, with an example |
 | <kbd>v</kbd> | draw the proof with the edits. Open it, then press <kbd>Enter</kbd> to save |
 
-The proof shows barline ticks, bar numbers (magenta) and rehearsal letters (boxed). `partitor proof 12` draws it again from the saved file.
+The proof shows barline ticks, bar numbers (magenta) and rehearsal letters (boxed), and under the name of each system how many bars partitor counts in it. A number is red where the count and the source disagree: `78 (printed 75)` where the source prints another number at that bar, `5 (after 6)` where a system does not follow the number the system before it ended with. A red number usually means a false barline: look at the ticks of that system and join the bar with `j`. `partitor proof 12` draws it again from the saved file.
 
 ## Groups {#groups eyebrow="Menu key g"}
 

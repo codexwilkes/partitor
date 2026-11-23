@@ -83,7 +83,7 @@ for you. No questions.
 ```bash
 sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.15.2
+cd /opt/partitor && sudo git checkout --detach 0.16.0
 sudo bin/partitor-quick-install
 ```
 
