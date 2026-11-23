@@ -1562,6 +1562,8 @@ This map comes from function names and headings. Check it when a module exists.
   only, and will keep doing so, so a later rename of a module does not break saved files.
   An older engine that reads a new file stops with an unpickling error, which `load_lines`
   turns into "rebuild the part". `LINES_FORMAT` stays 1.
+  A damaged file is refused the same way: `load_lines` reads the whole gzip stream first (gzip checks its CRC
+  at the end), so flipped bits give "rebuild the part" at once and pickle never sees them.
 - **Fonts.** `typography.font_dirs` computes the repo folders from its own file
   (`lib/partitor/typography.py`): the order is `PARTITOR_FONTS`, `share/fonts` of the repo,
   `/opt/partitor/fonts`, `lib/fonts`. A test lists them, because a wrong depth falls back to

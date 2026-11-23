@@ -23,6 +23,8 @@ sandbox (`SANDBOX.md`).
 | `partitor analyse ID --join p5:4`, `--unjoin p5:4` | Two systems the analysis took apart are one (no system ends after staff 4 of source page 5); saved, kept by every analysis. |
 | `partitor analyse ID --drop p1.s1`, `--undrop p1.s1` | Leave a system out (the end of another piece above the music), or put it back. It counts no bars. No analysis is run; every later analysis keeps it. |
 | `partitor bars`, `parts`, `groups`, `meta`, `proof ID` | Edit bar numbers, part names, groups, title; redraw the proof. |
+| `partitor cues ID [part]` | Cue lines of one part: a small staff of another voice, or a word, above a long rest (menu; saved, not built). Menu key `u`. Guide: `operator/guide.md`. |
+| `partitor cue ID LINE... --parts LIST` | The same cue line in several parts, for example `cue ID 3=97-98 --parts Tenore,5` (saved, not built). |
 | `partitor plan ID [part [N]]` | Which paper and staff size give the best page turns? Read-only until you pick an option `N`; then `rebuild`. Guide: `PLAN-AND-FOLDOUTS.md`. |
 | `partitor pages ID part [--move PAGE=N] [--dry-run]` | The pages of a built part with the turn after each; move a system to the next page. Guide: `PLAN-AND-FOLDOUTS.md`. |
 | `partitor rebuild ID [part ...]` | Build. With names or numbers: only those parts or groups. |

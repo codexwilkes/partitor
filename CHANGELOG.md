@@ -6,6 +6,10 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.11.1 — 2026-11-23
+
+### Changed
+- Docs: `partitor cues` and `partitor cue` are in the command table of `OPERATING.md`. `ARCHITECTURE.md` names cue lines in the Build stage. `DESIGN.md` says that a damaged `.lines` file is refused before pickle reads it. No change in behaviour.
 
 ## 0.11.0 — 2026-11-22
 

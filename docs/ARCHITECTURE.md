@@ -69,7 +69,8 @@ flowchart TB
   Pages run in parallel workers, and a stage cache keeps the result of a page.
 - **Edit and Review.** Your answers are saved in the settings of the piece and nothing is built.
 - **Build.** The saved lines are packed into pages. Page turns decide the page count
-  (`docs/DESIGN.md` §5). Each part also gets a large-print copy.
+  (`docs/DESIGN.md` §5). Cue lines that you set are drawn above the long rests (`docs/DESIGN.md` §13).
+  Each part also gets a large-print copy.
 
 ## The modules
 
