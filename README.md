@@ -15,9 +15,9 @@ Status: early public release. It works for the author, on one setup. Read
 ## What you get
 
 **Parts you can read**
-- One PDF per instrument, from a full score. Several staves can share a part
-  (for example three trombones on one staff group), and you can join or split
-  parts as you like.
+- One PDF per instrument, from a full score. One part can use two staves
+  (a keyboard). A group prints several parts as one small score (three
+  trombones). You can join or split parts as you like.
 - Large print: big staves and a calm layout. A second, larger copy
   (11 x 17 in, or A3) is made next to the normal one.
 - Bar numbers on every line, and the rehearsal marks of the score, so the
@@ -83,7 +83,7 @@ for you. No questions.
 ```bash
 sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.12.0
+cd /opt/partitor && sudo git checkout --detach 0.13.0
 sudo bin/partitor-quick-install
 ```
 

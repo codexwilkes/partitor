@@ -2,10 +2,12 @@
 <!-- Copyright (C) 2026 Nathan Wilkes and partitor contributors -->
 # Operator guide: sources
 
-`guide.md` and `problems.md` are the sources of the operator guide. The tool
+`guide.md`, `advanced.md` and `problems.md` are the sources of the operator guide. The tool
 `tools/build-operator-doc.py` builds `docs/operator-flow.html` from them and from
 `operator.css` and `VERSION`. Do not edit the HTML. The website reads these
-files. This file is the contract.
+files. This file is the contract. `guide.md` is the first-time flow only.
+`advanced.md` holds the features a new user does not need. The tool does not
+put `advanced.md` in the HTML file; the website shows it as its own page.
 
 ## Build and check
 
@@ -56,6 +58,19 @@ Body: one `##` section per id, in this order: `before`, `drop`, `analyse`,
 No other raw HTML. A raw block holds no blank line. Links: `#anchors` and
 links into this repo only. No link to an external host. No script.
 
+## advanced.md
+
+Front matter (YAML), all keys required: `page_title`, `title`, `lede`.
+
+Body: any number of `##` sections, each with a different id. The heading line
+is the same as in `guide.md`: `## Heading text {#id eyebrow="Menu key g"}`.
+Use `###` for sub-headings. The same rules for code, keys, tables, links and
+raw HTML apply. Link to the first-time flow with `[guide](guide.md)`, and to
+this file with `[Advanced](advanced.md)`.
+
+Every command and option of `partitor` that a user needs is named in
+`guide.md` or `advanced.md`.
+
 ## problems.md
 
 Front matter: `title`, `eyebrow`, `columns` (two column names). Each `##`
@@ -71,4 +86,10 @@ one paragraph: what to do. The website uses the pairs as its FAQ.
 - Menu keys: every key in the item-menu tables of `guide.md` is a key of
   `item_menu` in `lib/partitor/cli_main.py`, and the other way round. A test
   checks it.
-- Write in ASD-STE100 simplified technical English.
+- Write in simplified technical English (ASD-STE100 rules for sentences; no
+  fixed word list). One idea in a sentence.
+- The readers are professional musicians. Do not explain a musical term.
+  Do not explain how parts are made. Say what to type and what happens.
+- One word for one thing: bar (not measure), system, staff (not stave),
+  part, group. A test fails on the other words.
+- A table for keys, options and commands. A paragraph is at most 120 words.

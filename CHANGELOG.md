@@ -6,6 +6,12 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.13.0 — 2026-11-23
+
+### Changed
+- Docs: `docs/operator/guide.md` now holds the first-time flow only (about 1 500 words, was 3 700). Less common features moved to the new `docs/operator/advanced.md`: finding a piece, join and drop of systems, bar-number edits, groups, cue lines, ambitus, paper and print, page turns, one-part builds, command-line forms and the macOS set-up. The guide no longer explains musical terms or how parts are made. One word for one thing: bar, system, staff, part, group. The README says what a group is. No change in behaviour.
+- Docs: `docs/operator/README.md` (the contract) describes `advanced.md` and the prose rules. New test `tests/test_operator_prose.py` checks the rules.
+
 ## 0.12.0 — 2026-11-23
 
 ### Changed
