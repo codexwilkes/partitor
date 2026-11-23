@@ -95,7 +95,13 @@ The cue stands above the staff (above the top staff of a group). The bars under 
 - `fit` draws the cue at full size unless you type `size=`. At 0.6 the stretch is about 1.7 times. `size=0.8` is a compromise. Use `fit` per cue.
 - `sync` counts stemmed notes from the left barline of the cue bar. Rests and whole notes are not counted. A chord is one note. The bar is stretched in two pieces, before and after that note. If the note is not found, the build says so and fits the bar without it.
 - Build the part (<kbd>r</kbd>) and look at it. partitor warns when it cannot confirm that the part rests in a bar, or when the cue stands above ink.
-- For several parts: `partitor cue ID 3=97-98 --parts Tenore,5`. List cues: `partitor cues ID`.
+
+Command-line forms:
+
+| Command | Does |
+|---|---|
+| `partitor cues ID [PART]` | the same as <kbd>u</kbd>: shows the long rests of one part or group, then asks for lines (interactive) |
+| `partitor cue ID LINE... --parts LIST` | the same lines for several parts or groups, by name or number, comma separated. Saved, not built. Put options after the bars in one quoted line: `partitor cue ID "3=97-98 fit sync=3" --parts Tenore,5` |
 
 ## Ambitus {#ambitus eyebrow="Menu key k"}
 
