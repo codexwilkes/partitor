@@ -162,8 +162,12 @@ def group_bars(res: PageResult, idx: list[int], gsys: int, nums: list
     if nums:
         if len(nums) != len(allb) and len(kept) != len(allb):
             return [], [], "bar numbers do not match the barlines"
-        if len(nums) == len(allb) or (len(nums) == len(allb) + 1 and len(kept) == len(allb)):
-            # (one number more than barlines: the line ends inside a bar; the barlines still carry the numbers)
+        end = max(res.staves[i].x1 for i in idx)
+        open_end = bool(allb) and end - allb[-1] > BAR_END_SP * sp
+        if len(nums) == len(allb) or (len(nums) == len(allb) + 1 and len(kept) == len(allb) and open_end):
+            # (one number more than barlines and the line ends inside a bar: the barlines still carry the
+            # numbers. With a barline at the end the extra number is a stub at the start, a false barline
+            # next to the clef: which bar has which number is not known, so no number is given)
             numbers = [int(nums[(kept[j - 1] + 1) if j else 0]) for j in range(len(kept))]
     return [int(allb[k]) for k in kept], numbers, ""
 
@@ -312,6 +316,7 @@ def profiles(s: Strip, nbins: int, bin_px: float
     _, bot = profile(s.img, a, nbins, bin_px)
     boxes = [(x0, top, x1) for x0, top, x1, *_ in reh_boxes(s)]
     boxes.extend(rb[:3] for rb in rest_boxes(s, top_only=True))
+    boxes.extend((bx0, by0, bx1) for bx0, by0, bx1, _ in s.cue_boxes)     # a cue and its name keep the line above clear
     if s.bar_no is not None:
         _, top, wpx = bar_mark(s)
         c0 = bar_x(s)
@@ -359,6 +364,20 @@ def rest_boxes(s: Strip, top_only: bool = False) -> list[tuple[float, float, flo
     return [b for b in (rest_box(s), *(rest_box(s, lb) for lb in labels)) if b]
 
 
+def ink_cols(s: Strip, c0: int, c1: int) -> np.ndarray:
+    """ink_cols -> the ink of the columns c0..c1 of a line without the ink of its cues: a bar number
+    or a rehearsal letter belongs to the system and stands just above it, the cue above them."""
+    c0 = max(0, int(c0))
+    cols = s.img[:, c0:int(c1)]
+    if s.cue_boxes:
+        cols = cols.copy()
+        for bx0, by0, bx1, by1 in s.cue_boxes:
+            a, b = max(int(bx0), c0), min(int(bx1), c0 + cols.shape[1])
+            if b > a:
+                cols[max(0, int(by0)):int(by1) + 1, a - c0:b - c0] = False
+    return cols
+
+
 REH_SIZE = 2.6        # rehearsal letter size, staff spaces
 REH_PAD = 0.3         # box padding, staff spaces
 
@@ -374,7 +393,7 @@ def reh_boxes(s: Strip) -> list[tuple[float, float, float, float, str, float, fl
         tw = text_len(t, "sansbold", fs)
         x0 = float(mx) + (0.0 if mx <= s.staff_x0 + 2 else 0.3 * s.sp)
         x1 = x0 + tw + 2 * pad
-        cols = s.img[:, max(0, int(x0)):int(x1) + 1]
+        cols = ink_cols(s, x0, int(x1) + 1)
         rows = np.flatnonzero(cols.any(axis=1)) if cols.size else np.array([])
         ink_top = float(rows.min()) if rows.size else float(s.staff_top)
         bottom = min(s.staff_top - s.bar_raise * s.sp, ink_top - 0.4 * s.sp)
@@ -404,7 +423,7 @@ def bar_mark(s: Strip) -> tuple[float, float, float]:
     size = s.bar_size * s.sp
     wpx = text_len(str(s.bar_no), "sans", size)
     c0 = int(bar_x(s))
-    cols = s.img[:, c0:int(c0 + wpx) + 2]
+    cols = ink_cols(s, c0, int(c0 + wpx) + 2)
     rows = np.flatnonzero(cols.any(axis=1))
     ink_top = float(rows.min()) if rows.size else float(s.staff_top)
     base = min(s.staff_top - s.bar_raise * s.sp, ink_top - BAR_CLEAR_SP * s.sp)

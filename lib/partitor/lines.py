@@ -801,7 +801,7 @@ LINES_FORMAT = 1
 # written before the field loads (the lines have none of it); any other
 # difference in the fields still means "rebuild the part".
 _FIELD_DEFAULTS = {"name_labels": list, "rest_labels": list, "rest_in": int, "rest_out": int, "rest_counts": list,
-                   "rest_bar": lambda: "engraved", "cue_labels": list, "cue_todo": list}
+                   "rest_bar": lambda: "engraved", "cue_labels": list, "cue_todo": list, "cue_boxes": list}
 _NP_OK = {"_reconstruct", "ndarray", "dtype", "scalar", "_frombuffer"}
 
 

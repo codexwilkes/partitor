@@ -1751,7 +1751,10 @@ extra space (`lines._cue_spans`), the other rests and gaps take it. When a syste
 other column holds ink), the bar under the cue takes the space and `cueplace.fill_bar` pads the last bar of the
 cue with bare staff before its barline (`cueplace.pad_cue`), so that its barline still falls on the barline of the
 part and the notes keep their shape. A cue over bars the part plays, at the start of a system, is moved right
-until its clef is inside the staff. A rest line (no staff of the part in
+until its clef is inside the staff. A system with one more bar number than barlines is numbered only when it ends inside a bar
+(`strips.group_bars`); with a barline at the end the extra number is a stub at the start and the system has no
+numbers; a cue from such a source system is left out (`cueplace.source_pieces`). A rehearsal letter and the bar number belong to the system: they stand just
+above the staff, the cue above them (`Strip.cue_boxes`, read by `strips.ink_cols` and `strips.profiles`). A rest line (no staff of the part in
 those systems) becomes a line with bars. A text mark splits the rest in the same way, so that its bar starts
 at a barline. Bars of one cue that stand on two lines of the source are one cue (`cues.join_cues`); a cue over
 the end of a line of the part is one cue for each line.

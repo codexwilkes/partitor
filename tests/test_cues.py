@@ -304,6 +304,49 @@ class TestDrawCue(unittest.TestCase):
         self.assertFalse(s.img[:int(s.staff_top) - 5, :].any())            # (there was none)
         self.assertEqual([t for *_, t in r.cue_labels], ["Canto"])
 
+    def test_a_rehearsal_letter_stays_on_the_system_and_the_cue_stands_above_it(self):
+        from dataclasses import replace
+        from partitor.strips import reh_boxes
+        s, _ = self.line()
+        x = int(s.bars_x[0]) + 5
+        s = replace(s, marks=[(x, "A")])
+        before = reh_boxes(s)[0]
+        src, spre = make_source()
+        cue = cues.crop_cue(src, 1, 1, spre, clef=True)
+        r, _ = cueplace.draw_cue(s, cue, int(s.bars_x[0]), 0.6, "Canto")
+        pad = r.img.shape[0] - s.img.shape[0]
+        after = reh_boxes(r)[0]
+        self.assertAlmostEqual(after[3] - pad, before[3], places=3)       # the letter sits on the system as before ...
+        rows = np.flatnonzero(r.img[:int(r.staff_top) - 3, int(s.bars_x[0]):int(s.bars_x[0]) + 60].any(axis=1))
+        self.assertLess(int(rows.max()), int(after[1]))                     # ... and the cue is above its box
+        self.assertEqual(len(r.cue_boxes), 1)
+
+    def test_the_height_of_a_cue_and_its_name_is_kept_clear_by_the_page_layout(self):
+        from partitor.strips import profiles
+        s, _ = self.line()
+        src, spre = make_source()
+        cue = cues.crop_cue(src, 1, 1, spre, clef=True)
+        r, _ = cueplace.draw_cue(s, cue, int(s.bars_x[0]), 0.6, "Canto")
+        x0, y0, x1, y1 = r.cue_boxes[0]
+        self.assertLess(y0, int(np.flatnonzero(r.img[:, int(x0):int(x1)].any(axis=1)).min()))   # the box holds the name too
+        _, t_hdr, _ = profiles(r, 40, 10.0)
+        self.assertLessEqual(float(t_hdr.min()), y0)
+
+    def test_a_bar_number_stays_on_the_system_and_the_cue_stands_above_it(self):
+        from dataclasses import replace
+        from partitor.strips import bar_mark
+        s, _ = self.line()
+        s = replace(s, bar_no=11, bar_size=1.4, bar_raise=1.0)
+        before = bar_mark(s)
+        src, spre = make_source()
+        cue = cues.crop_cue(src, 1, 1, spre, clef=True)
+        r, _ = cueplace.draw_cue(s, cue, int(s.staff_x0) + 20, 0.6, "Canto")
+        pad = r.img.shape[0] - s.img.shape[0]
+        after = bar_mark(r)
+        self.assertAlmostEqual(after[0] - pad, before[0], places=3)
+        rows = np.flatnonzero(r.img[:int(r.staff_top) - 3, int(s.staff_x0):int(s.staff_x0) + 120].any(axis=1))
+        self.assertLess(int(rows.max()), int(after[1]))
+
     def test_the_first_barline_of_the_cue_falls_on_the_barline_of_the_part(self):
         s, _ = self.line()
         src, spre = make_source()
@@ -1038,6 +1081,26 @@ class TestJustifyKeepsTheCueBars(unittest.TestCase):
         top = d.img.shape[0] - s.img.shape[0]
         self.assertTrue(d.img[:top + int(s.staff_top) - 8, int(s.staff_x0):].any())     # the cue is there ...
         self.assertTrue(len(d.cue_labels) == 1 and d.cue_labels[0][0] >= int(s.staff_x0))  # ... right of the staff start
+
+    def test_a_source_system_with_more_numbers_than_barlines_is_not_cued(self):
+        # a false barline next to the clef: the numbers would be one too low on every bar
+        s, pre = rest_line()
+        src, spre = make_source()
+        src.bar_nums = [10, 11, 12, 13, 14, 15]
+        src.ends_at_bar = True
+        out, warns = cueplace.apply_cues([s], [pre], [cues.CueSpec("Canto", 11, 12)],
+                                         {"Canto": ([src], {id(src): spre})}, "Alto")
+        self.assertEqual(out[0].cue_todo, [])
+        self.assertTrue(any("more bar numbers than barlines" in w for w in warns), warns)
+
+    def test_a_source_system_that_ends_inside_a_bar_may_have_one_number_more(self):
+        s, pre = rest_line()
+        src, spre = make_source()
+        src.bar_nums = [10, 11, 12, 13, 14, 15]
+        src.ends_at_bar = False
+        out, warns = cueplace.apply_cues([s], [pre], [cues.CueSpec("Canto", 11, 12)],
+                                         {"Canto": ([src], {id(src): spre})}, "Alto")
+        self.assertEqual(len(out[0].cue_todo), 1, warns)
 
     def test_a_line_without_cues_is_justified_as_before(self):
         s, pre = rest_line()

@@ -74,6 +74,8 @@ per-system consistency.
   first note of the part; it counts notes with a stem only (a whole note is not found) and reads the top
   staff of a group.
 - A bar that a system break cuts keeps its number on both systems; a cue reads it where it first stands.
+- A system with more bar numbers than barlines (a false barline next to the clef, found by `partitor bars`) has no
+  bar numbers in the part, and a cue from it is left out; the build names the system. Settle its barlines first.
 - No separate proof for cues: build the part (the set before is kept in `parts.prev`) and look at it.
   The size is a factor of the staff: check the print of the large-print copy and of the small one.
 - An upbeat before the entry is not cropped (whole bars only). The table of long rests does not name the

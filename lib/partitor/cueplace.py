@@ -14,7 +14,7 @@ from .cues import CueError, CueImg, CueSpec, crop_cue, cue_size, join_cues, spli
 from .lines import rest_only_bars, staff_end, staff_lines
 from .model import Strip
 from .reflow import REST_BAR_SP, draw_hbar
-from .strips import rest_box
+from .strips import bar_mark, bar_x, reh_boxes, rest_box
 
 CUE_BAR_MIN_SP = 4.0              # least width of the bar under a cue, sp (a narrow cue still meets the barline)
 SINGLE_BAR_SP = 10.0              # width of a whole-rest bar made by a split, sp
@@ -213,7 +213,8 @@ def pad_top(s: Strip, n: int) -> Strip:
         staff_labels=[(a, t + n, b + n) for a, t, b in s.staff_labels],
         name_labels=[(a, t + n, b + n) for a, t, b in s.name_labels],
         ambitus_marks=[(x, bot + n, *rest) for x, bot, *rest in s.ambitus_marks],
-        cue_labels=[(x, b + n, f, t) for x, b, f, t in s.cue_labels])
+        cue_labels=[(x, b + n, f, t) for x, b, f, t in s.cue_labels],
+        cue_boxes=[(x0, y0 + n, x1, y1 + n) for x0, y0, x1, y1 in s.cue_boxes])
 
 
 def _count_boxes(s: Strip) -> list[tuple]:
@@ -342,6 +343,13 @@ def draw_cue(s: Strip, cue: CueImg, start_x: int, scale: float, label: str = "",
         bottom = int(rows.min()) - clear
         warns.append("the cue stands above ink of the part (its clef hangs over the end of the bar before): "
                      "remove the clef or the cue if it looks wrong")
+    for rx0, rtop, rx1, *_ in reh_boxes(s):     # a rehearsal letter stays on the system: the cue stands above it
+        if rx1 > ax and rx0 < ax + w_c:
+            bottom = min(bottom, int(rtop) - clear)
+    if s.bar_no is not None:                    # so does the bar number of the system
+        _, ntop, nw = bar_mark(s)
+        if bar_x(s) + nw > ax and bar_x(s) < ax + w_c:
+            bottom = min(bottom, int(ntop) - clear)
     for rb in _count_boxes(s):                  # the count of a multi-bar rest (its digits are taller than the box)
         if rb[2] > ax and rb[0] < ax + w_c:
             bottom = min(bottom, int(min(rb[1], rb[3] - 0.75 * rb[4])) - clear)
@@ -358,7 +366,8 @@ def draw_cue(s: Strip, cue: CueImg, start_x: int, scale: float, label: str = "",
     labels = list(s.cue_labels)
     if label:
         labels.append((ax + cue.clef_px * scale, y0 - 0.35 * fs, fs, label))
-    return dc_replace(s, img=out, cue_labels=labels), warns
+    return dc_replace(s, img=out, cue_labels=labels,
+                      cue_boxes=[*s.cue_boxes, (ax, y0 - label_h, ax + w_c, bottom)]), warns
 
 
 def source_pieces(items: list, first: int, last: int, src: str) -> list[tuple[Strip, int, int, int, int]]:
@@ -377,6 +386,10 @@ def source_pieces(items: list, first: int, last: int, src: str) -> list[tuple[St
     for n in range(first, last + 1):
         if n not in got:
             raise CueError(f"{src} has no music in bar {n} (it rests there, or the bar is not in the score)")
+        s = got[n][0]
+        if len(s.bar_nums) - len(s.bars_x) > (0 if s.ends_at_bar else 1):
+            raise CueError(f"{src}: the system of bar {s.bar_no} has more bar numbers than barlines (a false "
+                           "barline?): the bar numbers cannot be trusted; check it with partitor bars")
     out: list[list] = []
     for n in range(first, last + 1):
         s, k = got[n]
@@ -438,7 +451,8 @@ def apply_cues(strips: list[Strip], starts: list[int | None], specs: list[CueSpe
                 t = next((t for t, s in enumerate(work)
                           if find_bar(shown_bars(s, starts[t] or 0), n) is not None), None)
                 if t is None:
-                    raise CueError(f"bar {n} is not in the systems of {target}")
+                    raise CueError(f"bar {n} is not in the systems of {target} (a system with more bar numbers than "
+                                   "barlines has none: see partitor bars)")
                 if runs and runs[-1][0] == t:
                     runs[-1][2] = n
                 else:

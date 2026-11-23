@@ -6,6 +6,12 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.15.2 — 2026-11-23
+
+### Fixed
+- A cue over bars of a system that has more bar numbers than barlines is left out, and the build says why, in place of a cue over the wrong bars. 0.15.1 numbered the bars of a system with one number more than barlines; that is right only when the system ends inside a bar. With a barline at the end, the extra number is a stub bar at the start (a false barline next to the clef) and every number would be one too low: such a system has no bar numbers again (as before 0.15.1), and a cue whose source part has such a system names it. Check it with `partitor bars`.
+- A rehearsal letter or the bar number of a system under a cue stood above the cue, as if it belonged to the cue. It stays on the system, just above the staff, and the cue stands above it. The height of a cue and its name is kept clear by the page layout (the name no longer touches the system above).
+
 ## 0.15.1 — 2026-11-23
 
 ### Fixed
