@@ -234,6 +234,8 @@ def cmd_detect(a: argparse.Namespace) -> int:
         e["widths"] = r.get("widths", [])
         if r.get("repeats"):
             e["repeats"] = r["repeats"]
+        if r.get("weak"):
+            e["weak"] = [int(i) for i in r["weak"]]
         if r.get("anchors"):
             e["anchors"] = [[int(x[0]), int(x[1])] for x in r["anchors"]]
         if any(r.get("steps") or []):

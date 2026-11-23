@@ -46,6 +46,7 @@ def _proof_pages(data: dict) -> list[int]:
 
 
 PROOF_BAR = (0.62, 0.0, 0.62)       # bar numbers and barline ticks (magenta)
+PROOF_WEAK = (0.95, 0.5, 0.0)       # a barline without a stroke through the gaps between the staves (orange)
 PROOF_ALERT = (0.85, 0.0, 0.0)      # a bar number that differs from the number printed in the source (red)
 PROOF_LETTER = (0.85, 0.38, 0.0)    # rehearsal letters (orange)
 NAME_FS = 13.0     # part name above a staff (pt)
@@ -76,6 +77,7 @@ def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list, prev_l
     sp = (bot - top) / 4.0
     ty = top * f                                  # top line of the top staff
     letters = {int(m[0]): m[1] for m in e.get("marks") or []}
+    weak = {int(i) for i in ef.get("weak") or []}                          # barlines that may be false
     printed = {int(a[0]): int(a[1]) for a in ef.get("anchors") or []}     # bar index -> the number the source prints there
     split = set(rules.get("split") or [])
     incipit = set(rules.get("incipit") or [])
@@ -88,8 +90,11 @@ def proof_bars(page, e: dict, ef: dict, rules: dict, f: float, sts: list, prev_l
         left = edge * f
         edge += wd[i] * sp
         if i > 0:                                 # tick at the barline before bar i
-            page.draw_line((left, ty - 9), (left, ty - 1), color=PROOF_BAR, width=1.0)
+            page.draw_line((left, ty - 9), (left, ty - 1), color=PROOF_WEAK if i - 1 in weak else PROOF_BAR,
+                           width=1.6 if i - 1 in weak else 1.0)
         lab = str(n) + (" cont." if f"{e['id']}:{i}" in split else "")
+        if i > 0 and i - 1 in weak:
+            lab += " ?"                                   # no stroke through the gaps: check this barline
         off = i in printed and printed[i] != n
         if off:
             lab += f" (printed {printed[i]})"             # the count and the source disagree here
@@ -178,7 +183,7 @@ def annotate_proof(item: Path, data: dict | None = None) -> None:
         need = [e for e in by_page.get(pno, []) if "?" in (e.get("map") or [])]
         head = (f"source page {pno}" + (f"  -  {len(need)} system(s) to choose (red)"
                                          if need else "")
-                + "  |  bars: magenta numbers (red: not the printed number), boxed letters")
+                + "  |  bars: magenta numbers (red: not the printed number; orange tick, ?: no stroke between the staves), boxed letters")
         hw = pymupdf.get_text_length(head, fontname="hebo", fontsize=12)
         hfs = min(12.0, 12.0 * (page.rect.width - 16) / max(hw, 1.0))
         page.insert_text((8, 16), head, fontsize=hfs, fontname="hebo",

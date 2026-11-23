@@ -107,7 +107,9 @@ def analyse_one(doc: "pymupdf.Document", pno: int, dpi: int, nsys: int, ocr: boo
                      "geom": {"h": int(res.shape[0]),
                               "staves": [[int(st.x0), int(st.top), int(st.bottom)]
                                          for st in grp]},
-                     "repeats": [list(r) for r in res.repeats.get(grp[0].system, [])]})
+                     "repeats": [list(r) for r in res.repeats.get(grp[0].system, [])],
+                     "weak": [i for i, x in enumerate(res.barlines.get(grp[0].system, [])[:-1])
+                              if x in res.weak.get(grp[0].system, [])]})
     return res, recs
 
 

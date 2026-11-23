@@ -452,6 +452,7 @@ def edit_bars(e: dict, edits: list[dict]) -> tuple[dict, list[str]]:
         widths = []
     anchors = [(int(a[0]), int(a[1])) for a in e.get("anchors") or []]
     repeats = [(int(r[0]), r[1]) for r in e.get("repeats") or []]
+    weak = [int(i) for i in e.get("weak") or []]            # barlines without a stroke through a gap
     nb = raw
     for ed in edits:
         if ed["raw"] != raw:
@@ -470,6 +471,7 @@ def edit_bars(e: dict, edits: list[dict]) -> tuple[dict, list[str]]:
             anchors = [(b if b <= d else b - 1, v) for b, v in anchors]
             stub = [(-1, k) for x, k in repeats if x == d == 0 and k == "start"]
             repeats = sorted([(x if x < d else x - 1, k) for x, k in repeats if x != d] + stub)
+            weak = [i if i < d else i - 1 for i in weak if i != d]
             nb -= 1
         else:
             if not 1 <= n <= nb or not 5 <= ed["pct"] <= 95:
@@ -482,6 +484,7 @@ def edit_bars(e: dict, edits: list[dict]) -> tuple[dict, list[str]]:
                 widths[b:b + 1] = [w * pc, w * (1 - pc)]
             anchors = [(bb if bb <= b else bb + 1, v) for bb, v in anchors]
             repeats = [(x if x < b else x + 1, k) for x, k in repeats]
+            weak = [i if i < b else i + 1 for i in weak]
             nb += 1
     out["bars"] = nb
     if "nbars" in out:
@@ -492,6 +495,8 @@ def edit_bars(e: dict, edits: list[dict]) -> tuple[dict, list[str]]:
         out["anchors"] = [[b, v] for b, v in anchors]
     if e.get("repeats") is not None:
         out["repeats"] = [[x, k] for x, k in repeats]
+    if e.get("weak") is not None:
+        out["weak"] = weak
     return out, notes
 
 

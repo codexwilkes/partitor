@@ -35,10 +35,14 @@ DOTTED_MIN_SP = 6.0       # least distance from the staff start of a barline kno
 
 def detect_barlines(owner: np.ndarray, conn: np.ndarray, ink: np.ndarray,
                     staves: list[Staff], idxs: list[int], sp: float,
-                    thick: int, dotted_out: list[int] | None = None) -> list[int]:
+                    thick: int, dotted_out: list[int] | None = None,
+                    weak_out: list[int] | None = None) -> list[int]:
     """detect_barlines -> x of the barlines in one system (system start
     excluded), left to right. dotted_out (when given) receives the x of the
-    barlines found by (D) only: Mensurstriche, drawn in the gaps.
+    barlines found by (D) only: Mensurstriche, drawn in the gaps. weak_out
+    (when given) receives the x of the barlines kept without (C), no stroke
+    through a gap: a note stem, a digit or the edge of a clef that stands at
+    one x on several staves looks the same (score C: five false bars).
 
     Evidence: (C) connector pixels in a gap between two staves (barlines
     through the system); (D) a thin column at least 45% ink across a gap,
@@ -125,6 +129,8 @@ def detect_barlines(owner: np.ndarray, conn: np.ndarray, ink: np.ndarray,
             out.append(int(round(xc)))
             if dotted and not has_c and dotted_out is not None:
                 dotted_out.append(int(round(xc)))
+            if not has_c and weak_out is not None:
+                weak_out.append(int(round(xc)))
     return out
 
 
@@ -814,9 +820,11 @@ def analyse_page(page: pymupdf.Page, pno: int, dpi: int, sys_base: int,
         g = staves[0].system + k
         idxs = [st.idx for st in grp]
         dotted: list[int] = []
+        weak: list[int] = []
         res.barlines[g] = detect_barlines(owner, conn, ink | conn, staves, idxs, sp,
-                                          thick, dotted)
+                                          thick, dotted, weak)
         res.mensur[g] = dotted
+        res.weak[g] = weak
         # Mensurstriche: their dashes in the gaps belong to no staff
         # (thin, within 0.6 sp of the barline, centre in a gap)
         for xb in dotted:
@@ -1272,7 +1280,7 @@ def merge_sizes(a: PageResult, b: PageResult, sys_base: int,
         for src_res, old in srcs[k]:
             (sysmap_a if src_res is a else sysmap_b)[old] = gsys
         first = srcs[k][0]
-        for fld in ("barlines", "anchors", "num_boxes", "mensur", "repeats"):
+        for fld in ("barlines", "anchors", "num_boxes", "mensur", "repeats", "weak"):
             d = getattr(first[0], fld).get(first[1])
             if d is not None:
                 getattr(res, fld)[gsys] = d

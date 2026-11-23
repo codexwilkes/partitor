@@ -89,6 +89,9 @@ LAYOUT_HELP = """\
 # systems[].map: part per staff, top first. A part name twice = a two-staff
 #   part. '-' drops a staff. '?' must be replaced before build; `suggest`
 #   holds the best guess (copy it to `map` if it is right).
+# systems[].weak: indexes (from 0) of the barlines the analysis found without
+#   a stroke through the gaps between the staves: they may be a note stem, a
+#   digit or the edge of a clef (the proof draws them orange, with a ?).
 # systems[].bar: number of the first bar of the system (counted from the
 #   barlines, checked against printed numbers). Computed: to correct it,
 #   use bar_rules (below), not this value.

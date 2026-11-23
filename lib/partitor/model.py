@@ -57,6 +57,7 @@ class PageResult:
     music: bool = True
     barlines: dict[int, list[int]] = field(default_factory=dict)   # system -> x
     anchors: dict[int, list[tuple[int, int]]] = field(default_factory=dict)
+    weak: dict[int, list[int]] = field(default_factory=dict)       # system -> x of its barlines without a stroke through a gap
     num_boxes: dict[int, list[tuple[int, int, int, int]]] = field(default_factory=dict)
     # system -> boxes of printed mid-line bar numbers (kept as ink)
     restart: set[int] = field(default_factory=set)  # systems that start a movement

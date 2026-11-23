@@ -93,6 +93,25 @@ class TestBarNumbers(unittest.TestCase):
         self.assertTrue(abs(xs[0] - 501) <= 2 and abs(xs[1] - 801) <= 2, xs)
 
 
+    def test_barlines_without_a_stroke_through_the_gap_are_reported_as_weak(self):
+        sp, th = 20.0, 2
+        owner = np.full((400, 1200), pt.OWN_NONE, np.int32)
+        conn = np.zeros(owner.shape, bool)
+        sts = [pt.Staff(0, 0, [100 + 20 * k for k in range(5)], 100, 1100),
+               pt.Staff(0, 1, [250 + 20 * k for k in range(5)], 100, 1100)]
+        for i, st in enumerate(sts):
+            for ly in st.lines:
+                owner[int(ly), 100:1101] = i
+            for x in (500, 800):
+                owner[int(st.top) - 1:int(st.bottom) + 2, x:x + 2] = i
+        conn[int(sts[0].bottom) + 3:int(sts[1].top) - 3, 800:802] = True     # only the second barline runs through the gap
+        ink = owner != pt.OWN_NONE
+        weak: list[int] = []
+        xs = pt.detect_barlines(owner, conn, ink | conn, sts, [0, 1], sp, th, None, weak)
+        self.assertEqual(len(xs), 2, xs)
+        self.assertEqual(len(weak), 1, weak)
+        self.assertTrue(abs(weak[0] - 501) <= 2, weak)
+
     def test_clef_tails_in_two_gaps_are_no_barline(self):
         # score B p4.s1: G clefs stacked at one x reach into the gaps
         # (ink in the top and bottom fifth of both gaps): not a barline
@@ -268,6 +287,16 @@ class TestBarEdits(unittest.TestCase):
         # a pickup still leaves the whole movement out
         rules3 = {"pickup": ["p3.s1"], "split": [], "fix": {}}
         self.assertEqual(pt.bar_mismatches(pt.effective_systems(sy, rules3), rules3), [])
+
+    def test_weak_barlines_follow_the_bar_edits(self):
+        e = {"id": "p1.s1", "bars": 4, "widths": [20.0, 20.0, 20.0, 20.0], "weak": [0, 2]}
+        ed = lambda s: [pt.parse_bar_edit(s)]
+        out, _ = pt.edit_bars(e, ed("p1.s1:j2/4"))                  # barline 1 goes: the one after it moves up
+        self.assertEqual(out["weak"], [0, 1])
+        out, _ = pt.edit_bars(e, ed("p1.s1:j1/4"))                  # a weak barline joined away is gone
+        self.assertEqual(out["weak"], [1])
+        out, _ = pt.edit_bars(e, ed("p1.s1:a1@50/4"))               # a new barline in bar 1: the others move down
+        self.assertEqual(out["weak"], [1, 3])
 
     def test_mismatch_settled_by_a_fix(self):
         sy, rules = self.systems(), {"pickup": [], "split": [], "fix": {}}
@@ -504,6 +533,18 @@ class TestProofBars(unittest.TestCase):
             p1, p2 = self.texts(item)
             self.assertIn("3 bars", p1)                           # p1.s1 and p1.s2
             self.assertIn("4 bars", p2)                           # p2.s1
+
+    def test_a_barline_without_a_stroke_through_the_gap_is_drawn_orange_with_a_question_mark(self):
+        with tempfile.TemporaryDirectory() as d:
+            item = self.make_item(d, {})
+            data = pt.load_item(item)
+            data["systems"][0]["weak"] = [0]                     # the first barline of p1.s1
+            pt.annotate_proof(item, data)
+            doc = pymupdf.open(pt.item_file(item, "proof.pdf"))
+            weak = [dr for dr in doc[0].get_drawings() if dr["color"]
+                    and all(abs(a - b) < 0.01 for a, b in zip(dr["color"], pt.PROOF_WEAK)) and dr["rect"].height > 5]
+            self.assertEqual(len(weak), 1)
+            self.assertRegex(doc[0].get_text(), r"\d \?")            # the bar after that barline
 
     def test_ticks_stand_at_the_barlines(self):
         with tempfile.TemporaryDirectory() as d:

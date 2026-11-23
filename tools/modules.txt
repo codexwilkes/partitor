@@ -5,7 +5,7 @@
 #   LEVEL MODULE TESTS [exempt]
 # A module imports only modules of a strictly lower level (tools/check-modules.py).
 # TESTS: file names in tests/ that cover the module (comma separated), or * = all tests.
-# exempt: lifts the line limit for this module (analyse_page is one 832-line function).
+# exempt: lifts the line limit for this module (analyse_page is one 834-line function).
 # Modules that do not exist yet are listed too; the checks skip them until they appear.
 0 bars        test_bars.py
 0 config      *

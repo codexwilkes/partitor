@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.16.3 — 2026-11-23
+
+### Added
+- The proof marks the barlines that may be false. A barline found without a stroke through the gaps between the staves is drawn as an orange tick, and the number of its bar ends with `?`. A note stem, a time-signature digit or the edge of a clef that stands at one place on several staves looks like a barline; on a scan of five such false barlines all were orange, and two real barlines too. What the analysis finds does not change. The flag is the new key `weak` of each system in `score.yaml`; it follows the bar edits `j` and `a`. Analyse again to get it for an item made before.
+
 ## 0.16.2 — 2026-11-23
 
 ### Fixed

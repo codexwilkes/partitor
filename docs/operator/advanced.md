@@ -51,6 +51,8 @@ A dropped system counts no bars. The proof marks it “dropped”. Every later a
 
 The proof shows barline ticks, bar numbers (magenta) and rehearsal letters (boxed), and under the name of each system how many bars partitor counts in it. A number is red where the count and the source disagree: `78 (printed 75)` where the source prints another number at that bar, `5 (after 6)` where a system does not follow the number the system before it ended with. A red number usually means a false barline: look at the ticks of that system and join the bar with `j`. `partitor proof 12` draws it again from the saved file.
 
+A tick is orange and its number has a `?` where the barline has no stroke through the gaps between the staves: a note stem, a time-signature digit or the edge of a clef that stands at one place on several staves looks the same. Most orange ticks are real barlines, but a false one is nearly always orange. `partitor proof 12` draws it again from the saved file.
+
 ## Groups {#groups eyebrow="Menu key g"}
 
 A group prints several parts together as a small score.

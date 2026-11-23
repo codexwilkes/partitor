@@ -278,6 +278,11 @@ notehead, slur or word goes whole to one owner.
      (`i`) or neither (`n`), and Y/n for a split bar. `partitor bars ID`
      corrects by hand: pickup on/off (`p N`), incipit on/off (`i N`), split on/off, line start fixed (`f 3=16`); the
      lines after it follow.
+   - Weak barlines: `ownership.detect_barlines(weak_out=...)` reports the barlines kept without a stroke
+     through a gap (evidence C): stems, digits or a clef edge at one x on several staves pass the other
+     tests. They are stored as `weak` (indexes of the barlines) per system, follow the bar edits
+     (`bars.edit_bars`) and are drawn orange with a `?` in the proof. Rejecting them was tried: it removed
+     two real barlines of the same scan, so they are only marked.
 8. **Rehearsal letters.** A boxed letter (Source Sans 3 Semibold) at the first full bar after
    each repeat (after the completing half of a split bar), A, B, ...
    restarting at A in each movement. Letters printed in the source are copied
@@ -1555,7 +1560,7 @@ This map comes from function names and headings. Check it when a module exists.
 - **`global`.** `global NAME` is allowed only for a name that the same module assigns
   or defines at top level. For a name of another module write `owner.NAME = value`.
 - **Size.** At most 1 100 definition lines per module. One module is exempt
-  (`ownership`: `analyse_page` is one function of 832 lines).
+  (`ownership`: `analyse_page` is one function of 834 lines).
 - **Pickles.** Saved `.lines` files hold class paths. Files of 0.4.2 say `__main__.Strip`;
   files written since 0.5.0-dev.2 say `partitor.model.Strip`. The reader (`_LinesUnpickler`, in `lines`)
   accepts `__main__`, `partitor`, `pt` and every `partitor.*` path for `Strip` and `RestRun`
