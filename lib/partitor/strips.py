@@ -207,7 +207,7 @@ def group_strip(res: PageResult, sys_staves: list[int], runs: list[tuple[str, li
         end = max(res.staves[i].x1 for i in idx_all) + off
         st.ends_at_bar = bool(st.bars_x) and end - st.bars_x[-1] <= BAR_END_SP * sp
         st.end_gap_sp = (end - st.bars_x[-1]) / sp if st.bars_x else -1.0
-        st.bars_why = why or ("" if st.ends_at_bar else "the line does not end at a barline")
+        st.bars_why = why or ("" if st.ends_at_bar else "the system does not end at a barline")
         return st
 
     contiguous = all(pos[b] - pos[a] == 1 for a, b in zip(idx_all, idx_all[1:]))

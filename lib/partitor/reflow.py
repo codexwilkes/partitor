@@ -786,7 +786,7 @@ def whole_reason(s_: Strip, p) -> str:
         return "multi-bar rest"
     if not s_.ends_at_bar:
         gap = f" (last barline {s_.end_gap_sp:.1f} sp before the staff end)" if s_.end_gap_sp >= 0 else ""
-        return s_.bars_why or "the line does not end at a barline" + gap
+        return s_.bars_why or "the system does not end at a barline" + gap
     if len(s_.bars_x) < 2:
         return s_.bars_why or "one bar"
     if p is None:

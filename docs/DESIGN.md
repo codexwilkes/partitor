@@ -1155,8 +1155,8 @@ partitor plan <id> --group Name=A,B       try a group of parts in a temporary co
 partitor pages <id> <part> [--move PAGE=N]  pages and turns (§5.9)
 partitor analyse <id> [--yes] [--join pP:N] [--unjoin pP:N] [--drop pP.sN] [--undrop pP.sN] | analyse --all
 partitor bars | parts | groups | cues | meta | proof <id>
-partitor cues <id> [part]                 cue lines of a part or group (menu; §13)
-partitor cue <id> LINE... --parts LIST    the same cue lines for several parts (§13)
+partitor cues <id> [part]                 cues of a part or group (menu; §13)
+partitor cue <id> LINE... --parts LIST    the same cues for several parts (§13)
 partitor log [N|FILE] [--tail N] [--list]  print a run log of PARTITOR_LOG_DIR (§12.5; 0.8.67)
 ```
 
@@ -1463,10 +1463,10 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | 1 | `runlog` | Run log of one CLI run, off by default (§12.5) |
 | 2 | `ownership` | Ink ownership, safety gate, barline detect |
 | 2 | `lines` | Line fitting, labels, multi-bar rests, saved lines |
-| 2 | `cues` | Cue lines: the cue line syntax, `split_rest`, the crop of a cue, the table of long rests (§13) |
+| 2 | `cues` | Cues: the cue syntax, `split_rest`, the crop of a cue, the table of long rests (§13) |
 | 2 | `stagecache` | Stage cache of the page analysis (§12.4) |
 | 3 | `analysis` | Page loop, preview, cache read and write around `analyse_page` |
-| 3 | `cueplace` | Cue lines in the lines of a part: split of a rest, drawing of a cue (§13) |
+| 3 | `cueplace` | Cues in the lines of a part: split of a rest, drawing of a cue (§13) |
 | 3 | `render` | Packing, page plan, part drawing |
 | 4 | `partplan` | Part planning: the options table of `plan` (§5.8) |
 | 4 | `library` | Item folder, ids, load and save, parts folder swap, `step_size` |
@@ -1495,7 +1495,7 @@ machine-readable list; `tools/check-modules.py` enforces it.
 | §4.3 item 13 (ambitus) | `clef` |
 | §4.3 items 7, 11 (multi-work, group outputs) | `build`, `strips` |
 | §4.4 parallel | `parallel` |
-| §13 cue lines | `cues`, `cueplace`, `cli_cues` |
+| §13 cues | `cues`, `cueplace`, `cli_cues` |
 | §12.4 stage cache | `stagecache`, `analysis` |
 | §12.5 run log | `runlog`, `console`, `cli_main` |
 | §5.1 to 5.4, 5.6 layout | `render` |
@@ -1709,7 +1709,7 @@ Policy of the maintainer (keep it):
 
 ---
 
-## 13. Cue lines
+## 13. Cues
 
 A part with a long rest can show where another voice enters: a small staff of that voice above the rest
 (a cue), or a word at a bar (a text mark). Nothing is made unless the item has the key `cues`. A part

@@ -1116,10 +1116,10 @@ class TestRepage(unittest.TestCase):
         js, warns = pt.break_lines(st, [15])                # inside the rest line (bars 13-18)
         self.assertEqual(js, [])
         self.assertEqual(len(warns), 1)
-        self.assertIn("inside a line", warns[0])
+        self.assertIn("inside a system", warns[0])
         js, warns = pt.break_lines(st, [999])
         self.assertEqual(js, [])
-        self.assertIn("no line ends", warns[0])
+        self.assertIn("no system ends", warns[0])
 
     def test_set_turns_and_breaks(self):
         data = {"parts": ["Alto", "Bass"], "layout": {}}

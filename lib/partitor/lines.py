@@ -845,7 +845,7 @@ def load_lines(path: Path) -> dict:
     """load_lines -> the payload of save_lines. Raises ValueError (what is
     wrong) for a missing, damaged or foreign file."""
     if not path.is_file():
-        raise ValueError(f"no saved lines ({path.name}): rebuild the part once")
+        raise ValueError(f"no saved systems ({path.name}): rebuild the part once")
     try:
         with gzip.open(path, "rb") as f:
             raw = f.read()      # the whole stream first: gzip checks its CRC at the end, so a damaged
@@ -859,7 +859,7 @@ def load_lines(path: Path) -> dict:
     missing = [f for f in cur if isinstance(fields, list) and f not in fields]
     if not isinstance(d, dict) or d.get("format") != LINES_FORMAT or not isinstance(fields, list) \
        or any(f not in cur for f in fields) or any(f not in _FIELD_DEFAULTS for f in missing):
-        raise ValueError(f"saved lines are from another partitor ({d.get('version', '?') if isinstance(d, dict) else '?'} "
+        raise ValueError(f"saved systems are from another partitor ({d.get('version', '?') if isinstance(d, dict) else '?'} "
                          f"{path.name}): rebuild the part")
     for s in d.get("strips", []):                  # a file from before the field: the default
         s.__dict__.pop("_prof", None)              # files of earlier releases hold a profile cache

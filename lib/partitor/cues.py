@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Nathan Wilkes and partitor contributors
-"""Cue lines: small staves of another voice above a rest (docs/DESIGN.md §13)."""
+"""Cues: small staves of another voice above a rest (docs/DESIGN.md §13)."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -113,7 +113,7 @@ def crop_cue(src: Strip, b_first: int, b_last: int, music_x: int, clef: bool = T
     import numpy as np
     nbar = len(src.bars_x)
     if not 0 <= b_first <= b_last < nbar:
-        raise CueError(f"bars {b_first}-{b_last} of the source line are not there (it has {nbar})")
+        raise CueError(f"bars {b_first}-{b_last} of the source system are not there (it has {nbar})")
     ink = src.img & ~src.hdr
     if src.num_mask is not None:
         ink = ink & ~src.num_mask

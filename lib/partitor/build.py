@@ -431,7 +431,7 @@ def cmd_build(a: argparse.Namespace) -> int:
     want_groups = [g for g in groups if not only or g in only]
     # parts whose staves this build reads: the parts and the members of the groups
     consumers = set(want_parts) | {x for g in want_groups for x in groups[g]}
-    # cue lines (§13): the voices a cue shows are read too, also when they are not built
+    # cues (§13): the voices a cue shows are read too, also when they are not built
     cue_specs, cue_notes = cues.parse_cues(lay.get("cues"), list(part_strips), groups)
     for t_ in cue_notes:
         _warn(t_)

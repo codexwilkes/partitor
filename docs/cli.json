@@ -1,5 +1,5 @@
 {
- "version": "0.14.1",
+ "version": "0.15.0",
  "commands": [
   {
    "name": "menu",
@@ -315,7 +315,7 @@
   },
   {
    "name": "cues",
-   "help": "cue lines of one part: small staves of another voice above a rest (menu; saved, not built)",
+   "help": "cues of one part: small staves of another voice above a rest (menu; saved, not built)",
    "args": [
     {
      "flags": [
@@ -341,7 +341,7 @@
   },
   {
    "name": "cue",
-   "help": "the same cue lines for several parts: cue ID 3=97-98 --parts Tenore,5 (saved, not built)",
+   "help": "the same cues for several parts: cue ID 3=97-98 --parts Tenore,5 (saved, not built)",
    "args": [
     {
      "flags": [

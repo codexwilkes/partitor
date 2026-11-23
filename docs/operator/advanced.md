@@ -61,7 +61,7 @@ A group prints several parts together as a small score.
 
 `Trombones=` deletes the group. The group is one more PDF. Staves of other parts leave no gap. Each staff has a label. To fit more systems on a page: `Trombones:group_gap=5` (staff spaces between the staves of a group, also of a part on two staves).
 
-## Cue lines {#cues eyebrow="Menu key u"}
+## Cues {#cues eyebrow="Menu key u"}
 
 A cue is a small staff of another voice above a rest, or a word. Nothing is added unless you ask.
 

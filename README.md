@@ -25,7 +25,7 @@ Status: early public release. It works for the author, on one setup. Read
 - The lowest and highest note of the part is printed on the first system, so you
   can see at once if the part fits your instrument or your voice.
 - Multi-bar rests are joined, so systems are shorter and the part has fewer pages.
-- Cue lines: a small staff of another voice, or a word such as "Canto", above a
+- Cues: a small staff of another voice, or a word such as "Canto", above a
   long rest (`partitor cues`). Nothing is added unless you ask.
 
 **Page turns**
@@ -83,7 +83,7 @@ for you. No questions.
 ```bash
 sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.14.1
+cd /opt/partitor && sudo git checkout --detach 0.15.0
 sudo bin/partitor-quick-install
 ```
 
@@ -99,7 +99,7 @@ A NAS as library, other folders, upgrade and removal: `docs/INSTALL.md`.
 | File | About |
 |---|---|
 | `docs/operator-flow.html` | Step by step: from a PDF to printed parts (generated from `docs/operator/guide.md`) |
-| `docs/operator/advanced.md` | Less common features: groups, cue lines, bar numbers, paper, page turns |
+| `docs/operator/advanced.md` | Less common features: groups, cues, bar numbers, paper, page turns |
 | `docs/OPERATING.md` | Daily use, commands, problems |
 | `docs/PLAN-AND-FOLDOUTS.md` | Paper, staff size, page turns, fold-outs; print and assemble |
 | `docs/INSTALL.md` | Install, settings, upgrade, uninstall |

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Nathan Wilkes and partitor contributors
-"""Tests for cue lines (small staves of another voice above a rest; docs/DESIGN.md §13).
+"""Tests for cues (small staves of another voice above a rest; docs/DESIGN.md §13).
 
 Run with the venv interpreter:
 

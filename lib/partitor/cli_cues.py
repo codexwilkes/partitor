@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Nathan Wilkes and partitor contributors
-"""The cues and cue commands: cue lines above a rest (docs/DESIGN.md §13)."""
+"""The cues and cue commands: cues above a rest (docs/DESIGN.md §13)."""
 from __future__ import annotations
 
 import argparse
@@ -87,7 +87,7 @@ def rest_table(item, data: dict, target: str) -> list[str]:
 
 @locks_item
 def cmd_cues(a: argparse.Namespace) -> int:
-    """cues <id> [part]: the cue lines of one part or group, in a menu: a table of its long
+    """cues <id> [part]: the cues of one part or group, in a menu: a table of its long
     rests, its cues numbered, and a line to add one (3=97-98) or a word ("Canto"=97).
     Saved, not built."""
     start = time.monotonic()
@@ -153,7 +153,7 @@ def _edit_target(data: dict, item, target: str) -> None:
 
 @locks_item
 def cmd_cue(a: argparse.Namespace) -> int:
-    """cue <id> LINE... --parts LIST: the same cue line(s) for several parts or groups at
+    """cue <id> LINE... --parts LIST: the same cue(s) for several parts or groups at
     once. LIST: names or numbers, comma separated. Saved, not built."""
     start = time.monotonic()
     item = _item_or_die(a.id)

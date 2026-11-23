@@ -455,7 +455,7 @@ def edit_bars(e: dict, edits: list[dict]) -> tuple[dict, list[str]]:
     nb = raw
     for ed in edits:
         if ed["raw"] != raw:
-            notes.append(f"{e.get('id')}: edit {ed['text']} not applied: the line has {raw} "
+            notes.append(f"{e.get('id')}: edit {ed['text']} not applied: the system has {raw} "
                          f"bar(s) now, it had {ed['raw']}")
             continue
         n = ed["n"]
@@ -524,7 +524,7 @@ def edit_barlines(edits: list[dict], barlines: list[int], x0: int,
     raw = len(bl)
     for ed in edits:
         if ed["raw"] != raw:
-            notes.append(f"{ed['sid']}: edit {ed['text']} not applied: the line has {raw} "
+            notes.append(f"{ed['sid']}: edit {ed['text']} not applied: the system has {raw} "
                          f"bar(s) now, it had {ed['raw']}")
             continue
         n = ed["n"]

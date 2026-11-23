@@ -46,7 +46,7 @@ def item_menu(item: Path) -> None:
               "n bar numbers and marks")
         print("                            e expand  c contract  p pages  a paper  k ambitus"
               "  h short names  s set")
-        print("                            u cue lines (small staves above a rest: u Trombones)")
+        print("                            u cues (small staves above a rest: u Trombones)")
         print("  v review   y analyse again   r build (r Trombones, r 2-4: only those)")
         print("  f fit (paper, staff size, page turns: f Trombones)   "
               "l pages (see and move page turns: l Trombones)")
@@ -400,13 +400,13 @@ def build_parser() -> argparse.ArgumentParser:
         if name in ("expand", "contract"):
             sp_.add_argument("part", nargs="?", help="one part or group only (default: all)")
         sp_.add_argument("--build", action="store_true", help="build after the edit")
-    cu = sub.add_parser("cues", help="cue lines of one part: small staves of another voice above a rest "
-                        "(menu; saved, not built)", description="Cue lines of one part or group (a menu).\n\n"
+    cu = sub.add_parser("cues", help="cues of one part: small staves of another voice above a rest "
+                        "(menu; saved, not built)", description="Cues of one part or group (a menu).\n\n"
                         + CUE_OPTIONS, formatter_class=argparse.RawDescriptionHelpFormatter)
     cu.add_argument("id", help="12 or 2026-10-0012")
     cu.add_argument("part", nargs="?", help="one part or group (default: choose in the menu)")
     cu.add_argument("--build", action="store_true", help="build after the edit")
-    c1 = sub.add_parser("cue", help="the same cue lines for several parts: cue ID 3=97-98 --parts Tenore,5 "
+    c1 = sub.add_parser("cue", help="the same cues for several parts: cue ID 3=97-98 --parts Tenore,5 "
                         "(saved, not built)", description="The same cues for several parts or groups. "
                         'An entry is VOICE=BARS and options, or "word"=BAR.\n\n' + CUE_OPTIONS,
                         formatter_class=argparse.RawDescriptionHelpFormatter)

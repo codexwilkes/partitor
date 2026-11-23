@@ -123,7 +123,7 @@ Open it at any time: run `partitor`, then type the number of the item. The statu
 | <kbd>a</kbd> | paper: Letter, A4, Ledger |
 | <kbd>k</kbd> | ambitus of a part |
 | <kbd>h</kbd> | short names of staves in a group score |
-| <kbd>u</kbd> | cue lines |
+| <kbd>u</kbd> | cues |
 | <kbd>s</kbd> | any setting as `key=value` |
 
 | Key | Other |

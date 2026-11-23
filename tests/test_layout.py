@@ -244,7 +244,7 @@ class TestReflow(unittest.TestCase):
 
     def test_a_manual_break_ends_a_re_flowed_line(self):
         """0.8.47: re-flow ends a line after each `breaks` bar, so the page break can fall there
-        (before, the bar could fall inside a line: `break after bar N: bar is inside a line`)."""
+        (before, the bar could fall inside a system: `break after bar N: bar is inside a system`)."""
         ls = self.numbered()
         pre = pt.find_prefixes(ls)
         free = pt.reflow(ls, 400.0, pre)

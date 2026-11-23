@@ -9,8 +9,8 @@ from pathlib import Path
 
 DOCS = Path(__file__).resolve().parent.parent / "docs" / "operator"
 FILES = ["guide.md", "advanced.md", "problems.md"]
-BANNED = [r"\bmeasures?\b", r"\bstave\b", r"\bsounding pitch\b", r"\btranspos\w*", r"\bsound(s|ed) an octave\b"]
-LINE_OK = [r"command-line", r"status line", r"heading line", r"dotted line", r"cue lines?", r"staff lines", r"quoted line", r"`re-flow:` line", r"command line"]
+BANNED = [r"\bmeasures?\b", r"\bcue lines?\b", r"\bstave\b", r"\bsounding pitch\b", r"\btranspos\w*", r"\bsound(s|ed) an octave\b"]
+LINE_OK = [r"command-line", r"status line", r"heading line", r"dotted line", r"staff lines", r"quoted line", r"`re-flow:` line", r"command line"]
 MAX_PARAGRAPH_WORDS = 120
 GUIDE_MAX_WORDS = 1700
 

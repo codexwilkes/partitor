@@ -6,6 +6,13 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.15.0 — 2026-11-23
+
+### Changed
+- BREAKING (messages): more messages said "line" for a row of music; they say "system": `plan` ("system N cannot be cut"), the re-flow and break notes ("the system does not end at a barline", "bar is inside a system", "no system ends at that bar"), the bar-edit and cue errors, and "no saved systems".
+- Docs: `docs/PLAN-AND-FOLDOUTS.md` and `docs/KNOWN-LIMITS.md` use "system" and match these messages. No other change of content.
+- "Cues" is the name of the feature, where it said "cue lines": the menu line of key `u`, the help of `partitor cues` and `partitor cue`, the guide, the advanced page (section "Cues", same anchor `#cues`), the README, `docs/OPERATING.md`, `docs/KNOWN-LIMITS.md`, `docs/DESIGN.md` and the code comments. No change in behaviour or in a command, option or key.
+
 ## 0.14.1 — 2026-11-23
 
 ### Changed

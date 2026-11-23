@@ -77,7 +77,7 @@ Example (the numbers are only an example):
 | `attacca` | Turns at the start of a movement. Fair. |
 | `fold-out` | Number of fold-out sheets. A fold-out gives 3 pages without a turn. |
 | `bad` | Turns while the player plays. Avoid these. |
-| `note` | `best`: see below. `re-flow`: lines are cut at barlines for a narrower page. |
+| `note` | `best`: see below. `re-flow`: systems are cut at barlines for a narrower page. |
 
 `best` means, for that paper: the fewest turns while playing, then the largest
 staff, then the fewest fold-outs, then the fewest pages. It is a good first
@@ -175,7 +175,7 @@ stop inside the cut line, so no dotted line touches music.
 
 ## Fix a bad turn by hand
 
-`partitor pages ID PART` shows one line for each page of a built part: its
+`partitor pages ID PART` shows one row for each page of a built part: its
 bars, its systems, the room left at the foot (in systems) and the turn after
 it. A turn while the player plays is marked `PLAYING`.
 
@@ -202,7 +202,7 @@ Use it when the planner could not find a good turn, or when you see a better one
 on the page. The pages before the moved page keep their ends: if the planner
 would change one, `pages` pins it (`[pin]` in the table; the `breaks:` line
 lists them as "pinned"). A pin is not a manual break: it holds only for the
-lines of the current build. A rebuild that makes other lines (another staff
+systems of the current build. A rebuild that makes other systems (another staff
 size, re-flow) drops the pins and keeps your manual breaks; it says so.
 `--clear` drops both. If the next page has no room, the later pages move
 on by themselves. The `<- move a system?` mark shows only when the next page has
@@ -214,10 +214,10 @@ A move up to a page with no room is refused: a break is a limit, so the page wou
 only get shorter. Move a system off that page first.
 
 `plan` keeps the manual breaks in its estimates (a break after bar N ends a page
-where a line ends after bar N). With re-flow a line ends at each break bar, in the
-build and in the estimates. A row says "N break(s) end no line" when a break
-falls inside a line that is not cut, or names a bar the part does not have. After `plan ID PART N`, check the breaks with
-`pages`; if a break no longer ends a line, drop them with `--clear`. A part built
+where a system ends after bar N). With re-flow a system ends at each break bar, in the
+build and in the estimates. A row says "N break(s) end no system" when a break
+falls inside a system that is not cut, or names a bar the part does not have. After `plan ID PART N`, check the breaks with
+`pages`; if a break no longer ends a system, drop them with `--clear`. A part built
 before 0.8.21 has no bar numbers in its plan data: `plan` says so; rebuild once.
 
 ## Settings
@@ -232,8 +232,8 @@ plan.
 ## Rests
 
 Bars that hold only rests on every staff are merged into one multi-bar rest
-(count above every staff) before the lines are cut and paged. This makes
-lines shorter and gives the planner more turn points. A bar with a note, a
+(count above every staff) before the systems are cut and paged. This makes
+systems shorter and gives the planner more turn points. A bar with a note, a
 rehearsal mark or a printed number is never merged. Set `rests: keep` to print
 every bar as engraved.
 
@@ -243,9 +243,9 @@ every bar as engraved.
   a bad turn and the build warns about it.
 - A right fold-out cannot be followed by a left one. A left fold-out cannot
   follow a title page.
-- A line that cannot be cut narrow enough makes an option unavailable. The
-  note says which line, how wide, and its bars (for example "line 6 cannot be
-  cut: 300 mm of music (bars 37-40)"). Look at those bars in the proof: a line
+- A system that cannot be cut narrow enough makes an option unavailable. The
+  note says which system, how wide, and its bars (for example "system 6 cannot be
+  cut: 300 mm of music (bars 37-40)"). Look at those bars in the proof: a system
   with no clef and key to copy, or one very wide bar, limits the staff size on
   that paper.
 - Per-staff rests are not used yet: a turn where one staff rests is counted

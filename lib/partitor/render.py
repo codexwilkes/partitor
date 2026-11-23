@@ -326,10 +326,10 @@ def prefix_notes(strips: list[Strip], pre) -> list[str]:
 
     def where(i: int) -> str:
         sp = spans[i]
-        return f"line {i + 1}" if not sp or sp[1] is None else f"bar {sp[0]}" if sp[0] == sp[1] else f"bars {sp[0]}-{sp[1]}"
+        return f"system {i + 1}" if not sp or sp[1] is None else f"bar {sp[0]}" if sp[0] == sp[1] else f"bars {sp[0]}-{sp[1]}"
     out = [f"prefix borrowed: {where(i)} take the clef and key of {where(k)} "
            "(the scan differs, the key signature agrees)" for i, k in sorted(getattr(pre, "borrowed", {}).items())]
-    return out + [f"no clef and key to copy: {where(i)} stay one piece (re-flow cannot make the staff larger than this line allows)"
+    return out + [f"no clef and key to copy: {where(i)} stay one piece (re-flow cannot make the staff larger than this system allows)"
                   for i, s_ in enumerate(strips)
                   if pre[i] is None and s_.rest_src is None and s_.ends_at_bar and len(s_.bars_x) >= 2]
 
@@ -363,14 +363,14 @@ def break_lines(strips: list[Strip], bars: list[int]) -> tuple[list[int], list[s
             if hit + 1 < len(strips):
                 out.append(hit + 1)
             else:
-                warn.append(f"break after bar {n}: the last line of the part (ignored)")
+                warn.append(f"break after bar {n}: the last system of the part (ignored)")
             continue
         ends = [sp[1] for sp in spans if sp and sp[1] is not None]
         near = sorted(ends, key=lambda e: (abs(e - n), e))[:4]
         inside = any(sp and sp[1] is not None and sp[0] <= n < sp[1] for sp in spans)
         warn.append(f"break after bar {n}: " + (
-            "bar is inside a line (lines are not cut)" if inside else "no line ends at that bar")
-            + (f"; line ends near it: {', '.join(str(e) for e in sorted(near))}" if near else ""))
+            "bar is inside a system (systems are not cut)" if inside else "no system ends at that bar")
+            + (f"; system ends near it: {', '.join(str(e) for e in sorted(near))}" if near else ""))
     return sorted(set(out)), warn
 
 

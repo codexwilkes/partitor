@@ -30,11 +30,11 @@ result. The proof PDF (`<id>-proof.pdf`) is the place to look first.
 | Title below the top of the page | asks, never drops | The question about systems above a title (another piece) is asked only for the first page of the score, and only for a title that is centred, at least 12 sp wide and 1.8 sp high. A title that is left-aligned, small or on a later page is not found; use `analyse ID --drop p1.s1`. |
 | Rests | good | Whole-bar rests inside printed staves stay as engraved. "Tacet" is not built. |
 | Ambitus | weak: about half of the extremes right in early tests | See below. |
-| Page turns | good on groups | Lines that end in rests and final double barlines are not used as turn points when `turns=any`. A one-bar rest is too short to turn on. |
+| Page turns | good on groups | Systems that end in rests and final double barlines are not used as turn points when `turns=any`. A one-bar rest is too short to turn on. |
 
 ## Ambitus
 
-The lowest and highest note of each part are printed on the first line. Every
+The lowest and highest note of each part are printed on the first system. Every
 note counts, so a false notehead changes the range. Causes seen: a beam or flag
 start near a head (the flag curl of a stem-down eighth is dropped by its width, also when a staff line cuts its head in two), a staff-line remnant in an empty stretch, an accidental
 counted as a head, a head on a line that is missed (the range narrows). Whole
@@ -58,7 +58,7 @@ per-system consistency.
 - Margins and sizes are estimates from test prints on a few printers. Check the
   first print of every part.
 
-## Cue lines
+## Cues
 
 - A cue is whole bars of one voice, with its own clef and key at a small size (0.6 of the staff by
   default). It is never drawn in the staff, only above it, and above the top staff of a group. There is no
@@ -73,7 +73,7 @@ per-system consistency.
   the part, unless `fit` stretches the cue (the notes of the cue are then squashed or stretched). `sync=N` lines up one note of the cue with the
   first note of the part; it counts notes with a stem only (a whole note is not found) and reads the top
   staff of a group.
-- A bar that a line break cuts keeps its number on both lines; a cue reads it where it first stands.
+- A bar that a system break cuts keeps its number on both systems; a cue reads it where it first stands.
 - No separate proof for cues: build the part (the set before is kept in `parts.prev`) and look at it.
   The size is a factor of the staff: check the print of the large-print copy and of the small one.
 - An upbeat before the entry is not cropped (whole bars only). The table of long rests does not name the

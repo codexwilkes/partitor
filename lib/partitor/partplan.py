@@ -206,7 +206,7 @@ def estimate(src: Source, opts: dict, paper: str, staff_mm: float, cut: bool = T
         sp_ = src.lines[i].get("span")
         bars = (f" (bar {sp_[0]})" if sp_[0] == sp_[1] else f" (bars {sp_[0]}-{sp_[1]})") if sp_ else ""
         return Option(paper, staff_mm, False,
-                      f"line {i + 1} cannot be cut: {w * k0 / 72.0 * 25.4:.0f} mm of music{bars}")
+                      f"system {i + 1} cannot be cut: {w * k0 / 72.0 * 25.4:.0f} mm of music{bars}")
     n = len(pieces)
     L = [src.lines[p[0]] for p in pieces]
     _, _, mt, mb = page_box(ov, 0, False)

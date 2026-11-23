@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Nathan Wilkes and partitor contributors
-"""Cue lines in the lines of a part (docs/DESIGN.md §13): the bar of a rest that
+"""Cues in the lines of a part (docs/DESIGN.md §13): the bar of a rest that
 holds the last bar of a cue is split so that the cue's barline falls on a barline
 of the part (respan), and the cue is drawn above the staff (draw_cue)."""
 from __future__ import annotations
@@ -331,7 +331,7 @@ def draw_cue(s: Strip, cue: CueImg, start_x: int, scale: float, label: str = "",
     ink = g >= CUE_INK_MIN
     ax = int(start_x) - int(round(cue.clef_px * scale))
     if ax < 0:
-        raise CueError("the cue does not fit: it would start left of the line")
+        raise CueError("the cue does not fit: it would start left of the system")
     h_c, w_c = ink.shape
     cols = _no_specks(s.img[:, ax:ax + w_c] & ~s.hdr[:, ax:ax + w_c], sp)
     rows = np.flatnonzero(cols[:int(s.staff_top - 0.3 * sp)].any(axis=1)) if cols.size else np.array([], int)   # (not the thickness of the top line)
@@ -438,7 +438,7 @@ def apply_cues(strips: list[Strip], starts: list[int | None], specs: list[CueSpe
                 t = next((t for t, s in enumerate(work)
                           if find_bar(shown_bars(s, starts[t] or 0), n) is not None), None)
                 if t is None:
-                    raise CueError(f"bar {n} is not in the lines of {target}")
+                    raise CueError(f"bar {n} is not in the systems of {target}")
                 if runs and runs[-1][0] == t:
                     runs[-1][2] = n
                 else:
@@ -555,7 +555,7 @@ def _text_mark(work: list[Strip], starts: list[int | None], spec: CueSpec, targe
     t = next((t for t, s in enumerate(work)
               if find_bar(shown_bars(s, starts[t] or 0), n) is not None), None)
     if t is None:
-        raise CueError(f"bar {n} is not in the lines of {target}")
+        raise CueError(f"bar {n} is not in the systems of {target}")
     bars = shown_bars(work[t], starts[t] or 0)
     i = find_bar(bars, n)
     s2 = work[t]
