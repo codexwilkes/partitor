@@ -36,4 +36,4 @@ Answer <kbd>j</kbd> in the choices, or `partitor analyse ID --join p5:4`. The ba
 
 ## A part rests for whole systems
 
-Normal: those bars become one rest line with the count (for example 14), so the numbers continue.
+Normal: those bars become one multi-bar rest with the count (for example 14), so the numbers continue.

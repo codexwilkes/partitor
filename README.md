@@ -24,9 +24,9 @@ Status: early public release. It works for the author, on one setup. Read
   conductor's "from bar 45" works for you too.
 - The lowest and highest note of the part is printed on the first line, so you
   can see at once if the part fits your instrument or your voice.
-- Multi-bar rests are joined, so lines are shorter and the part has fewer pages.
-- Cue lines: in a part with a long rest you can add a small staff of another voice above the rest, or a word
-  such as "Canto", so that you see where the entry comes (`partitor cues`). Nothing is added unless you ask.
+- Multi-bar rests are joined, so systems are shorter and the part has fewer pages.
+- Cue lines: a small staff of another voice, or a word such as "Canto", above a
+  long rest (`partitor cues`). Nothing is added unless you ask.
 
 **Page turns**
 - Pages end where you can rest, not in the middle of a passage. You turn at a
@@ -83,7 +83,7 @@ for you. No questions.
 ```bash
 sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.13.1
+cd /opt/partitor && sudo git checkout --detach 0.13.2
 sudo bin/partitor-quick-install
 ```
 
@@ -98,7 +98,8 @@ A NAS as library, other folders, upgrade and removal: `docs/INSTALL.md`.
 
 | File | About |
 |---|---|
-| `docs/operator-flow.html` | Step by step: from a PDF to printed parts (generated from `docs/operator/`) |
+| `docs/operator-flow.html` | Step by step: from a PDF to printed parts (generated from `docs/operator/guide.md`) |
+| `docs/operator/advanced.md` | Less common features: groups, cue lines, bar numbers, paper, page turns |
 | `docs/OPERATING.md` | Daily use, commands, problems |
 | `docs/PLAN-AND-FOLDOUTS.md` | Paper, staff size, page turns, fold-outs; print and assemble |
 | `docs/INSTALL.md` | Install, settings, upgrade, uninstall |
@@ -114,10 +115,10 @@ Developers and people who build on partitor: see `CONTRIBUTING.md`.
   Python 3.12 and the tests pass there (checked on CPython 3.12.3; the
   installer itself is not run on 24.04 yet).
 - **Windows:** best effort. An experimental console build with an installer,
-  not supported: `platforms/windows/README.md`. Steps for PowerShell are in the
-  operator guide (`docs/operator/guide.md`).
+  not supported: `platforms/windows/README.md`. The start command for PowerShell
+  is in the operator guide (`docs/operator/guide.md`).
 - **macOS:** best effort. No installer and no sandbox: you run the engine from
-  the source in Terminal. The steps are in the operator guide. The tests run on
+  the source in Terminal. The steps are in `docs/operator/advanced.md`. The tests run on
   macOS in CI, and a failure there does not block a release.
 
 ## Support

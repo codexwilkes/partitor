@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.13.2 — 2026-11-23
+
+### Changed
+- Docs: the README lists `docs/operator/advanced.md` in the guides, gives its path for the macOS steps, and says "systems" where it meant systems. The cue-line bullet is shorter. `problems.md` says "multi-bar rest". No change in behaviour.
+
 ## 0.13.1 — 2026-11-23
 
 ### Changed
