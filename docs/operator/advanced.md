@@ -39,7 +39,7 @@ A dropped system counts no bars. The proof marks it “dropped”. Every later a
 |---|---|
 | `p 1` | pickup on or off |
 | `i 1` | incipit on or off |
-| `s 22 1` | bar 1 of line 22 completes the bar before it (one number for both halves) |
+| `s 22 1` | bar 1 of line 22 completes the bar before it (a bar split over a line break keeps one number) |
 | `f 3=16` | line 3 starts at bar 16 |
 | `j 4 1` | join a false barline |
 | `b 4` | list the bars of line 4 |

@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.13.4 — 2026-11-23
+
+### Changed
+- Docs: the guide says that Windows and macOS have no sandbox (open only PDFs you trust). The advanced page says that a bar split over a line break keeps one number. No change in behaviour.
+
 ## 0.13.3 — 2026-11-23
 
 ### Changed
