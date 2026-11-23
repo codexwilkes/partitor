@@ -601,10 +601,10 @@ Ordered by priority. Items 1-3 come before the layout features in §4.2.
       0.5-1.7 sp high, 1.2-4 sp below the staff, centred under the clef;
       bottom line E3. An 8 that touches the clef's curl joins it into one
       blob too wide for a digit: a second window, 1.7 sp below the line,
-      under the curl, takes the 8 alone. The ambitus of a G8 staff is the
-      sounding pitch (an octave below the written note) and is drawn in the
-      8vb clef, at the staff positions of the source; a range set by hand
-      is sounding pitch too.
+      under the curl, takes the 8 alone. The ambitus is drawn in the clef
+      read from the score, at the staff positions of the source. Names are
+      the pitch on the staff: G8 has the bottom line of G2 (E4). No clef
+      transposes, and G2 is never changed to G8.
     - `score.yaml` `ambitus: {part: {range: C4-F5, from}}`. `from`: `auto`
       (computed, refreshed on every save), `on` (computed for a continuo-like
       part), `operator` (`set ID "Part:ambitus=C4-F5"`, never overwritten),

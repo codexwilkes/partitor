@@ -176,8 +176,9 @@ def clef_blob(owner: np.ndarray, line_px: np.ndarray, st: Staff, idx: int, sp: f
 
 # ── Ambitus (DESIGN.md §4.3 item 13): noteheads per staff ───────────────────
 # staff step 0 = bottom line, 1 = the space above it, ...; diatonic number
-# of the bottom line per clef (C0 = 0, 7 per octave)
-CLEF_BOTTOM = {"G2": 30, "G8": 23, "G1": 32, "C1": 28, "C2": 26, "C3": 24, "C4": 22,
+# of the bottom line per clef (C0 = 0, 7 per octave). Names are the pitch on
+# the staff: G8 has the bottom line of G2 (E4); no clef transposes.
+CLEF_BOTTOM = {"G2": 30, "G8": 30, "G1": 32, "C1": 28, "C2": 26, "C3": 24, "C4": 22,
                "C5": 20, "F3": 20, "F4": 18, "F5": 16}
 NOTE_NAMES = "CDEFGAB"
 
@@ -226,9 +227,9 @@ def part_clef_steps(data: dict, part: str) -> tuple[str | None, list[int]]:
     lowest and highest noteheads per staff) from the systems' maps.
     Clefs are smoothed along the part (a misread clef shifts every note):
     a clef unlike both neighbouring systems of the part, which agree (at
-    either end: unlike the next three, which agree), takes theirs; a part with G8
-    on a quarter or more of its staves is G8 where G2 was read (the 8 is
-    missed more often than invented). Real clef changes last."""
+    either end: unlike the next three, which agree), takes theirs. A clef is
+    never changed to G8: the clef is the one read from the score. Real clef
+    changes last."""
     seq = part_clef_seq(data, part)
     clef, nums = None, []
     for c, st_, _, _ in seq:
@@ -261,11 +262,6 @@ def part_clef_seq(data: dict, part: str) -> list[list]:
             nxt = cl[1:4] if i == 0 else cl[-4:-1]
             if len(set(nxt)) == 1 and nxt[0] in CLEF_BOTTOM and c != nxt[0]:
                 seq[i][0] = nxt[0]
-    n8 = sum(1 for it in seq if it[0] == "G8")
-    if n8 and n8 >= 0.25 * sum(1 for it in seq if it[0] in ("G2", "G8")):
-        for it in seq:
-            if it[0] == "G2":
-                it[0] = "G8"
     return seq
 
 

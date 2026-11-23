@@ -135,9 +135,9 @@ class TestClefsAndSpacing(unittest.TestCase):
         for bad in ("F##3", "Fx3", "F#", "bb"):
             with self.assertRaises(ValueError):
                 pt.parse_pitch(bad)
-        # bottom lines: treble E4, tenor-8 E3, alto F3, tenor D3, bass G2
+        # bottom lines: treble E4, treble-8 E4 (no transposition), alto F3, tenor D3, bass G2
         self.assertEqual([pt.pitch_name(pt.CLEF_BOTTOM[c]) for c in ("G2", "G8", "C3", "C4", "F4")],
-                         ["E4", "E3", "F3", "D3", "G2"])
+                         ["E4", "E4", "F3", "D3", "G2"])
 
     def test_template_bitmaps_are_unchanged(self):
         import hashlib
@@ -183,7 +183,7 @@ class TestClefsAndSpacing(unittest.TestCase):
         doc = pymupdf.open()
         page = doc.new_page()
         pt.draw_ambitus(page, 50, 100, "F4", 14, 28)           # C2-C4: ledger lines both ways
-        pt.draw_ambitus(page, 150, 100, "G8", 23, 30)
+        pt.draw_ambitus(page, 150, 100, "G8", 30, 37)
         self.assertGreater(len(page.get_drawings()), 5)
 
     def _eight_staff(self, touching: bool, eight: bool = True):
@@ -216,14 +216,14 @@ class TestClefsAndSpacing(unittest.TestCase):
         owner, st, sp = self._eight_staff(touching=False, eight=False)
         self.assertFalse(clef._octave_eight_below(owner, st, 0, sp))
 
-    def test_treble8_ambitus_is_sounding_pitch(self):
-        # the same steps: treble 8 sounds an octave below the plain treble
+    def test_treble8_ambitus_names_the_staff_pitch(self):
+        # the same steps give the same names: no clef transposes
         def sysm(c):
             return {"id": "p1.s1", "map": ["A"], "clefs": [c], "steps": [[4, 9]]}
         _, n2 = pt.part_clef_steps({"parts": ["A"], "systems": [sysm("G2")]}, "A")
         _, n8 = pt.part_clef_steps({"parts": ["A"], "systems": [sysm("G8")]}, "A")
         self.assertEqual([pt.pitch_name(x) for x in n2], ["B4", "G5"])
-        self.assertEqual([pt.pitch_name(x) for x in n8], ["B3", "G4"])
+        self.assertEqual([pt.pitch_name(x) for x in n8], ["B4", "G5"])
 
     def test_ambitus_clef_smoothing(self):
         def sysm(i, clef, steps):
@@ -234,7 +234,11 @@ class TestClefsAndSpacing(unittest.TestCase):
         self.assertEqual(pt.refresh_ambitus(data)["T"]["range"], "G2-A3")
         data = {"parts": ["T"], "systems": [sysm(1, "G8", [0, 4]), sysm(2, "G2", [0, 8]),
                                             sysm(3, "G8", [1, 5])]}
-        self.assertEqual(pt.refresh_ambitus(data)["T"]["range"], "E3-F4")
+        self.assertEqual(pt.refresh_ambitus(data)["T"]["range"], "E4-F5")
+        # G2 staves are not changed to G8 when part of the part reads G8
+        data = {"parts": ["T"], "systems": [sysm(1, "G8", [0, 4]), sysm(2, "G8", [0, 8]),
+                                            sysm(3, "G2", [1, 5]), sysm(4, "G2", [1, 5])]}
+        self.assertEqual([it[0] for it in pt.part_clef_seq(data, "T")], ["G8", "G8", "G2", "G2"])
         # a real change lasts: C3 then G2 twice
         data = {"parts": ["T"], "systems": [sysm(1, "C3", [0, 2]), sysm(2, "G2", [0, 2]),
                                             sysm(3, "G2", [0, 2])]}

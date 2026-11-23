@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.12.0 — 2026-11-23
+
+### Changed
+- Ambitus: a part with a treble clef with an 8 below (G8) names its pitches as they stand on the staff, like every other clef. Before, the names were an octave lower than the staff. partitor no longer changes G2 to G8 when other staves of the part read G8. A range typed by hand for a G8 part before this change must be typed again (`k`).
+
 ## 0.11.1 — 2026-11-23
 
 ### Changed
