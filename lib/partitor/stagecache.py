@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import gzip
 import hashlib
+import io
 import os
 import pickle
 import subprocess
@@ -144,16 +145,15 @@ class StageCache:
             return None
         try:
             with gzip.open(path, "rb") as f:
-                d = _CacheUnpickler(f).load()
-                while f.read(1 << 20):      # to the end of the stream: gzip checks its CRC there
-                    pass
+                raw = f.read()              # the whole stream first: gzip checks its CRC at the end, so a
+            d = _CacheUnpickler(io.BytesIO(raw)).load()     # damaged entry never reaches the unpickler
             if not isinstance(d, dict) or d.get("format") != ANALYSIS_CACHE_FORMAT \
                or d.get("key") != self.key(pno, sys_base, joins) \
                or not isinstance(d.get("result"), PageResult):
                 raise ValueError("wrong format or key")
             return d["result"]
-        except (OSError, EOFError, zlib.error, MemoryError, pickle.UnpicklingError, AttributeError,
-                ValueError, ImportError, IndexError, TypeError, KeyError) as e:
+        except (OSError, EOFError, zlib.error, MemoryError, OverflowError, pickle.UnpicklingError,
+                AttributeError, ValueError, ImportError, IndexError, TypeError, KeyError) as e:
             self._note_once(f"cache:  page {pno + 1}: entry not used ({type(e).__name__}); "
                             "analysed again")
             try:

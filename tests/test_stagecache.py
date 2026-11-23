@@ -168,6 +168,33 @@ class TestStageCache(unittest.TestCase):
             got = self.cache.get(0, 0)                      # must not raise
             self.assertTrue(got is None or np.array_equal(got.owner, owner), trial)
 
+    def test_a_damaged_entry_is_a_miss_wherever_the_bit_is(self):
+        # every byte of a small entry, three bits each: a miss or the same data, at once (as for saved lines)
+        import signal
+        owner = np.arange(120, dtype=np.int32).reshape(8, 15) % 7 - 1
+        res = pt.PageResult(0, owner.shape, 20.0, 2, 0.0, 0.0, [], [], owner)
+        self.cache.put(0, 0, res)
+        p = self.cache.path(0, 0)
+        good = p.read_bytes()
+
+        def stuck(*_):
+            raise AssertionError("a damaged entry hangs the reader")
+        old = signal.signal(signal.SIGALRM, stuck)
+        try:
+            for i in range(len(good)):
+                for bit in (0, 5, 7):
+                    b = bytearray(good)
+                    b[i] ^= 1 << bit
+                    p.write_bytes(bytes(b))
+                    signal.alarm(5)
+                    try:
+                        got = self.cache.get(0, 0)                  # must not raise, must not hang
+                    finally:
+                        signal.alarm(0)
+                    self.assertTrue(got is None or np.array_equal(got.owner, owner), (i, bit))
+        finally:
+            signal.signal(signal.SIGALRM, old)
+
     def test_a_new_program_version_alone_keeps_the_key(self):
         # 0.7.1: the analysis source hash decides, not the release number
         env = stagecache.environment_id()

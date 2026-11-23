@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.16.2 — 2026-11-23
+
+### Fixed
+- A damaged entry of the analysis cache could raise an error (`OverflowError`) in the reader and stop a build, in place of being analysed again. The reader now reads the whole file first, so that its checksum is checked before the data is read, as the reader of saved lines does since 0.11.0. An entry that fails any way is a miss and is analysed again.
+
 ## 0.16.1 — 2026-11-23
 
 ### Fixed
