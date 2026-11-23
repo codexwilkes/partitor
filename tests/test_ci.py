@@ -11,6 +11,7 @@ Run: python3 -m unittest -v tests/test_ci.py
 import os
 import re
 import unittest
+from pathlib import Path
 
 try:
     import yaml
@@ -23,7 +24,7 @@ WF = os.path.join(ROOT, ".github", "workflows", "ci.yml")
 
 # Discovered tests (skipped ones count) at the last step. Raise it with every step that adds
 # tests; never lower it (CONTRIBUTING.md: the number of tests must not fall).
-MIN_TESTS = 1297
+MIN_TESTS = 1298
 
 
 def text(*parts):
@@ -132,6 +133,22 @@ class TestTestCount(unittest.TestCase):
         failed = [t.id() for t in tests if type(t).__name__ == "_FailedTest"]
         self.assertEqual(failed, [], "a test file does not import")
         self.assertGreaterEqual(len(tests), MIN_TESTS, "tests were removed or are not found")
+
+
+class TestDocGate(unittest.TestCase):
+    """tools/doc-gate.sh runs the tests that read docs/. A new test that reads docs/ must be on its list."""
+
+    def test_every_test_that_reads_docs_is_in_the_doc_gate(self):
+        root = Path(HERE).parent
+        script = (root / "tools" / "doc-gate.sh").read_text(encoding="utf-8")
+        m = re.search(r"^DOC_TESTS=\((.*?)\)$", script, re.M)
+        self.assertIsNotNone(m, "DOC_TESTS list not found in tools/doc-gate.sh")
+        listed = set(m.group(1).split())
+        reading = {p.stem for p in Path(HERE).glob("test_*.py")
+                   if p.stem != "test_ci" and '"docs"' in p.read_text(encoding="utf-8")}
+        self.assertEqual(sorted(reading - listed), [], "add these to DOC_TESTS in tools/doc-gate.sh")
+        for name in listed:
+            self.assertTrue((Path(HERE) / f"{name}.py").is_file(), f"{name}: no such test file")
 
 
 if __name__ == "__main__":

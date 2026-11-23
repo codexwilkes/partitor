@@ -6,6 +6,17 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.14.1 — 2026-11-23
+
+### Changed
+- Docs: `docs/RELEASING.md` has a table "Gates by kind of change". A change only in `README.md`, `CHANGELOG.md`, `VERSION`, `docs/` or the version line of `lib/partitor/__init__.py` runs `tools/doc-gate.sh` (about 1 minute); the tag waits for green CI. No change in behaviour.
+
+### Added
+- `tools/doc-gate.sh`: the gate for a docs-only change. It refuses a change outside those files, runs the tests that read `docs/` and `tools/check-repo.sh`.
+
+### Tests
+- `tests/test_ci.py`: every test module that reads `docs/` is on the list of `tools/doc-gate.sh`; the script is in the shellcheck step of CI. `MIN_TESTS` 1298.
+
 ## 0.14.0 — 2026-11-23
 
 ### Changed

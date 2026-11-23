@@ -62,6 +62,17 @@ The steps are in the maintainer's release procedure. In short: green CI on `main
 generated docs), all gates on the final tree, one release commit, push, wait for CI, tag, GitHub Release (flag a pre-release),
 attach the Windows setup program with the manual workflow.
 
+## Gates by kind of change
+
+CI runs the full test suite on every push. The local gate depends on what the change touches.
+
+| Change | Local gate | Tag |
+|---|---|---|
+| Only `README.md`, `CHANGELOG.md`, `VERSION`, `docs/` and the version line of `lib/partitor/__init__.py` | `tools/doc-gate.sh` (about 1 minute): the tests that read docs, and `tools/check-repo.sh` | After green CI on the commit |
+| Anything under `lib/`, `tests/` or `tools/`, or a change to the help text (it changes `docs/cli.json` and `docs/COMMANDS.md`) | The full suite, `bash -n` and `shellcheck` for Bash, and the G0 checks | After green CI on the commit |
+
+`tools/doc-gate.sh` refuses a change outside the first row. `tests/test_ci.py` checks that every test that reads `docs/` is on its list.
+
 ## Websites and other readers
 
 A reader that shows "the current version" uses the newest stable release. It may offer the newest pre-release as a separate
