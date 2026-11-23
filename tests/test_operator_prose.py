@@ -10,6 +10,7 @@ from pathlib import Path
 DOCS = Path(__file__).resolve().parent.parent / "docs" / "operator"
 FILES = ["guide.md", "advanced.md", "problems.md"]
 BANNED = [r"\bmeasures?\b", r"\bstave\b", r"\bsounding pitch\b", r"\btranspos\w*", r"\bsound(s|ed) an octave\b"]
+LINE_OK = [r"command-line", r"status line", r"heading line", r"dotted line", r"cue lines?", r"staff lines", r"quoted line", r"`re-flow:` line", r"command line"]
 MAX_PARAGRAPH_WORDS = 120
 GUIDE_MAX_WORDS = 1700
 
@@ -35,6 +36,22 @@ class OperatorProse(unittest.TestCase):
             for pat in BANNED:
                 with self.subTest(file=name, pattern=pat):
                     self.assertIsNone(re.search(pat, body(name), re.I), f"{name}: {pat}")
+
+    def test_no_line_for_a_system(self):
+        """A row of music is a system. `line` stays for the text kinds listed in LINE_OK."""
+        for name in FILES:
+            text = body(name)
+            for ok in LINE_OK:
+                text = re.sub(ok, "", text, flags=re.I)
+            with self.subTest(file=name):
+                self.assertIsNone(re.search(r"\blines?\b", text, re.I), f"{name}: {re.search(r'.{30}lines?.{20}', text, re.I | re.S)}")
+
+    def test_bars_help_says_system(self):
+        src = (DOCS.parent.parent / "lib" / "partitor" / "cli_bars.py").read_text(encoding="utf-8")
+        texts = re.findall(r'^BARS_(?:HELP|EXAMPLE) = """\\\n(.*?)"""', src, re.S | re.M)
+        self.assertEqual(len(texts), 2)
+        for txt in texts:
+            self.assertIsNone(re.search(r"\bline\b|\blines\b", txt, re.I))
 
     def test_paragraphs_are_short(self):
         for name in FILES:

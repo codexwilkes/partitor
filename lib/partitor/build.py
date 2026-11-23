@@ -273,7 +273,7 @@ def cmd_detect(a: argparse.Namespace) -> int:
         _warn(f"bars:  {mismatch_text(m)}")
         _note("Check the proof. The parts follow the source score unless you say "
               "otherwise: partitor bars <id> (k keeps the printed numbers; j / a mend "
-              "a misread barline)")
+              "a misread barline; f N=B sets the number of system N)")
     nrep = sum(len(e.get("repeats") or []) for e in entries)
     if nrep:
         _ok(f"repeats:  {nrep} repeat sign(s); rehearsal letters "
@@ -472,7 +472,7 @@ def cmd_build(a: argparse.Namespace) -> int:
             _fail(f"bars:  {mismatch_text(m)}")
         _note("The parts follow the source score only when you confirm it. Run: "
               "partitor bars <id>  (k N keeps the printed numbers; j / a mend a "
-              "misread barline)")
+              "misread barline; f N=B sets the number of system N)")
         return _summary(start)
     for k_, s_ in enumerate(eff_sys):
         nb_ = int(s_.get("bars") or 0)
@@ -825,14 +825,14 @@ def cmd_build(a: argparse.Namespace) -> int:
                **({"group": True} if extra.get("members") else {}),
                **({"pins_dropped": True} if pins_dropped else {})}
         flow = f" (re-flowed from {nsrc})" if opts.get("reflow") == "on" else ""
-        _ok(f"{name}:  {len(strips)} lines{flow}  {n} page(s)  staff {h_mm:.1f} mm  "
+        _ok(f"{name}:  {len(strips)} systems{flow}  {n} page(s)  staff {h_mm:.1f} mm  "
             f"gap {g:.2f} sp  -> {fn}")
         if rec.get("foldout"):
             _note(f"{name}: {sheet_text(opts['paper'], rec['foldouts'])}: print and assemble as in "
                   f"{rec['assemble']}")
         if (opts.get("reflow_offer") == "on" and opts.get("reflow") != "on"
                 and h_mm < opts["small_mm"] and h_width < opts["small_mm"]):
-            _note(f"{name}: small print ({h_mm:.1f} mm, held by the source line width): "
+            _note(f"{name}: small print ({h_mm:.1f} mm, held by the source system width): "
                   f"re-flow can give up to {opts['max_staff_mm']:.0f} mm (--reflow on)")
         return rec
 
@@ -968,7 +968,7 @@ def run_build(item: Path, only: list[str] | None = None, jobs: str | None = None
         for r in new:
             if r.pop("pins_dropped", False):
                 set_pins(data, r["part"], [])
-                _note(f"pages:  {r['part']}: the lines changed, so the page ends kept by "
+                _note(f"pages:  {r['part']}: the systems changed, so the page ends kept by "
                       "`pages --move` (pins) are dropped; your breaks stay")
         if only:
             left = [x for x in data.get("pending") or []
@@ -1017,7 +1017,7 @@ def _rebuild_report(item: Path, before: dict | None, only: list[str] | None = No
 
 def small_parts(data: dict, only: list[str] | None = None) -> list[dict]:
     """Built parts and groups with small print that re-flow can enlarge:
-    staff below small_mm because the source line width holds it, re-flow
+    staff below small_mm because the source system width holds it, re-flow
     off (for the item and for the part). only: those names only (a build
     of some parts)."""
     b = (data.get("built") or {}).get("parts") or []

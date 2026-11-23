@@ -76,7 +76,7 @@ def rest_table(item, data: dict, target: str) -> list[str]:
     try:
         strips = load_lines(lines_path(item / "lines", target))["strips"]
     except (ValueError, OSError):
-        return [f"{DIM}(no built lines of {target} yet: rebuild, then the long rests are listed){RST}"]
+        return [f"{DIM}(no built systems of {target} yet: rebuild, then the long rests are listed){RST}"]
     marks = cues.letter_bars(data)
     out = []
     for first, last, n in cues.long_rests(strips, LONG_REST_BARS):

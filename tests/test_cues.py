@@ -960,7 +960,7 @@ class TestCueCommands(unittest.TestCase):
 
     def test_a_table_without_built_lines_says_so(self):
         text = "\n".join(cli_cues.rest_table(self.item, pt.load_item(self.item), "Bass"))
-        self.assertIn("no built lines", text)
+        self.assertIn("no built systems", text)
 
 
 class TestSavedLines(unittest.TestCase):

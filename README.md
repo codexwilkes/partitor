@@ -20,9 +20,9 @@ Status: early public release. It works for the author, on one setup. Read
   trombones). You can join or split parts as you like.
 - Large print: big staves and a calm layout. A second, larger copy
   (11 x 17 in, or A3) is made next to the normal one.
-- Bar numbers on every line, and the rehearsal marks of the score, so the
+- Bar numbers at the start of every system, and the rehearsal marks of the score, so the
   conductor's "from bar 45" works for you too.
-- The lowest and highest note of the part is printed on the first line, so you
+- The lowest and highest note of the part is printed on the first system, so you
   can see at once if the part fits your instrument or your voice.
 - Multi-bar rests are joined, so systems are shorter and the part has fewer pages.
 - Cue lines: a small staff of another voice, or a word such as "Canto", above a
@@ -83,7 +83,7 @@ for you. No questions.
 ```bash
 sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.13.4
+cd /opt/partitor && sudo git checkout --detach 0.14.0
 sudo bin/partitor-quick-install
 ```
 

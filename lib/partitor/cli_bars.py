@@ -35,8 +35,8 @@ def confirm_bar_mismatches(item: Path) -> None:
         if yes(f"{m['id']}: keep the printed numbers (the source's own numbering)?"):
             ack.append(m["key"])
         else:
-            _note(f"{m['id']}: left open. Mend the barlines (partitor bars: j join, a add) "
-                  "or keep the printed numbers (k); the build stops until then")
+            _note(f"{m['id']}: left open. Mend the barlines (partitor bars: j join, a add), "
+                  "keep the printed numbers (k), or set the number (f N=B); the build stops until then")
     if ack != list(rules.get("bars_ack") or []):
         rules["bars_ack"] = ack
         data["bar_rules"] = rules
@@ -82,44 +82,44 @@ def confirm_bar_rules(item: Path) -> None:
 STUB_SP = 8.0     # a first bar this narrow (a clef, no music) before a repeat start is a stub
 
 BARS_HELP = """\
-  Line numbers (N) are the numbers in the list. Bars of a line (I): b N lists them.
+  System numbers (N) are the numbers in the list. Bars of a system (I): b N lists them.
   NUMBERS
-    k N        keep the printed numbers of the source at line N (when the count
+    k N        keep the printed numbers of the source at system N (when the count
                and the source differ and the source is right)
-    f N=B      line N starts at bar B; the lines after it follow (f N= clears)
-    p N        pickup: the movement that starts at line N begins at bar 0
-    i N        incipit: the first bar of the movement at line N shows the original
+    f N=B      system N starts at bar B; the systems after it follow (f N= clears)
+    p N        pickup: the movement that starts at system N begins at bar 0
+    i N        incipit: the first bar of the movement at system N shows the original
                notation. It stays in the part with no number; the next bar is 1.
-               (p and i on the same line replace each other; the same command = off)
-    s N I      bar I of line N completes the bar before it: both keep one number
-               (a bar cut by a line break, a repeat sign or a change of mensuration).
+               (p and i on the same system replace each other; the same command = off)
+    s N I      bar I of system N completes the bar before it: both keep one number
+               (a bar cut by a system break, a repeat sign or a change of mensuration).
                The same command again = off.   s K  = bar after repeat sign K (below)
   BARLINES (when the proof shows a wrong barline: v)
-    j N I      join bar I of line N with the next (remove a false barline).
+    j N I      join bar I of system N with the next (remove a false barline).
                A clef stub before a repeat sign (a first bar under 8 sp wide):
                j N 1 - the repeat sign stays.
-    a N I [P]  add a barline in bar I of line N, P % from its left edge (50)
-    u N        undo the last j / a of line N         b N   list the bars of line N
+    a N I [P]  add a barline in bar I of system N, P % from its left edge (50)
+    u N        undo the last j / a of system N         b N   list the bars of system N
   REHEARSAL LETTERS (A, B, ... in bar order in each movement)
     m B [B..]  letter on/off at bar number B (the first bar with that number)
-    m N:I      letter on/off at bar I of line N (for a number two bars share)
+    m N:I      letter on/off at bar I of system N (for a number two bars share)
   CHECK
     v [N]      draw proof.pdf now with these edits (not saved yet): bar numbers
                in magenta above the top staff, a tick at each barline, boxed
-               letters. N: tells the proof page of line N.
+               letters. N: tells the proof page of system N.
     ?          help with an example            Enter = save and finish
 """
 
 BARS_EXAMPLE = """\
-  Example: the last bar of line 21 (p7.s4) is a half bar. Its other half is the
-  first bar after the clef and the repeat sign on line 22 (p8.s1, a new
-  mensuration). Both halves are bar 48. A letter E marks the start of line 22.
+  Example: the last bar of system 21 (p7.s4) is a half bar. Its other half is the
+  first bar after the clef and the repeat sign on system 22 (p8.s1, a new
+  mensuration). Both halves are bar 48. A letter E marks the start of system 22.
     b 22      bar 1 is only 5.7 sp wide: a clef stub, not a bar
     j 22 1    join the stub with the next bar (the repeat sign stays)
-    s 22 1    bar 1 of line 22 completes the bar before it (both are 48)
-    m 22:1    letter at bar 1 of line 22 (m 48 would mark the half bar of line 21)
+    s 22 1    bar 1 of system 22 completes the bar before it (both are 48)
+    m 22:1    letter at bar 1 of system 22 (m 48 would mark the half bar of system 21)
     m 22:2    the automatic letter after a repeat sign now stands on bar 2 of
-              line 22 (the first full bar): remove it. The list below each m
+              system 22 (the first full bar): remove it. The list below each m
               shows where the letters stand.
     v         draw proof.pdf, look at the proof page, then Enter to save
 """
@@ -153,7 +153,7 @@ def bars_listing(sy: dict, ef: dict, rules: dict, ln: int) -> list[str]:
     printed = {int(a[0]): int(a[1]) for a in ef.get("anchors") or []}
     marks = {int(m[0]): m[1] for m in sy.get("marks") or []}
     raw, cur = int(sy.get("bars") or 0), int(ef.get("bars") or 0)
-    out = [f"line {ln} {sy['id']}: {cur} bar(s)"
+    out = [f"system {ln} {sy['id']}: {cur} bar(s)"
            + (f" (detected {raw})" if raw != cur else "")]
     for i, num in enumerate(nums):
         tags = []
@@ -183,7 +183,7 @@ def _line(arg: str, n: int) -> int:
 
 @locks_item
 def cmd_bars(a: argparse.Namespace) -> int:
-    """bars <id>: set pickups, split bars, barlines, line-start numbers and
+    """bars <id>: set pickups, split bars, barlines, system-start numbers and
     rehearsal letters by hand; saved, not built. v draws proof.pdf with the
     unsaved edits. Each line: one key and a value."""
     start = time.monotonic()
@@ -238,13 +238,13 @@ def cmd_bars(a: argparse.Namespace) -> int:
                 print(f"  {YLW}The barline count and the printed numbers of the source differ:{RST}")
                 for m in ms:
                     ln_ = line_of.get(m['id'], '?')
-                    print(f"     line {ln_}: {mismatch_text(m)}")
+                    print(f"     system {ln_}: {mismatch_text(m)}")
                     ef_ = eff[ln_ - 1] if isinstance(ln_, int) else {}
                     if ef_ and stub_bar(ef_):
                         print(f"     its first bar is only {float(ef_['widths'][0]):g} sp wide "
                               f"(a clef before a repeat sign, no music): j {ln_} 1 joins it")
                 print("     The parts should follow the source. k N keeps the printed numbers; "
-                      "j / a mend a barline; s N I joins the two halves of a split bar. "
+                      "j / a mend a barline; f N=B sets the number of system N; s N I joins the two halves of a split bar. "
                       "The build stops until each is settled. ? = help with an example.")
             print(BARS_HELP, end="")
             if cands:
@@ -268,13 +268,13 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     g_ = (systems[ln_ - 1].get("geom") or {}).get("page") if ln_ else None
                     first_ = (_proof_pages(data) or [1])[0]
                     _ok("proof.pdf drawn with the edits (not saved yet)"
-                        + (f": line {ln_} is on proof page {int(g_) - first_ + 1} "
+                        + (f": system {ln_} is on proof page {int(g_) - first_ + 1} "
                            f"(source page {g_})" if g_ else ""))
                     continue
                 if op == "p":
                     sid = systems[_line(arg, len(systems)) - 1]["id"]
                     if sid not in movement_first:
-                        print(f"     {YLW}line {arg} does not start a movement{RST}")
+                        print(f"     {YLW}system {arg} does not start a movement{RST}")
                         continue
                     if sid in rules["incipit"]:
                         rules["incipit"].remove(sid)
@@ -285,7 +285,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                 elif op == "i":
                     sid = systems[_line(arg, len(systems)) - 1]["id"]
                     if sid not in movement_first:
-                        print(f"     {YLW}line {arg} does not start a movement{RST}")
+                        print(f"     {YLW}system {arg} does not start a movement{RST}")
                         continue
                     if sid in rules["pickup"]:
                         rules["pickup"].remove(sid)
@@ -295,18 +295,18 @@ def cmd_bars(a: argparse.Namespace) -> int:
                         rules["incipit"].append(sid)
                 elif op == "s":
                     w_ = arg.split()
-                    if len(w_) == 2:                       # s N I: bar I of line N
+                    if len(w_) == 2:                       # s N I: bar I of system N
                         ln, i = _line(w_[0], len(systems)), int(w_[1])
                         sy, ef = systems[ln - 1], eff[ln - 1]
                         cur = int(ef.get("bars") or 0)
                         if not 1 <= i <= cur:
-                            print(f"     {YLW}line {ln} has {cur} bar(s): bar 1-{cur}{RST}")
+                            print(f"     {YLW}system {ln} has {cur} bar(s): bar 1-{cur}{RST}")
                             continue
                         if i == 1 and (ln == 1 or sy.get("restart")):
-                            print(f"     {YLW}line {ln} starts a movement: no bar before it{RST}")
+                            print(f"     {YLW}system {ln} starts a movement: no bar before it{RST}")
                             continue
                         if i == 2 and stub_bar(ef):
-                            print(f"     {YLW}bar 1 of line {ln} is a clef stub: join it first "
+                            print(f"     {YLW}bar 1 of system {ln} is a clef stub: join it first "
                                   f"(j {ln} 1), then s {ln} 1{RST}")
                             continue
                         key = f"{sy['id']}:{i - 1}"
@@ -331,7 +331,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                             if int(i) < 1:
                                 raise ValueError(w_)
                             tgt = (systems[ln - 1]["id"], int(i) - 1)
-                            label = f"bar {int(i)} of line {ln}"
+                            label = f"bar {int(i)} of system {ln}"
                         else:
                             tgt, label = int(w_), f"bar {int(w_)}"
                         try:
@@ -346,7 +346,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                         renumber(data)          # the next bar sees the new letters
                         changed = True
                         print("     letters now: " + (", ".join(
-                            f"{m_[1]} = bar {e_['bar_nums'][m_[0]]} (line {n_}, bar {m_[0] + 1})"
+                            f"{m_[1]} = bar {e_['bar_nums'][m_[0]]} (system {n_}, bar {m_[0] + 1})"
                             for n_, e_ in enumerate(systems, 1) for m_ in e_.get("marks") or []
                             if m_[0] < len(e_.get("bar_nums") or [])) or "none"))
                 elif op in ("j", "a"):
@@ -357,7 +357,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     cur = int(eff[ln - 1].get("bars") or 0)
                     if op == "j":
                         if not 1 <= n <= cur - 1:
-                            print(f"     {YLW}line {ln} has {cur} bar(s): join needs a bar "
+                            print(f"     {YLW}system {ln} has {cur} bar(s): join needs a bar "
                                   f"1-{cur - 1}{RST}")
                             continue
                         if n == 1 and stub_bar(eff[ln - 1]):
@@ -367,7 +367,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     else:
                         pc = int(w_[2]) if len(w_) > 2 else 50
                         if not 1 <= n <= cur or not 5 <= pc <= 95:
-                            print(f"     {YLW}line {ln} has {cur} bar(s); place 5-95 %{RST}")
+                            print(f"     {YLW}system {ln} has {cur} bar(s); place 5-95 %{RST}")
                             continue
                         rules["bar_edits"].append(format_bar_edit(sy["id"], "a", n, raw, pc))
                 elif op == "u":
@@ -375,7 +375,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     mine = [t for t in rules["bar_edits"]
                             if parse_bar_edit(t) and parse_bar_edit(t)["sid"] == sid]
                     if not mine:
-                        print(f"     {YLW}no bar edit on line {arg}{RST}")
+                        print(f"     {YLW}no bar edit on system {arg}{RST}")
                         continue
                     rules["bar_edits"].remove(mine[-1])
                 elif op == "b":
@@ -387,7 +387,7 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     sid = systems[_line(arg, len(systems)) - 1]["id"]
                     hit = [m for m in ms if m["id"] == sid]
                     if not hit:
-                        print(f"     {YLW}no difference at line {arg}{RST}")
+                        print(f"     {YLW}no difference at system {arg}{RST}")
                         continue
                     rules["bars_ack"].extend(m["key"] for m in hit)
                 elif op == "f":

@@ -1,5 +1,5 @@
 {
- "version": "0.13.4",
+ "version": "0.14.0",
  "commands": [
   {
    "name": "menu",
@@ -153,7 +153,7 @@
   },
   {
    "name": "repage",
-   "help": "new page breaks from the saved lines: turns while resting, manual breaks (no analysis, no build)",
+   "help": "new page breaks from the saved systems: turns while resting, manual breaks (no analysis, no build)",
    "args": [
     {
      "flags": [
@@ -356,7 +356,7 @@
      ],
      "help": "3=97-98 (voice and bars; options after, in one quoted line: \"3=97-98 fit sync=3\") or \"Canto\"=97 (a word)",
      "positional": true,
-     "metavar": "LINE"
+     "metavar": "ENTRY"
     },
     {
      "flags": [
@@ -646,7 +646,7 @@
      "flags": [
       "--clearance"
      ],
-     "help": "least space between the ink of two lines, in staff spaces (1)"
+     "help": "least space between the ink of two systems, in staff spaces (1)"
     },
     {
      "flags": [
@@ -674,7 +674,7 @@
      "flags": [
       "--bar-numbers"
      ],
-     "help": "bar number at each line start, or none (start)",
+     "help": "bar number at each system start, or none (start)",
      "choices": [
       "start",
       "none"
@@ -741,7 +741,7 @@
      "flags": [
       "--reflow"
      ],
-     "help": "cut new lines at barlines for a larger staff (off; on hold)",
+     "help": "cut new systems at barlines for a larger staff (off; on hold)",
      "choices": [
       "on",
       "off"

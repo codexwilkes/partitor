@@ -478,7 +478,7 @@ def offer_reflow(item: Path, only: list[str] | None = None) -> None:
     parts/ as it was. only: after a build of some parts or groups
     (0.3.0-dev.34): the offer covers those and sets `Name:reflow=on` for
     them, not the item; the trial builds only them. A group's pages grow
-    faster than a part's (several staves per line): its page budget is
+    faster than a part's (several staves per system): its page budget is
     GROUP_REFLOW_PAGES times the pages without re-flow (`pages=N` changes it)."""
     from . import build
     from .build import _size_summary, build_report, small_parts
@@ -492,11 +492,11 @@ def offer_reflow(item: Path, only: list[str] | None = None) -> None:
     s0, c0 = _size_summary(data["built"], names)
     _head("Small print")
     print(f"     {', '.join(p['part'] for p in small)}: staff {s0:.1f} mm. The source "
-          "lines are long, so the page width holds the size.")
-    print(f"     Re-flow cuts lines at barlines (clef and key copied to each line): "
+          "systems are long, so the page width holds the size.")
+    print(f"     Re-flow cuts systems at barlines (clef and key copied to each system): "
           f"up to {lay['max_staff_mm']:.0f} mm, more pages.")
     if any(p.get("group") for p in small):
-        print(f"     A group has several staves per line, so its pages grow faster: its "
+        print(f"     A group has several staves per system, so its pages grow faster: its "
               f"page budget is {GROUP_REFLOW_PAGES:g} x the pages now "
               "(set \"Name:pages=N\" to change it).")
     before = data                       # layout, pending and built as they were
@@ -649,7 +649,7 @@ def plan_rows(opts_list: list, old: dict, lay: dict, show_all: bool = True) -> l
         c = o.counts
         note = ", ".join(x for x in ("best" if o.n in best else "", "re-flow" if o.reflow else "",
                                      "no title page" if not o.title_page else "",
-                                     f"{len(o.lost)} break(s) end no line" if o.lost else "") if x)
+                                     f"{len(o.lost)} break(s) end no system" if o.lost else "") if x)
         out.append(f"{mark} {o.n:>2}  {o.paper:<6} {o.staff_mm:>4.1f} mm {o.pages:>5} {c.get('rest', 0):>5} "
                    f"{c.get('rest1', 0):>5} {c.get('attacca', 0):>7} {o.folds:>8} "
                    f"{c.get('bad', 0) + c.get('bridge', 0):>4}  {note}")
@@ -716,7 +716,7 @@ def plan_table(item: Path, data: dict, built: dict, nm: str, trial: bool = False
         _warn(f"plan:  {nm}: {e}")
         src = None
     if src is None and not any(s.bars_x for s in pl["strips"]):
-        _warn(f"plan:  {nm}: no plan data and the saved lines are re-flowed: rebuild the part once "
+        _warn(f"plan:  {nm}: no plan data and the saved systems are re-flowed: rebuild the part once "
               f"(partitor rebuild {data['id']} {nm})")
         return None
     if lay.get("duplex") == "off":
@@ -857,7 +857,7 @@ def cmd_pages(a: argparse.Namespace) -> int:
     try:
         rows = report()
     except ValueError as e:
-        _die(f"pages: {nm}: {e}", "Rebuild the part once to save its lines")
+        _die(f"pages: {nm}: {e}", "Rebuild the part once to save its systems")
     moves = list(getattr(a, "move", None) or [])
     if len(moves) > 1:
         _die("pages: one --move for each call", "Each move changes the pages after it: look at the table, then move again")
@@ -1012,7 +1012,7 @@ def cmd_plan(a: argparse.Namespace) -> int:
             except ValueError as e:
                 _die(f"plan: {e}")
             if part_layout(data, nm).get("breaks"):
-                _warn(f"plan:  {nm}: manual page breaks are kept, but bar numbers may no longer end a line "
+                _warn(f"plan:  {nm}: manual page breaks are kept, but bar numbers may no longer end a system "
                       f"at this size. Check: partitor pages {data['id']} {nm}   Drop them: partitor pages "
                       f"{data['id']} {nm} --clear")
             mark_pending(data, *(c.split(": ")[0] for c in changes))
@@ -1023,7 +1023,7 @@ def cmd_plan(a: argparse.Namespace) -> int:
                 _note(f"plan:  {nm}: needs " + sheet_text(chosen.paper, chosen.folds)
                       + "; the build writes the print and assembly steps to a text file next to the PDFs")
     if pick is None:
-        _note("estimates from the lines of the last build (no per-staff rests: bridgeable turns are not "
+        _note("estimates from the systems of the last build (no per-staff rests: bridgeable turns are not "
               "counted); a build gives the real numbers. * = as built; best = fewest turns while playing, "
               "then the largest staff, then the fewest fold-outs (one per paper)")
         _note(f"Set an option: partitor plan {data['id']} PART N    then: partitor rebuild {data['id']}")
@@ -1086,7 +1086,7 @@ def cmd_repage(a: argparse.Namespace) -> int:
             o["_pins"] = list(pin["bars"])
         elif pin:                                   # made for other lines (0.8.39)
             set_pins(data, nm, [])
-            _note(f"pages:  {nm}: the lines changed, so the page ends kept by `pages --move` (pins) "
+            _note(f"pages:  {nm}: the systems changed, so the page ends kept by `pages --move` (pins) "
                   "are dropped; your breaks stay")
         lib_logo = library_logo(library_root())
         if lib_logo:
@@ -1118,7 +1118,7 @@ def cmd_repage(a: argparse.Namespace) -> int:
         done.append(nm)
     if not done:
         shutil.rmtree(stage, ignore_errors=True)
-        _fail("repage:  nothing done (rebuild the parts once to save their lines)")
+        _fail("repage:  nothing done (rebuild the parts once to save their systems)")
         return _summary(start)
     for nm, tl in report:
         _head(f"Turns: {nm}")

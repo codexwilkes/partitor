@@ -175,7 +175,7 @@ def step_size(data: dict, bigger: bool, part: str | None = None
             return [f"{pre}pages={pages + 1}"], "larger staff on one more page"
         if lay.get("reflow") != "on" and any(
                 p.get("width_mm", 99.0) < lay["max_staff_mm"] - 0.05 for p in b):
-            return [f"{pre}reflow=on"], "staff held by the source line width; lines re-flowed"
+            return [f"{pre}reflow=on"], "staff held by the source system width; systems re-flowed"
         if lay["gap"] < GAP_MAX:
             return [f"{pre}gap={min(GAP_MAX, lay['gap'] + 1)}"], "staff at full width; more space"
         raise ValueError("at the largest size and gap")

@@ -39,13 +39,13 @@ A dropped system counts no bars. The proof marks it “dropped”. Every later a
 |---|---|
 | `p 1` | pickup on or off |
 | `i 1` | incipit on or off |
-| `s 22 1` | bar 1 of line 22 completes the bar before it (a bar split over a line break keeps one number) |
-| `f 3=16` | line 3 starts at bar 16 |
+| `s 22 1` | bar 1 of system 22 completes the bar before it (a bar split over a system break keeps one number) |
+| `f 3=16` | system 3 starts at bar 16 |
 | `j 4 1` | join a false barline |
-| `b 4` | list the bars of line 4 |
+| `b 4` | list the bars of system 4 |
 | `m 95` | rehearsal mark at bar 95, on or off |
 | `m 95 110 120` | several marks |
-| `m 22:1` | mark at bar 1 of line 22. Letters follow in bar order |
+| `m 22:1` | mark at bar 1 of system 22. Letters follow in bar order |
 | `?` | help, with an example |
 | <kbd>v</kbd> | draw the proof with the edits. Open it, then press <kbd>Enter</kbd> to save |
 
@@ -67,9 +67,9 @@ A cue is a small staff of another voice above a rest, or a word. Nothing is adde
 
 1. Press <kbd>u</kbd> (`u Trombones` for one part or group).
 2. Pick the part that gets the cue. The table shows its long rests.
-3. Type a line, for example `3=97-98`.
+3. Type an entry, for example `3=97-98`.
 
-| Line | Result |
+| Entry | Result |
 |---|---|
 | `3=97-98` | the music of part 3 (number or name), bars 97 to 98, from the same bars of the source. One bar: `3=97` |
 | `"Canto"=97` | the word, at bar 97 |
@@ -100,8 +100,8 @@ Command-line forms:
 
 | Command | Does |
 |---|---|
-| `partitor cues ID [PART]` | the same as <kbd>u</kbd>: shows the long rests of one part or group, then asks for lines (interactive) |
-| `partitor cue ID LINE... --parts LIST` | the same lines for several parts or groups, by name or number, comma separated. Saved, not built. Put options after the bars in one quoted line: `partitor cue ID "3=97-98 fit sync=3" --parts Tenore,5` |
+| `partitor cues ID [PART]` | the same as <kbd>u</kbd>: shows the long rests of one part or group, then asks for entries (interactive) |
+| `partitor cue ID ENTRY... --parts LIST` | the same entries for several parts or groups, by name or number, comma separated. Saved, not built. Put options after the bars in one quoted line: `partitor cue ID "3=97-98 fit sync=3" --parts Tenore,5` |
 
 ## Ambitus {#ambitus eyebrow="Menu key k"}
 
@@ -122,9 +122,9 @@ Pick a part. Type its range (`F3-A4`), `auto`, `off` or `on`. <kbd>Enter</kbd> k
 | `Trombones:group_gap=5` | staff spaces between the staves of a group |
 | `reflow=on` | re-flow (see below) |
 
-**Ledger** (`paper=ledger`): 17×11 in, landscape, staff up to 8 mm (Letter: 3.6–3.8 mm on long lines). Systems are 2.2 times as wide, so there are about twice as many pages. There is no large-print copy. Print double-sided, flip on the short edge. Two-page spreads are wide: check your stand.
+**Ledger** (`paper=ledger`): 17×11 in, landscape, staff up to 8 mm (Letter: 3.6–3.8 mm on long systems). Systems are 2.2 times as wide, so there are about twice as many pages. There is no large-print copy. Print double-sided, flip on the short edge. Two-page spreads are wide: check your stand.
 
-**Re-flow** (experimental, off by default): when the lines of the score are long, partitor offers to cut them at barlines, with the clef copied, for a staff up to 8 mm on more pages. It shows the size and pages before and after. You keep it or not. A group is cut only at barlines that all its staves have, and stays within 1.5 times its pages unless you set `pages`. The build prints a `re-flow:` line: how many lines can be cut, and why the others stay whole.
+**Re-flow** (experimental, off by default): when the systems of the score are long, partitor offers to cut them at barlines, with the clef copied, for a staff up to 8 mm on more pages. It shows the size and pages before and after. You keep it or not. A group is cut only at barlines that all its staves have, and stays within 1.5 times its pages unless you set `pages`. The build prints a `re-flow:` line: how many systems can be cut, and why the others stay whole.
 
 ## Page turns {#turns eyebrow="Menu keys f, l, x"}
 

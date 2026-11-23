@@ -803,7 +803,7 @@ def reflow_report(strips: list[Strip], pre: list) -> str:
     kinds: dict[str, int] = {}
     for i in whole:
         kinds[why[i]] = kinds.get(why[i], 0) + 1
-    txt = f"re-flow: {len(strips) - len(whole)} of {len(strips)} lines can be cut"
+    txt = f"re-flow: {len(strips) - len(whole)} of {len(strips)} systems can be cut"
     if not whole:
         return txt
     txt += "; whole: " + ", ".join(f"{n} {k}" for k, n in sorted(kinds.items(), key=lambda t: -t[1]))
@@ -811,8 +811,8 @@ def reflow_report(strips: list[Strip], pre: list) -> str:
     w = max((i for i in whole if strips[i].rest_src is None),
             key=lambda i: strips[i].img.shape[1], default=None)
     if w is not None:
-        txt += (f"; widest whole line {strips[w].img.shape[1] / sp:.0f} sp "
-                f"(line {w + 1}: {why[w]})")
+        txt += (f"; widest whole system {strips[w].img.shape[1] / sp:.0f} sp "
+                f"(system {w + 1}: {why[w]})")
     return txt
 
 

@@ -716,7 +716,7 @@ class TestRestsAndTitles(unittest.TestCase):
             lp.write_text(yaml.safe_dump(lay, sort_keys=False))
             r = run("build", pdf, "--large", "off")
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-            self.assertIn("Bass:  2 lines", r.stdout)
+            self.assertIn("Bass:  2 systems", r.stdout)
             text = pymupdf.open(Path(d, "s.partitor", "parts", "03-Bass.pdf"))[0].get_text()
             want = pt.rest_text(str(nb))[0]          # Bravura time-signature digits
             self.assertIn(want, text.split())
@@ -1333,8 +1333,8 @@ class TestGroupReflow(unittest.TestCase):
         ls = self.lines() + [group_line([(75, 20)], [105], width=300, why="no barline in the system")]
         ls[-1].ends_at_bar = False
         txt = pt.reflow_report(ls, pt.find_prefixes(ls))
-        self.assertIn("3 of 4 lines can be cut", txt)
-        self.assertIn("widest whole line 30 sp (line 4: no barline in the system)", txt)
+        self.assertIn("3 of 4 systems can be cut", txt)
+        self.assertIn("widest whole system 30 sp (system 4: no barline in the system)", txt)
 
     def test_small_parts_sees_groups_and_per_part_reflow(self):
         built = {"layout": {"parts": {"G": {"reflow": "on"}}}, "built": {"parts": [
@@ -1407,8 +1407,8 @@ class TestGroupReflowReal(unittest.TestCase):
         args = ("--reflow", "on", "--max-staff-mm", "12", "--page-count", "3")
         with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
             txt, f1 = self.run_build(a, 2, 1, *args)
-            self.assertIn("G:  3 lines (re-flowed from 2)", txt)
-            self.assertIn("G: re-flow: 2 of 2 lines can be cut", txt)
+            self.assertIn("G:  3 systems (re-flowed from 2)", txt)
+            self.assertIn("G: re-flow: 2 of 2 systems can be cut", txt)
             _, f2 = self.run_build(b, 2, 2, *args)
             self.assertEqual(self.sig(f1), self.sig(f2))
 
@@ -1459,7 +1459,7 @@ class TestGroupReflowReal(unittest.TestCase):
         with tempfile.TemporaryDirectory() as a:
             txt, _ = self.run_build(a, 1, 1, "--reflow", "on")      # one line: nothing to cut
             self.assertIn("G: page budget", txt)
-            self.assertIn("G: re-flow: 0 of 1 lines can be cut; whole: 1 no clef and key prefix found", txt)
+            self.assertIn("G: re-flow: 0 of 1 systems can be cut; whole: 1 no clef and key prefix found", txt)
 
 
 @needs_deps

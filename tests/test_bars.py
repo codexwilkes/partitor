@@ -416,7 +416,7 @@ class TestHalfBarOverStub(unittest.TestCase):
         pt.renumber(lay)
         eff = pt.effective_systems(lay["systems"], lay["bar_rules"])
         txt = "\n".join(pt.bars_listing(lay["systems"][2], eff[2], lay["bar_rules"], 3))
-        self.assertIn("line 3 p2.s1: 3 bar(s) (detected 4)", txt)
+        self.assertIn("system 3 p2.s1: 3 bar(s) (detected 4)", txt)
         self.assertIn("1: bar 6  width 38.4   completes the bar before it", txt)
         self.assertIn("3: bar 8  width 37   source prints 8", txt)
         raw = "\n".join(pt.bars_listing(lay["systems"][2], half_bar_like()[2], {}, 3))
@@ -651,7 +651,7 @@ class TestBarRules(unittest.TestCase):
                                capture_output=True, text=True, env=env, timeout=120)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             self.assertIn("(incipit)", r.stdout)
-            self.assertIn("line 2 does not start a movement", r.stdout)
+            self.assertIn("system 2 does not start a movement", r.stdout)
             self.assertEqual(pt.load_item(item)["bar_rules"]["incipit"], ["p1.s1"])
             r = subprocess.run([sys.executable, SRC, "bars", "4"], input="p 1\n\n",
                                capture_output=True, text=True, env=env, timeout=120)
@@ -746,12 +746,12 @@ class TestBarRules(unittest.TestCase):
             self.assertIn("join it first (j 3 1)", out)               # s 3 2 refused
             self.assertIn("clef stub joined", out)
             self.assertIn("split on: p2.s1:0 completes the bar before it", out)
-            self.assertIn("mark at bar 1 of line 3: added", out)
-            self.assertIn("mark at bar 2 of line 3: removed", out)
-            self.assertIn("letters now: A = bar 6 (line 3, bar 1)", out)
-            self.assertIn("proof.pdf drawn with the edits (not saved yet): line 3 is on proof page 2",
+            self.assertIn("mark at bar 1 of system 3: added", out)
+            self.assertIn("mark at bar 2 of system 3: removed", out)
+            self.assertIn("letters now: A = bar 6 (system 3, bar 1)", out)
+            self.assertIn("proof.pdf drawn with the edits (not saved yet): system 3 is on proof page 2",
                           out)
-            self.assertIn("Example: the last bar of line 21", out)    # ? prints the example
+            self.assertIn("Example: the last bar of system 21", out)    # ? prints the example
             self.assertIn("NUMBERS", out)                             # the help text
             data = pt.load_item(item)
             br = data["bar_rules"]
@@ -769,10 +769,10 @@ class TestBarRules(unittest.TestCase):
                                input="s 1 1\ns 3 9\nm 9:1\nm 3:9\nm x\ns\nz\n\n",
                                capture_output=True, text=True, env=env, timeout=120)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-            self.assertIn("line 1 starts a movement: no bar before it", r.stdout)
-            self.assertIn("line 3 has 4 bar(s): bar 1-4", r.stdout)
+            self.assertIn("system 1 starts a movement: no bar before it", r.stdout)
+            self.assertIn("system 3 has 4 bar(s): bar 1-4", r.stdout)
             self.assertIn("not understood: m 9:1", r.stdout)
-            self.assertIn("no bar 9 of line 3", r.stdout)
+            self.assertIn("no bar 9 of system 3", r.stdout)
             self.assertIn("not understood: m x", r.stdout)
             self.assertIn("unknown: z   (? = help)", r.stdout)
             self.assertEqual(pt.load_item(item)["bar_rules"].get("split"), [])

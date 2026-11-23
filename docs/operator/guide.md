@@ -81,7 +81,7 @@ The names come from the printed staff labels. Type one change at a time. Press <
 | `7=-` | no PDF for part 7 (listed as “not extracted”) |
 | `7=+` | makes the PDF for part 7 again |
 | `7+8` | joins part 7 into part 8: one part on two staves |
-| `7=-; 8=Continuo` | several changes in one line |
+| `7=-; 8=Continuo` | several changes in one entry |
 
 ### Choices for the red systems
 
@@ -155,12 +155,12 @@ Press <kbd>v</kbd> in the item menu, or run `partitor show ID`. The wizard shows
      4  Tenor Trombone I  (C4)  — ambitus C3-F4 (by hand)
      7  Continuo  (G2+F4)  — two staves, ambitus none (off)
   group:     Trombones: Alto Trombone, Tenor Trombone I, …
-  bars:      line starts 1, 3, 6, 9 …; letters A (p10.s3)
+  bars:      system starts 1, 3, 6, 9 …; letters A (p10.s3)
   settings:  paper=letter</div>
 
 Check the parts, the groups and the title. If something is wrong, go back to stage 3. Nothing is built yet.
 
-**Ambitus.** The lowest and highest note of each part, printed before the first line. The proof rings them in green, with bar, page and system. Check them. Fix a wrong value with <kbd>k</kbd>.
+**Ambitus.** The lowest and highest note of each part, printed before the first system. The proof rings them in green, with bar, page and system. Check them. Fix a wrong value with <kbd>k</kbd>.
 
 | Status | Means | Next |
 |---|---|---|

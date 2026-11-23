@@ -6,6 +6,16 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.14.0 — 2026-11-23
+
+### Changed
+- BREAKING (messages and help text): a row of music is a "system" everywhere. The bar commands (`partitor bars`, the `b`, `f`, `j`, `a`, `m`, `s`, `u` keys), the build summary, the re-flow report, `--bar-numbers`, `--clearance`, `--reflow` and the saved-systems messages said "line". Scripts that read "N lines" in the build output must read "N systems". The positional name of `partitor cue` is now `ENTRY` (was `LINE`).
+- The bar-number stop of the build, `partitor bars` and the proof wizard name all three answers: `k N` keeps the printed numbers, `j` / `a` mend a barline, `f N=B` sets the number of system N.
+- Docs: the guide, the advanced page, `problems.md` and the README use "system". `problems.md` has a table of the three bar-number answers.
+
+### Tests
+- `tests/test_operator_prose.py`: the operator docs and the bar help do not say "line" for a system.
+
 ## 0.13.4 — 2026-11-23
 
 ### Changed

@@ -117,7 +117,7 @@ html { scroll-behavior: smooth; }
 
 <div class="wrap">
 <header>
-  <span class="eyebrow">partitor 0.13.4</span>
+  <span class="eyebrow">partitor 0.14.0</span>
   <h1>From score to parts</h1>
   <p class="lede">Turn a score PDF into large-print parts. You work in a terminal. Make every change first, review, then build once. Only the build takes long.</p>
 </header>
@@ -236,7 +236,7 @@ html { scroll-behavior: smooth; }
 </tr>
 <tr>
 <td><code>7=-; 8=Continuo</code></td>
-<td>several changes in one line</td>
+<td>several changes in one entry</td>
 </tr>
 </tbody>
 </table></div>
@@ -398,10 +398,10 @@ html { scroll-behavior: smooth; }
      4  Tenor Trombone I  (C4)  — ambitus C3-F4 (by hand)
      7  Continuo  (G2+F4)  — two staves, ambitus none (off)
   group:     Trombones: Alto Trombone, Tenor Trombone I, …
-  bars:      line starts 1, 3, 6, 9 …; letters A (p10.s3)
+  bars:      system starts 1, 3, 6, 9 …; letters A (p10.s3)
   settings:  paper=letter</div>
 <p>Check the parts, the groups and the title. If something is wrong, go back to stage 3. Nothing is built yet.</p>
-<p><strong>Ambitus.</strong> The lowest and highest note of each part, printed before the first line. The proof rings them in green, with bar, page and system. Check them. Fix a wrong value with <kbd>k</kbd>.</p>
+<p><strong>Ambitus.</strong> The lowest and highest note of each part, printed before the first system. The proof rings them in green, with bar, page and system. Check them. Fix a wrong value with <kbd>k</kbd>.</p>
 <div class="tablewrap"><table>
 <thead>
 <tr>
@@ -470,9 +470,9 @@ html { scroll-behavior: smooth; }
       <tr><td>“library folder not readable”</td><td>The folder exists, but your user may not enter it (folder mode or group). Give your user read access (see <code>INSTALL.md</code>: the group <code>partitor</code>), log in again after a change of group, run <code>partitor</code> again.</td></tr>
       <tr><td>“library folder not set up”</td><td>The folder exists but has no <code>inbox</code> and <code>library</code> inside. Run the set-up again (see <code>INSTALL.md</code>), or point partitor at the right folder.</td></tr>
       <tr><td>The wizard stopped (<kbd>q</kbd>, lost connection)</td><td>The item is kept. Open it from the menu and continue; <kbd>r</kbd> asks what is still open.</td></tr>
-      <tr><td>A part is missing on some lines</td><td>Check the red systems on the proof; correct with <kbd>t</kbd> or analyse again with <kbd>y</kbd>.</td></tr>
+      <tr><td>A part is missing on some systems</td><td>Check the red systems on the proof; correct with <kbd>t</kbd> or analyse again with <kbd>y</kbd>.</td></tr>
       <tr><td>A page shows two systems (for example 4 and 13 staves) where the score has one</td><td>Answer <kbd>j</kbd> in the choices, or <code>partitor analyse ID --join p5:4</code>. The bar numbers of that page are then counted once.</td></tr>
-      <tr><td>Bar numbers are off from some line on</td><td><kbd>n</kbd>, then <code>f N=B</code> for the first wrong line.</td></tr>
+      <tr><td>Bar numbers are off from some system on</td><td>Press <kbd>n</kbd>, then use the command that fits. <code>k N</code> keeps the printed numbers of the source at system N, when they are right. <code>j N I</code> removes a misread barline, <code>a N I</code> adds one. <code>f N=B</code> sets system N to bar B; the systems after it count on from there, and a later printed number that disagrees is asked again.</td></tr>
       <tr><td>A part rests for whole systems</td><td>Normal: those bars become one multi-bar rest with the count (for example 14), so the numbers continue.</td></tr>
     </tbody>
   </table></div>
@@ -480,7 +480,7 @@ html { scroll-behavior: smooth; }
 
 <footer>
   <div class="staff" role="presentation"></div>
-  <p>partitor 0.13.4. Install: <code>INSTALL.md</code>; Windows: <code>platforms/windows/README.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Every command: <code>COMMANDS.md</code>. Design: <code>DESIGN.md</code>. Less common features: <a href="advanced.md">Advanced</a>.</p>
+  <p>partitor 0.14.0. Install: <code>INSTALL.md</code>; Windows: <code>platforms/windows/README.md</code>. Storage: <code>STORAGE-LOCAL.md</code>, <code>STORAGE-SMB.md</code>. Every command: <code>COMMANDS.md</code>. Design: <code>DESIGN.md</code>. Less common features: <a href="advanced.md">Advanced</a>.</p>
 </footer>
 </div>
 </body>

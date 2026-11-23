@@ -551,7 +551,7 @@ class TestManualBreaksInPlan(unittest.TestCase):
         src = pt.read_source(self.numbered(24), self.O, 400)
         o = pt.estimate(src, {**self.O, "breaks": [999]}, "letter", 8.0)
         rows = cli_items.plan_rows([dataclasses.replace(o, n=1)], {"staff_mm": 8.0}, {"paper": "letter"})
-        self.assertTrue(any("1 break(s) end no line" in r for r in rows), rows)
+        self.assertTrue(any("1 break(s) end no system" in r for r in rows), rows)
 
     def test_old_plan_data_without_spans_still_loads(self):
         src = pt.read_source(self.numbered(6), self.O, 400)

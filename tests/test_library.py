@@ -313,7 +313,7 @@ class TestPartialBuild(unittest.TestCase):
         self.assertEqual(d["layout"]["parts"]["A"]["breaks"], [5])
         self.assertEqual(pt.part_pins(d, "B")["bars"], [7])               # another part: kept
         self.assertFalse(any("pins_dropped" in r for r in d["built"]["parts"]))
-        self.assertIn("A: the lines changed", out.getvalue())
+        self.assertIn("A: the systems changed", out.getvalue())
 
     def test_set_pins_and_part_pins(self):
         d = {"layout": {}}

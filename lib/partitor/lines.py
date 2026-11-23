@@ -853,7 +853,7 @@ def load_lines(path: Path) -> dict:
         d = _LinesUnpickler(io.BytesIO(raw)).load()
     except (OSError, EOFError, zlib.error, MemoryError, pickle.UnpicklingError, AttributeError,
             ValueError, ImportError, IndexError, TypeError, KeyError) as e:
-        raise ValueError(f"saved lines cannot be read ({path.name}: {e}): rebuild the part")
+        raise ValueError(f"saved systems cannot be read ({path.name}: {e}): rebuild the part")
     cur = strip_fields()
     fields = d.get("fields") if isinstance(d, dict) else None
     missing = [f for f in cur if isinstance(fields, list) and f not in fields]

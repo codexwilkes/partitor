@@ -22,7 +22,7 @@ The folder exists but has no `inbox` and `library` inside. Run the set-up again 
 
 The item is kept. Open it from the menu and continue; <kbd>r</kbd> asks what is still open.
 
-## A part is missing on some lines
+## A part is missing on some systems
 
 Check the red systems on the proof; correct with <kbd>t</kbd> or analyse again with <kbd>y</kbd>.
 
@@ -30,9 +30,9 @@ Check the red systems on the proof; correct with <kbd>t</kbd> or analyse again w
 
 Answer <kbd>j</kbd> in the choices, or `partitor analyse ID --join p5:4`. The bar numbers of that page are then counted once.
 
-## Bar numbers are off from some line on
+## Bar numbers are off from some system on
 
-<kbd>n</kbd>, then `f N=B` for the first wrong line.
+Press <kbd>n</kbd>, then use the command that fits. `k N` keeps the printed numbers of the source at system N, when they are right. `j N I` removes a misread barline, `a N I` adds one. `f N=B` sets system N to bar B; the systems after it count on from there, and a later printed number that disagrees is asked again.
 
 ## A part rests for whole systems
 

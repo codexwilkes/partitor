@@ -20,11 +20,11 @@ from .proof import annotate_proof
 
 
 def bar_summary(data: dict) -> str:
-    """'line starts 0, 7, 14 …; letters A (p8.s2)' for the CLI."""
+    """'system starts 0, 7, 14 …; letters A (p8.s2)' for the CLI."""
     sy = data.get("systems") or []
     starts = ", ".join(str(e.get("bar")) for e in sy[:8]) + (" …" if len(sy) > 8 else "")
     lets = [f"{m[1]} ({e['id']})" for e in sy for m in (e.get("marks") or [])]
-    return f"line starts {starts}" + (f"; letters {', '.join(lets)}" if lets else "")
+    return f"system starts {starts}" + (f"; letters {', '.join(lets)}" if lets else "")
 
 
 def saved(item: Path, a: argparse.Namespace, start: float) -> int:

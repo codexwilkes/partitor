@@ -277,7 +277,7 @@ def plan_parser() -> argparse.ArgumentParser:
     pn = argparse.ArgumentParser(
         prog="partitor plan",
         description="Options of a part: paper, staff size, page turns and fold-outs, estimated "
-                    "from the saved lines (read-only). With a part and a number: set that option "
+                    "from the saved systems (read-only). With a part and a number: set that option "
                     "(saved, not built; then partitor rebuild).")
     pn.add_argument("id", help="12 or 2026-10-0012")
     pn.add_argument("words", nargs="*", metavar="PART [N]",
@@ -379,7 +379,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "first systems of the next page up); the part is paged again")
     pg.add_argument("--clear", action="store_true", help="drop the manual page breaks and the pins of the part")
     pg.add_argument("--dry-run", action="store_true", help="show the pages after --move, save nothing")
-    rp = sub.add_parser("repage", help="new page breaks from the saved lines: turns while "
+    rp = sub.add_parser("repage", help="new page breaks from the saved systems: turns while "
                         "resting, manual breaks (no analysis, no build)")
     rp.add_argument("id", help="12 or 2026-10-0012")
     rp.add_argument("parts", nargs="*", metavar="PART",
@@ -407,11 +407,11 @@ def build_parser() -> argparse.ArgumentParser:
     cu.add_argument("part", nargs="?", help="one part or group (default: choose in the menu)")
     cu.add_argument("--build", action="store_true", help="build after the edit")
     c1 = sub.add_parser("cue", help="the same cue lines for several parts: cue ID 3=97-98 --parts Tenore,5 "
-                        "(saved, not built)", description="The same cue lines for several parts or groups. "
-                        'A line is VOICE=BARS and options, or "word"=BAR.\n\n' + CUE_OPTIONS,
+                        "(saved, not built)", description="The same cues for several parts or groups. "
+                        'An entry is VOICE=BARS and options, or "word"=BAR.\n\n' + CUE_OPTIONS,
                         formatter_class=argparse.RawDescriptionHelpFormatter)
     c1.add_argument("id", help="12 or 2026-10-0012")
-    c1.add_argument("lines", nargs="+", metavar="LINE", help='3=97-98 (voice and bars; options after, in one '
+    c1.add_argument("lines", nargs="+", metavar="ENTRY", help='3=97-98 (voice and bars; options after, in one '
                     'quoted line: "3=97-98 fit sync=3") or "Canto"=97 (a word)')
     c1.add_argument("--parts", required=True, help="parts or groups: names or numbers, comma separated")
     c1.add_argument("--build", action="store_true", help="build after the edit")
@@ -477,14 +477,14 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--gap", type=float, help="staff spaces between staves, the widest (10)")
     b.add_argument("--min-gap", dest="gap_min", type=float,
                    help="smallest space between staves, to save a page turn (7)")
-    b.add_argument("--clearance", type=float, help="least space between the ink of two lines, "
+    b.add_argument("--clearance", type=float, help="least space between the ink of two systems, "
                    "in staff spaces (1)")
     b.add_argument("--page-count", dest="page_count", type=int, help="force this many pages")
     b.add_argument("--min-staff-mm", dest="min_staff_mm", type=float,
                    help="smallest staff height, mm (5)")
     b.add_argument("--ink", choices=["normal", "darker"], help="ink strength (normal)")
     b.add_argument("--bar-numbers", dest="bar_numbers", choices=["start", "none"],
-                   help="bar number at each line start, or none (start)")
+                   help="bar number at each system start, or none (start)")
     b.add_argument("--bar-raise", dest="bar_raise", type=float,
                    help="least height of a bar number above the staff, staff spaces (1)")
     b.add_argument("--bar-size", dest="bar_size", type=float,
@@ -499,7 +499,7 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--large", choices=["on", "off"],
                    help="also a large-print copy per part (on)")
     b.add_argument("--reflow", choices=["on", "off"],
-                   help="cut new lines at barlines for a larger staff (off; on hold)")
+                   help="cut new systems at barlines for a larger staff (off; on hold)")
     b.add_argument("--max-staff-mm", dest="max_staff_mm", type=float,
                    help="largest staff height, mm (8)")
     b.add_argument("--title-page", dest="title_page", choices=["auto", "off"],
