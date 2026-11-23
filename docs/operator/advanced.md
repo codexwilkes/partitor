@@ -156,7 +156,7 @@ Some menu keys have a command-line form.
 | <kbd>f</kbd> | `partitor plan ID Trombones` |
 | <kbd>l</kbd> | `partitor pages ID Trombones` |
 | <kbd>h</kbd> | short names: pick a part, type its short form or `auto` |
-| <kbd>e</kbd> / <kbd>c</kbd> | one step larger or smaller (pages, then space between staves). Asks for a part; <kbd>Enter</kbd> = all |
+| <kbd>e</kbd> / <kbd>c</kbd> | `partitor expand` / `partitor contract`: one step larger or smaller (pages, then space between staves). Asks for a part; <kbd>Enter</kbd> = all |
 | <kbd>p</kbd> | pages: `auto` or 1–99 |
 
 ## macOS {#macos eyebrow="Best effort"}

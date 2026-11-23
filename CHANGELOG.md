@@ -6,6 +6,12 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.13.1 — 2026-11-23
+
+### Changed
+- Docs: the advanced page names `partitor expand` and `partitor contract` (menu keys `e` and `c`).
+- `tools/check-repo.sh` fails when a user doc (README, INSTALL, OPERATING, KNOWN-LIMITS, STORAGE, SANDBOX, the operator guide, the Windows README) names a version other than `VERSION`.
+
 ## 0.13.0 — 2026-11-23
 
 ### Changed

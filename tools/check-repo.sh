@@ -11,6 +11,7 @@
 #   - a broken module structure (tools/check-modules.py --static)
 #   - a stale docs/operator-flow.html (tools/build-operator-doc.py --check) or a version in it that is not VERSION
 #   - a version that differs from VERSION: the package, the tag example in README.md and docs/INSTALL.md, the newest CHANGELOG release
+#   - a version in the user docs (README, INSTALL, OPERATING, guide, ...) that is not VERSION
 #   - a stale docs/COMMANDS.md or docs/cli.json (tools/build-cli-doc.py --check)
 #   - a stale or wrong docs/ARCHITECTURE.md (tools/check-architecture.py)
 # A private token list is checked by the maintainer, not here (it is itself personal).
@@ -55,6 +56,14 @@ for doc in README.md docs/INSTALL.md; do
 done
 logver="$(sed -n 's/^## \([0-9][0-9.]*[0-9a-z.-]*\) — .*/\1/p' CHANGELOG.md | head -n 1)"
 [ "$logver" = "$ver" ] || bad "the newest CHANGELOG release is ${logver:-none}, VERSION is ${ver}"
+# No other version in the user docs: "partitor X.Y.Z" or "release X.Y.Z" must be VERSION (history files are exempt).
+for doc in README.md docs/INSTALL.md docs/OPERATING.md docs/KNOWN-LIMITS.md docs/STORAGE-LOCAL.md docs/STORAGE-SMB.md docs/SANDBOX.md \
+           docs/operator/guide.md docs/operator/advanced.md docs/operator/problems.md platforms/windows/README.md; do
+  [ -f "$doc" ] || continue
+  while IFS= read -r v; do
+    [ "$v" = "$ver" ] || bad "${doc} names version ${v}, VERSION is ${ver}"
+  done < <(grep -oE '(partitor|release) [0-9]+\.[0-9]+\.[0-9]+' "$doc" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | sort -u)
+done
 # The command reference and the machine source of the CLI are generated from the code.
 python3 tools/build-cli-doc.py --check || bad "docs/COMMANDS.md or docs/cli.json is old (run tools/build-cli-doc.py)"
 # The architecture page: the module block is generated; diagrams use the drawable subset; paths exist.
