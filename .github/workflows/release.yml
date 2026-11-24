@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 Nathan Wilkes and partitor contributors
+#
+# GitHub Release from a tag. It starts when the workflow "ci" has finished for a pushed tag
+# (X.Y.Z or X.Y.Z-suffix) and only when that run succeeded. The notes are the section of the
+# tag in CHANGELOG.md (tools/release-notes.py). The release is a DRAFT: read it, then publish it
+# on GitHub. A tag with a suffix is flagged as a pre-release. A release that exists is not
+# changed. The Windows setup program is not made here (windows-release, by hand).
+# Actions are pinned by version tag.
+name: release
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+
+permissions:
+  contents: write            # to create the draft release
+
+concurrency:
+  group: release-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    name: draft release from the CHANGELOG
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.event.workflow_run.head_branch }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: only a version tag
+        id: tag
+        run: |
+          if [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "version=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=no" >> "$GITHUB_OUTPUT"
+            echo "not a version tag ($TAG): nothing to do"
+          fi
+      - uses: actions/checkout@v6
+        if: steps.tag.outputs.version == 'yes'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: draft release
+        if: steps.tag.outputs.version == 'yes'
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "release $TAG exists: not changed"
+            exit 0
+          fi
+          python3 tools/release-notes.py "$TAG" > "$RUNNER_TEMP/notes.md"
+          flags=(--draft --verify-tag --title "$TAG" -F "$RUNNER_TEMP/notes.md")
+          if [[ "$TAG" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$TAG" "${flags[@]}"

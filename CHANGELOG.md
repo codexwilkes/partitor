@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.18.6 — 2026-11-24
+
+### Added
+- A tag now makes its GitHub Release. The workflow `release.yml` starts after the CI run of a pushed version tag (`X.Y.Z` or `X.Y.Z-suffix`) has succeeded. It makes a **draft** release with the CHANGELOG section of that version as the notes (`tools/release-notes.py`), flagged as a pre-release when the tag has a suffix. A release that exists is not changed. You read the draft and publish it. Nothing changes for users of the program.
+
 ## 0.18.5 — 2026-11-24
 
 ### Changed

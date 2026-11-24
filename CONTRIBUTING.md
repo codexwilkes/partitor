@@ -75,6 +75,7 @@ take 25-60 s; one per test made `test_render` the slowest module.
 cd /opt/partitor      # or your clone
 venv/bin/python3 -m unittest discover -s tests -v
 tools/check-repo.sh                           # also runs tools/check-modules.py --static and tools/build-operator-doc.py --check
+tools/release-notes.py "$(cat VERSION)" >/dev/null   # the CHANGELOG has a section for this version
 shellcheck -S warning bin/partitor bin/partitor-init bin/partitor-install tools/check-repo.sh tools/bench-start.sh   # if installed
 ```
 

@@ -59,8 +59,15 @@ The tag has no `v`. It is annotated. The tag points to the commit that passed CI
 ## Procedure
 
 The steps are in the maintainer's release procedure. In short: green CI on `main`, release edit (version, CHANGELOG heading,
-generated docs), all gates on the final tree, one release commit, push, wait for CI, tag, GitHub Release (flag a pre-release),
-attach the Windows setup program with the manual workflow only when someone needs it.
+generated docs), all gates on the final tree, one release commit, push, wait for CI, push the tag, read the draft release,
+publish it. Windows is separate: the setup program is built with the manual workflow only when someone needs it.
+
+## Release notes
+
+- The notes of a release are its section in `CHANGELOG.md` (`## X.Y.Z — date`), written for users. Commit messages are not used.
+- After CI succeeds for a pushed tag, `.github/workflows/release.yml` makes a **draft** release with those notes (`tools/release-notes.py TAG`). A tag with a suffix (`0.19.0-beta.1`) is flagged as a pre-release. A release that exists is not changed.
+- The tool fails, and no release is made, when the CHANGELOG has no section for the tag, the section is empty, or `VERSION` differs from the tag. Read the draft, then publish it on GitHub.
+- To see the notes before you tag: `tools/release-notes.py <version>`.
 
 ## Windows builds
 
