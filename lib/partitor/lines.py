@@ -163,7 +163,7 @@ def _cue_spans(s: Strip) -> list[tuple[int, int]]:
     """_cue_spans -> [(left barline x, right barline x)] of the bars under the cues of a line
     that are still to be drawn (Strip.cue_todo, cueplace): justify gives them no extra space."""
     out = []
-    for img, _scale, number, _label, pre_w, _fit, _sync in s.cue_todo:
+    for img, _scale, number, _label, pre_w, _fit, _sync, _align in s.cue_todo:
         if img is None or number not in s.bar_nums:
             continue
         i = s.bar_nums.index(number)

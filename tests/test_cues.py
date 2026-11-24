@@ -709,10 +709,65 @@ class TestNotesAndSync(unittest.TestCase):
         out, warns = cueplace.apply_cues([line], [pre], [cues.CueSpec("Canto", 11, 12, False, None, 0.6, None, False, 1)],
                                          {"Canto": ([src], {id(src): spre})}, "Alto")
         self.assertEqual(warns, [])
-        self.assertEqual(out[0].cue_todo[0][5:], (1, 1))          # fit from the second bar, sync 1
+        self.assertEqual(out[0].cue_todo[0][5:], (1, 1, None))    # fit from the second bar, sync 1, no align
         drawn, warns = cueplace.draw_cues(out)
         self.assertTrue(any("sync=1" in w and "without it" in w for w in warns), warns)
         self.assertEqual(drawn[0].cue_todo, [])                   # the cue is drawn all the same
+
+    def test_align_moves_the_cue_so_that_its_note_stands_over_the_first_note_of_the_part(self):
+        cue, part = self.cue_and_part()
+        part.staff_x0 = 0
+        start, why = cueplace.align_start(part, cue, 1, 1, 2, 1.0, 100, 0)
+        self.assertEqual(why, "")
+        self.assertTrue(abs(start - 20) <= 2, start)             # note 2 of the cue bar at 140, the part's note at 160
+        small, why = cueplace.align_start(part, cue, 1, 1, 2, 0.5, 100, 0)
+        self.assertEqual(why, "")
+        self.assertTrue(abs(small - 90) <= 2, small)             # at half size the note stands at 70: 160 - 70
+
+    def test_align_leaves_the_cue_where_it_falls_and_says_why(self):
+        cue, part = self.cue_and_part()
+        part.staff_x0 = 0
+        self.assertIn("3 note", cueplace.align_start(part, cue, 1, 1, 5, 1.0, 100, 0)[1])
+        part.staff_x0 = 40                                       # the note of the part is too near the start
+        got, why = cueplace.align_start(part, cue, 1, 1, 2, 1.0, 100, 0)
+        self.assertEqual(got, 100)
+        self.assertIn("left of the staff", why)
+        part.staff_x0 = 0
+        part.img[25:60, 160] = False
+        part.img[25:60, 190] = True                              # the part enters late: the cue starts at 70, ends at 370
+        part.img = part.img[:, :300]
+        part.hdr = part.hdr[:, :300]
+        self.assertIn("past the end", cueplace.align_start(part, cue, 1, 1, 1, 1.0, 100, 0)[1])
+        part.img[25:60, 190] = False
+        self.assertIn("no note", cueplace.align_start(part, cue, 1, 1, 2, 1.0, 100, 0)[1])
+
+    def test_align_is_noted_in_the_build_and_is_not_a_fit(self):
+        line, pre = rest_line(note_bar=2)
+        src, spre = make_source()
+        src.bar_nums = [11, 12, 13, 14, 15]
+        spec = cues.CueSpec("Canto", 11, 12, False, None, None, None, False, None, 2)
+        out, warns = cueplace.apply_cues([line], [pre], [spec], {"Canto": ([src], {id(src): spre})}, "Alto")
+        self.assertEqual(warns, [])
+        self.assertEqual(out[0].cue_todo[0][5:], (None, None, (1, 2)))     # not fitted; bar index 1, note 2
+        self.assertEqual(out[0].cue_todo[0][1], 0.6)                       # the small size stays
+        spec2 = cues.CueSpec("Canto", 11, 11, False, None, None, None, False, None, 2)
+        out, warns = cueplace.apply_cues([line], [pre], [spec2], {"Canto": ([src], {id(src): spre})}, "Alto")
+        self.assertTrue(any("align=2" in w and "plays in none" in w for w in warns), warns)
+        self.assertIsNone(out[0].cue_todo[0][7])
+
+    def test_align_is_read_and_checked(self):
+        entry, why = cues.parse_cue_line(["Canto", "Alto"], "Canto=59 align=3")
+        self.assertEqual((entry, why), ({"src": "Canto", "bars": [59, 59], "align": 3}, ""))
+        self.assertEqual(cues.entry_text(entry), "Canto=59 align=3")
+        for bad in ("Canto=59 align=0", "Canto=59 align=x", "Canto=59 align=", "Canto=59 align=2 fit",
+                    "Canto=59 align=2 sync=1"):
+            self.assertIsNone(cues.parse_cue_line(["Canto"], bad)[0], bad)
+        got, notes = cues.parse_cues({"Alto": [{"src": "Canto", "bars": [59, 59], "align": 3},
+                                               {"src": "Canto", "bars": [59, 59], "align": 3, "fit": True},
+                                               {"src": "Canto", "bars": [59, 59], "align": 0}]}, ["Canto", "Alto"], {})
+        self.assertEqual([c.align for c in got["Alto"]], [3])
+        self.assertEqual(len(notes), 2)
+        self.assertEqual(cues.cue_size(got["Alto"][0]), 0.6)
 
     def test_sync_is_read_and_checked(self):
         entry, why = cues.parse_cue_line(["Canto", "Alto"], "Canto=24-25 sync=3")

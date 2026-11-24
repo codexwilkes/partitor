@@ -168,6 +168,7 @@ class CueSpec:
     anchor: int | None = None    # the bar whose left barline is pinned to the part's (None: the first bar the part plays)
     fit: bool = False            # the bars from the anchor on are stretched sideways to the bars of the part
     sync: int | None = None      # with fit: the sync-th note of the cue bar at the anchor stands over the part's first note
+    align: int | None = None     # the cue keeps its size and spacing and moves sideways: its align-th note over the part's first note
 
 
 CUE_SIZE_RANGE = (0.3, 1.0)       # the size of a cue, as a factor of the staff (0.6 default)
@@ -221,9 +222,12 @@ def parse_cues(raw: object, parts: list[str], groups: dict[str, list[str]]) -> t
                     spec = CueSpec(str(it["src"]), a, b, bool(it.get("clef", True)),
                                    None if lab is None else str(lab), size,
                                    None if anc is None else int(anc), bool(it.get("fit", False)),
-                                   None if it.get("sync") is None else int(it["sync"]))
+                                   None if it.get("sync") is None else int(it["sync"]),
+                                   None if it.get("align") is None else int(it["align"]))
                     if spec.sync is not None and spec.sync < 1:
                         raise ValueError(f"sync {spec.sync}")
+                    if spec.align is not None and (spec.align < 1 or spec.fit or spec.sync is not None):
+                        raise ValueError(f"align {spec.align}: 1 or more, and not with fit or sync")
             except (KeyError, ValueError, TypeError) as e:
                 notes.append(f"cues: {target}: entry {it!r} is wrong ({e}); left out")
                 continue
@@ -236,7 +240,7 @@ def parse_cue_line(parts: list[str], line: str) -> tuple[dict | None, str]:
     part names in score order (the numbers of the line count from 1).
         3=97-98            the voice of part 3, bars 97 to 98
         Canto=97           by name; one bar
-        3=97-98 noclef size=0.5 label=Soprano      options: noclef, nolabel, size=, label=, anchor=, fit, sync=
+        3=97-98 noclef size=0.5 label=Soprano      options: noclef, nolabel, size=, label=, anchor=, fit, sync=, align=
         "Canto"=97         a word at bar 97, no music"""
     import shlex
     left, eq, right = line.partition("=")
@@ -295,6 +299,10 @@ def parse_cue_line(parts: list[str], line: str) -> tuple[dict | None, str]:
             if not w[5:].isdigit() or int(w[5:]) < 1:
                 return None, f"{w}: the number of a note of the cue bar, 1 or more"
             entry["sync"] = int(w[5:])
+        elif w.startswith("align="):
+            if not w[6:].isdigit() or int(w[6:]) < 1:
+                return None, f"{w}: the number of a note of the cue bar, 1 or more"
+            entry["align"] = int(w[6:])
         elif w == "fit":
             entry["fit"] = True
         elif w.startswith("anchor="):
@@ -302,7 +310,9 @@ def parse_cue_line(parts: list[str], line: str) -> tuple[dict | None, str]:
                 return None, f"{w}: a bar of the cue, {a} to {b}"
             entry["anchor"] = int(w[7:])
         else:
-            return None, f"'{w}': options are noclef, nolabel, size=0.5, label=Text, anchor=25, fit, sync=3"
+            return None, f"'{w}': options are noclef, nolabel, size=0.5, label=Text, anchor=25, fit, sync=3, align=3"
+    if entry.get("align") and (entry.get("fit") or entry.get("sync")):
+        return None, "align moves the cue as it is; it does not go with fit or sync"
     return entry, ""
 
 
@@ -326,6 +336,8 @@ def entry_text(entry: dict) -> str:
         out += " fit"
     if entry.get("sync"):
         out += f" sync={entry['sync']}"
+    if entry.get("align"):
+        out += f" align={entry['align']}"
     return out
 
 

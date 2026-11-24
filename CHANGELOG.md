@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.18.0 — 2026-11-24
+
+### Added
+- Cue option `align=N`. The cue keeps its size and its spacing and moves sideways, so that its N-th note with a stem stands over the first note of the part in the bar where the part enters. Notes are counted from the left barline of the cue bar, as for `sync`: rests and whole notes are not counted, a chord is one note. The cue barline then does not meet the barline of the part. It does not go with `fit` or `sync`. If the note is not found, or the cue would start left of the staff or end past the line, the build says so and leaves the cue where it falls. Set it in the menu line (`3=59 align=3`) or as `align:` of a `cues` entry.
+
 ## 0.17.0 — 2026-11-23
 
 ### Changed

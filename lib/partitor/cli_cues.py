@@ -18,7 +18,8 @@ CUE_OPTIONS = """  options after the bars (3=97-98 size=0.5 noclef):
     noclef      no clef at the start          nolabel      no name above          label=Text   another name
     anchor=25   the bar whose left barline meets the part's (default: the bar where the part starts to play)
     fit         stretch the cue bars from the anchor to the bars of the part, so that the barlines meet
-    sync=3      fit, and put the 3rd note with a stem of that cue bar over the first note of the part"""        # the table lists rests of this many bars or more
+    sync=3      fit, and put the 3rd note with a stem of that cue bar over the first note of the part
+    align=3     no fit: move the whole cue sideways, its 3rd note with a stem over the first note of the part"""        # the table lists rests of this many bars or more
 
 
 def _targets(data: dict) -> list[str]:

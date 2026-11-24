@@ -478,9 +478,13 @@ def apply_cues(strips: list[Strip], starts: list[int | None], specs: list[CueSpe
                 else:
                     s2 = work[t]
                 pre_w = (starts[t] or 0) - int(s2.staff_x0)
+                if spec.align and a > m2:
+                    warns.append(f"cue {spec.src} {spec.first}-{spec.last} in {target}: align={spec.align}: "
+                                 f"{target} plays in none of these bars; the cue stands where it falls")
                 work[t] = dc_replace(s2, cue_todo=[*s2.cue_todo, (img, scale, m1, label, pre_w,
                                                          a - m1 if (spec.fit or spec.sync) and a <= m2 else None,
-                                                         spec.sync)])
+                                                         spec.sync,
+                                                         (a - m1, spec.align) if spec.align and a <= m2 else None)])
         except CueError as e:
             warns.append(f"cue {spec.src} {spec.first}-{spec.last} in {target}: {e}; the cue is left out")
             continue
@@ -530,7 +534,7 @@ def draw_cues(strips: list[Strip]) -> tuple[list[Strip], list[str]]:
     out, warns = [], []
     for s in strips:
         todo, s = s.cue_todo, dc_replace(s, cue_todo=[])
-        for img, scale, number, label, pre_w, fit_from, sync in todo:
+        for img, scale, number, label, pre_w, fit_from, sync, align in todo:
             i = s.bar_nums.index(number) if number in s.bar_nums else 0
             ax = int(s.bars_x[i - 1]) if i > 0 and s.bars_x else int(s.staff_x0) + pre_w
             try:
@@ -548,12 +552,48 @@ def draw_cues(strips: list[Strip]) -> tuple[list[Strip], list[str]]:
                 if fit_from is None and not (i >= 0 and i < len(s.rest_counts) and s.rest_counts[i] > 0):
                     # a cue over bars the part plays: its clef must not hang out to the left of the staff
                     start = max(ax, int(s.staff_x0) + int(round(img.clef_px * scale)) + 2)
+                if align:
+                    start, why = align_start(s, img, number, align[0], align[1], scale, start, ax)
+                    if why:
+                        warns.append(f"cue {label} bar {number}: align={align[1]}: {why}; the cue stands where it falls")
                 s, w = draw_cue(s, img, start, scale, label, fit_from, widths, split)
                 warns += [f"cue {label} bar {number}: {x}" for x in w]
             except CueError as e:
                 warns.append(f"cue {label} bar {number}: {e}; the cue is left out")
         out.append(s)
     return out, warns
+
+
+def align_start(s: Strip, cue: CueImg, number: int, k: int, n: int, scale: float,
+                start: int, ax: int) -> tuple[int, str]:
+    """align_start -> (the column for the first barline of the cue, "") such that the n-th note with
+    a stem of its bar k (counted from the left, as for `sync_split`) stands over the first note with a
+    stem of the part in the bar under it, or (start, why) when that cannot be done: the cue keeps
+    its size and spacing and only moves sideways. It does not move left of the clef's room at the start
+    of the staff, nor right of the end of the line. ax: the left barline of the part's first
+    bar of the cue."""
+    edges = [0] + [b + 1 for b in cue.bars]
+    if k + 1 >= len(edges):
+        return start, "the bar of the cue is not there"
+    mine = note_xs(cue.img, cue.staff_row, cue.sp, edges[k], edges[k + 1], tuple(cue.bars))
+    if len(mine) < n:
+        return start, f"the bar of the cue has {len(mine)} note(s) with a stem"
+    num = number + k
+    if num not in s.bar_nums:
+        return start, "the bar of the part is not a bar of its own here"
+    j = s.bar_nums.index(num)
+    if j >= len(s.bars_x):
+        return start, "the bar of the part has no barline after it"
+    left, right = (int(s.bars_x[j - 1]) if j > 0 else ax), int(s.bars_x[j])
+    theirs = note_xs(s.img & ~s.hdr, s.staff_top, s.sp, left + 1, right, (left, right))
+    if not theirs:
+        return start, "the part has no note with a stem in its bar"
+    new = int(round(theirs[0] - mine[n - 1] * scale + cue.clef_px * scale))
+    if new < int(s.staff_x0) + int(round(cue.clef_px * scale)) + 2:
+        return start, "the note of the cue stands too far left of the note of the part: the cue would start left of the staff"
+    if new - int(round(cue.clef_px * scale)) + int(round(cue.img.shape[1] * scale)) > s.img.shape[1]:
+        return start, "the cue would reach past the end of the line"
+    return new, ""
 
 
 def sync_split(s: Strip, cue: CueImg, number: int, fit_from: int, widths: list[int],
@@ -613,7 +653,7 @@ def _text_mark(work: list[Strip], starts: list[int | None], spec: CueSpec, targe
     if bars[i].rest and (s2.rest_src is not None or bars[i].count > 1):
         s2 = respan(s2, bars, i, i, n, n)
     pre_w = (starts[t] or 0) - int(s2.staff_x0)
-    work[t] = dc_replace(s2, cue_todo=[*s2.cue_todo, (None, 0.0, n, spec.label or "", pre_w, None, None)])
+    work[t] = dc_replace(s2, cue_todo=[*s2.cue_todo, (None, 0.0, n, spec.label or "", pre_w, None, None, None)])
     return work
 
 

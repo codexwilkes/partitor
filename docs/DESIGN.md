@@ -1722,12 +1722,12 @@ A part with a long rest can show where another voice enters: a small staff of th
 without cues is built exactly as before (the G0 and real-page checks show no difference).
 
 **The key `cues`** (`score.yaml`, §3): `{part or group: [entry, ...]}`. An entry is
-`{src: Canto, bars: [23, 24], clef: true, label: null, size: 0.6, anchor: 24, fit: false, sync: 3}` (`clef`, `label`, `size`, `anchor`, `fit` and `sync` are
+`{src: Canto, bars: [23, 24], clef: true, label: null, size: 0.6, anchor: 24, fit: false, sync: 3, align: 3}` (`clef`, `label`, `size`, `anchor`, `fit`, `sync` and `align` are
 optional; `label: ""` shows no name; `size` is a factor of the staff, 0.3 to 1; absent: 0.6, or 1 with `fit` or `sync`, `cues.cue_size`) or `{text: Canto, bar: 57}`.
 `cues.parse_cues` reads it; an entry that is wrong is left out and named in a warning. `analyse` again keeps
 the key when the part names are the same and says so (the bars are read by number: look at them again);
 else it says that they were dropped. Set with the menu key `u` (`partitor cues ID [PART]`) or
-`partitor cue ID LINE... --parts LIST`; the line is `VOICE=BARS [noclef] [nolabel] [size=N] [label=T] [anchor=N] [fit] [sync=N]`
+`partitor cue ID LINE... --parts LIST`; the line is `VOICE=BARS [noclef] [nolabel] [size=N] [label=T] [anchor=N] [fit] [sync=N] [align=N]`
 or `"word"=BAR` (`cues.parse_cue_line`). Saved, not built: `pending` names `PART:cues`.
 
 **Rules.**
@@ -1778,10 +1778,16 @@ The bars of the cue before it must be rests of the part and become the piece des
 apply_cues`); from the anchor on, the part is not changed. The cue is one picture drawn from the barline
 before its first bar, at the scale of its size, so its anchor barline meets the part's to 2 px. The bar
 piece under a cue is at least `CUE_BAR_MIN_SP` (4 sp) wide, so a narrow cue still meets it. With `fit`
-(`Strip.cue_todo`, sixth item: the index of the first bar to fit; seventh: `sync`) `cueplace.draw_cues` gives each cue bar
+(`Strip.cue_todo`, sixth item: the index of the first bar to fit; seventh: `sync`; eighth: `(bar index, note)` of `align`) `cueplace.draw_cues` gives each cue bar
 from the anchor on the width of the bar of the part under it (`fit_widths`; it stops at a bar the part
 shows inside a merged rest or on another line) and `scaled_cue` scales that bar sideways to this width
 at the height of the scale. With `sync` (implies `fit`) `cueplace.sync_split` reads the notes with a stem (`cueplace.note_xs`: a run of ink of 2.2 sp in the height of a staff, not on a barline, stems within 0.8 sp are one note; the head is read at the end of the stem with more ink beside it) of the first fitted bar of the cue and of the part's bar on its top staff: the sync-th note of the cue and the first of the part. `scaled_cue` then scales the bar in two pieces, before and after that note, so that they stand over each other; a note that is not found is a warning and the bar is fitted without it. `lines._cue_spans` protects only the rest bars from `justify`.
+
+**Align.** `align=N` (`CueSpec.align`, not with `fit` or `sync`; size as without them, 0.6) moves the whole cue sideways without
+scaling it: `cueplace.align_start` reads the notes with a stem (`note_xs`) of the cue bar at the anchor and of the part's bar under it
+(the first bar the part plays; a system's first bar starts at its staff) and sets the start column so that the N-th note of the cue stands
+over the first note of the part. The cue barline then does not meet the part's. A note not found, a start left of the clef's room at the
+staff start, or an end past the line is a warning and the cue stays at the anchor. `align` with no bar where the part plays is a warning at `apply_cues`.
 
 **Checks and failures.** A bar of the part before the anchor must hold no note: `cueplace._plays` (a column with ink in
 two or more spaces of one staff) refuses the cue, "plays here". When `lines.rest_only_bars` cannot confirm

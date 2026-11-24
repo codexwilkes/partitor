@@ -88,6 +88,7 @@ Options after the bars:
 | `anchor=25` | the bar where the cue barline meets the part barline |
 | `fit` | stretches the cue bars after the anchor to the bars of the part |
 | `sync=3` | the 3rd stemmed note of the cue bar is put over the first note of the part in that bar. Implies `fit` |
+| `align=3` | the whole cue moves sideways so that its 3rd stemmed note stands over the first note of the part in that bar. No stretch. Not with `fit` or `sync` |
 
 The cue stands above the staff (above the top staff of a group). The bars under it become one multi-bar rest, as wide as the cue.
 
@@ -96,6 +97,7 @@ The cue stands above the staff (above the top staff of a group). The bars under 
 - The bars before the anchor must be rests.
 - `fit` draws the cue at full size unless you type `size=`. At 0.6 the stretch is about 1.7 times. `size=0.8` is a compromise. Use `fit` per cue.
 - `sync` counts stemmed notes from the left barline of the cue bar. Rests and whole notes are not counted. A chord is one note. The bar is stretched in two pieces, before and after that note. If the note is not found, the build says so and fits the bar without it.
+- `align` keeps the size and the spacing of the cue (0.6 unless you type `size=`). The cue barline then does not meet the part barline. It counts notes as `sync` does. The bar is the first bar where the part plays. The cue does not move left of the clef room at the start of the staff, nor past the end of the system. If it cannot, or the note is not found, the build says so and leaves the cue where it falls.
 - Build the part (<kbd>r</kbd>) and look at it. partitor warns when it cannot confirm that the part rests in a bar, or when the cue stands above ink.
 
 Command-line forms:
