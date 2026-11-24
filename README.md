@@ -4,29 +4,30 @@
 
 Make instrument parts from a score PDF.
 
-Give partitor a PDF of a score, vector or scanned. It finds the staves and
-systems, asks you which staff is which part, and writes one PDF per part. It
-was made for amateur players with older eyes: you decide how big the music is,
-and the parts are laid out so that you can read them on a stand.
+Give partitor a PDF of a score, vector or scanned. It attempts to identify and
+slice the staves and systems, asks which staff is which part, and then produces
+one PDF per part.
 
-Status: early public release. It works for the author, on one setup. Read
-`docs/KNOWN-LIMITS.md` before you rely on it.
+Status: early public release. Read `docs/KNOWN-LIMITS.md` before you rely on it.
 
-## What you get
+## Features
 
-**Parts you can read**
-- One PDF per instrument, from a full score. One part can use two staves
-  (a keyboard). A group prints several parts as one small score (three
-  trombones). You can join or split parts as you like.
-- Large print: big staves and a calm layout. A second, larger copy
-  (11 x 17 in, or A3) is made next to the normal one.
-- Bar numbers at the start of every system, and the rehearsal marks of the score, so the
-  conductor's "from bar 45" works for you too.
-- The lowest and highest note of the part is printed on the first system, so you
-  can see at once if the part fits your instrument or your voice.
-- Multi-bar rests are joined, so systems are shorter and the part has fewer pages.
-- Cues: a small staff of another voice, or a word such as "Canto", above a
-  long rest (`partitor cues`). Nothing is added unless you ask.
+**Parts**
+- One PDF per instrument, from a full score.
+- One part can use two staves (a keyboard), or optionally a group prints
+  several parts as one small score (three trombones for example). You can join
+  or split parts as you like.
+- A second, larger copy (11 x 17 in, or A3) is made next to the normal one, in
+  case you want a larger print size.
+- Bar numbers at the start of every system, and optionally the rehearsal marks
+  of the score.
+- The lowest and highest note of the part (the ambitus) is printed on the first
+  system, so you can see at once if the part fits your instrument or your
+  voice.
+- Multi-bar rests are joined, so systems are shorter and the part has fewer
+  pages.
+- Optional cues: a small staff of another part, or a word such as "Canto",
+  above a long rest (`partitor cues`).
 
 **Page turns**
 - Pages end where you can rest, not in the middle of a passage. You turn at a
@@ -37,43 +38,41 @@ Status: early public release. It works for the author, on one setup. Read
   three pages with no turn. It writes a short list of steps to cut, fold and
   tape it.
 - You can move a system to the next or the previous page by hand, and the
-  choice stays.
+  choice persists.
 - Parts of three pages or more get extra margin at the spine, for a punched or
   bound part, printed double-sided.
 
 **Scores that are not clean**
-- Works on vector PDFs and on scans, also phone scans (clean scans work best). It straightens a curled
-  page.
+- Works on vector PDFs and on scans, also phone scans (clean scans work best).
+  It straightens a curled page.
 - Reads staff labels and clefs, and matches them to the parts, also when the
   staff count changes in the piece.
 - Lyrics and text stay with the right staff.
 - If the score has one piece after another, or a title above the music, it asks
   and you decide what to leave out.
 
-**You stay in control**
-- A text menu that you can use over SSH, also from a phone. No web page, no
-  account.
+**Behaviour**
 - partitor asks when it is not sure. Nothing is guessed silently.
 - A proof PDF shows what partitor read: staves, bars, and the lowest and
   highest notes, so you can check before you print.
 - You can correct bar numbers, part names, groups, title and the note range.
-  Your corrections stay when you analyse again.
+  Your corrections persist when you analyse again.
 - You can rebuild one part, change its paper or staff size, and print again,
   without a new analysis of the whole score.
 - Your scores stay on your own computer or your own NAS. There is no network
   use and nothing is sent anywhere.
 
-## What it does not do
+## For clarity
 
-partitor makes parts. It does not publish, sync, run a web interface, keep
-accounts, store in the cloud, or export notation (MusicXML, MIDI).
+partitor makes parts from PDF scores. It does not publish, sync, run a web
+interface, keep accounts, store in the cloud, or export notation (MusicXML,
+MIDI).
 
 ## What you need
 
 - Ubuntu 26.04 LTS with systemd (the tested platform).
-- Root access. The engine itself never runs as root (`docs/SANDBOX.md`).
-- A score PDF that you have the right to copy. This repository has **no** sample
-  scores.
+- Best-effort Windows and macOS.
+- A score PDF that you have the right to copy.
 
 ## Quick start (Ubuntu)
 
@@ -83,7 +82,7 @@ for you. No questions.
 ```bash
 sudo apt install -y git
 sudo git clone https://github.com/codexwilkes/partitor /opt/partitor
-cd /opt/partitor && sudo git checkout --detach 0.18.1
+cd /opt/partitor && sudo git checkout --detach 0.18.2
 sudo bin/partitor-quick-install
 ```
 

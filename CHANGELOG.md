@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.18.2 — 2026-11-24
+
+### Changed
+- `README.md` (the first page of the site) is revised: a shorter opening, the sections "Features", "For clarity" and "What you need", and the page-turn and behaviour lists in plainer terms. The bullet about the text menu is removed. No program change.
+
 ## 0.18.1 — 2026-11-24
 
 ### Fixed
