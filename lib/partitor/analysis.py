@@ -156,9 +156,10 @@ def check_page(res: PageResult) -> None:
         _warn(f"noise: {pid}  ({noise} px removed, "
               f"{100.0 * noise / res.ink_px:.1f}% of ink)")
     disc = sum(v for k, v in res.discard.items() if k != D_NOMUSIC)
-    _ok(f"{pid}:  {len(res.staves)} staves  {len(res.systems)} systems  "
-        f"sp={res.sp:.1f}px  skew={res.skew:+.1f}°  dewarp={res.dewarp:.0f}px  "
-        f"discard={disc}px  review={len(res.review)}")
+    odd = bool(res.review) or abs(res.skew) >= 0.1 or res.dewarp >= 1
+    _ok(f"{pid}:  {len(res.staves)} staves  {len(res.systems)} systems"
+        + (f"  sp={res.sp:.1f}px  skew={res.skew:+.1f}°  dewarp={res.dewarp:.0f}px  "
+           f"discard={disc}px  review={len(res.review)}" if odd else ""))
 
 
 # =============================================================================

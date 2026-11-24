@@ -1121,9 +1121,10 @@ Sections 5.1 to 5.8 keep their numbers.
 - Every change is a CLI action that writes `score.yaml`, and reports the result
   (pages, staff size, review items). Edits are saved; only a build makes PDFs
   (§6.2 stages).
-- Output uses a fixed set of glyphs, counters and a summary block. A command that runs a build
-  step (`rebuild`, `new`) prints the build's summary, then its own; since 0.8.45 the last one keeps
-  the build's warnings (`console._reset_counts(keep_warnings=True)`), so it ends with `OK with N
+- Output uses a fixed set of glyphs, counters and a summary block. A clean run ends with one line,
+  `ALL OK (12 s)`; a warning or a failure prints the counts and each text. A command that runs a
+  build step (`rebuild`, `new`) prints one verdict: the build's own is quiet unless a check failed
+  (`_summary(start, quiet=True)`). Since 0.8.45 the command's verdict keeps the build's warnings (`console._reset_counts(keep_warnings=True)`), so it ends with `OK with N
   warning(s)`, not `ALL OK`, after a warning.
 - Ctrl-C (0.8.45): one line, `stopped (Ctrl-C)`, exit code 130, no traceback (`cli_main.main`). A
   build writes into `parts.new/` and `lines.new/`, so `parts/` and `score.yaml` stay as they were;

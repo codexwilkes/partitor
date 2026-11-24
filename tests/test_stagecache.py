@@ -470,7 +470,7 @@ class TestCacheOutputIsIdentical(unittest.TestCase):
             self.assertEqual(build.run_build(item), 0)
         text = buf.getvalue().replace(str(item), "ITEM")
         text = re.sub(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \w+", "DATE", text)
-        text = re.sub(r"elapsed: \d+ms", "elapsed: T", text)
+        text = re.sub(r"\(\d+(?:\.\d)? s\)|elapsed: \d+ms", "(T)", text)
         text = re.sub(r"took \d+ s", "took N s", text)
         return text
 

@@ -616,8 +616,9 @@ class TestBarRules(unittest.TestCase):
             real_input, old_share = builtins.input, os.environ.get("PARTITOR_LIBRARY")
             builtins.input = lambda prompt="": next(it)
             os.environ["PARTITOR_LIBRARY"] = str(share)
+            self.out = io.StringIO()
             try:
-                with contextlib.redirect_stdout(io.StringIO()):
+                with contextlib.redirect_stdout(self.out):
                     pt.cmd_bars(argparse.Namespace(id="2026-10-0001"))
             finally:
                 builtins.input = real_input
@@ -627,6 +628,31 @@ class TestBarRules(unittest.TestCase):
                     os.environ["PARTITOR_LIBRARY"] = old_share
             pt._reset_counts()
             return pt.load_item(item)
+
+    def test_bars_help_is_two_aligned_columns_within_80(self):
+        from partitor import cli_bars
+        lines = cli_bars.BARS_HELP.splitlines()
+        self.assertLessEqual(max(len(x) for x in lines), 80)
+        text = cli_bars.BARS_HELP
+        for key in ("k N", "f N=B", "p N", "i N", "s N I", "s K", "j N I", "a N I [P]",
+                    "u N", "b N", "m B [B..]", "m N:I", "v [N]", "?", "Enter"):
+            self.assertIn(key, text)
+
+    def test_bars_help_notes_keep_the_long_explanations(self):
+        from partitor import cli_bars
+        for word in ("incipit", "clef stub", "magenta", "mensuration"):
+            self.assertIn(word, cli_bars.BARS_NOTES + cli_bars.BARS_EXAMPLE)
+
+    def test_bars_menu_shows_saved_state_and_last_result_under_the_help(self):
+        self.run_bars_menu("b 1", "p 1")
+        out = self.out.getvalue()
+        self.assertIn("(no edits yet)", out)
+        self.assertIn("(edits not saved: Enter saves)", out)
+        legend = "N system (list above)"
+        self.assertEqual(out.count(legend), 3)          # a draw before each of two commands, and one after
+        at = [i for i in range(len(out)) if out.startswith(legend, i)]
+        self.assertIn("system 1 p1.s1:", out[at[1]:at[2]])     # the result stands under the next help
+        self.assertIn("✔  p 1", out)
 
     def test_bars_menu_refuses_line_zero(self):
         data = self.run_bars_menu("f 0=5", "b 0", "j 0 1", "k 0", "u 0", "m 0:1", "s 0 1")
@@ -869,7 +895,7 @@ class TestBarRules(unittest.TestCase):
                                capture_output=True, text=True, env=env, timeout=120)
             self.assertIn("its first bar is only 5.7 sp wide", r.stdout)
             self.assertIn("j 3 1 joins it", r.stdout)
-            self.assertIn("s N I joins the two halves of a split bar", r.stdout)
+            self.assertIn("s N I  join the halves of a split bar", r.stdout)
 
     def test_proof_command_draws_again(self):
         with tempfile.TemporaryDirectory() as d:

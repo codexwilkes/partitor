@@ -12,7 +12,7 @@ sandbox (`SANDBOX.md`).
 
 | Command | Does |
 |---|---|
-| `partitor` | Menu: recent items and "new from inbox". |
+| `partitor` | Menu: recent items and "new from inbox"; the first line names the online documentation, https://partitor.ca. |
 | `partitor new [n]` | Wizard for a PDF in `inbox/`. |
 | `partitor list [words]` | All items, or those that match every word. |
 | `partitor show ID` | Review: parts, groups, settings, open choices. |

@@ -22,11 +22,43 @@ from .cli_items import (
 from .cli_cues import CUE_OPTIONS, cmd_cue, cmd_cues
 from .cli_parts import ambitus_menu, ask_part, cmd_groups, cmd_parts, short_menu
 from .config import LAYOUT_DEFAULTS, PAGE_HEADER_SP, PAPER
-from .console import Abort, BOLD, RST, YLW, _die, _warn, ask
+from .console import Abort, BOLD, DIM, RST, YLW, _die, _warn, ask, columns
 from .library import (
     PAPER_NEXT, _id_parts, find_item, id_order, inbox_pdfs, item_dirs, item_id, item_line,
     item_mtime, item_status, library_root, load_item, work_mark,
 )
+
+
+_ITEM_LEFT = [
+    "EDIT (saved, not built)",
+    "m  title, composer",
+    "t  part names",
+    "g  groups",
+    "n  bar numbers and marks",
+    "e  expand (larger staves)",
+    "c  contract (smaller staves)",
+    "p  pages (auto or 1-99)",
+    "a  paper",
+    "k  ambitus",
+    "h  short names",
+    "s  set key=value",
+    "u  cues: small staves above a rest",
+]
+_ITEM_RIGHT = [
+    "BUILD AND CHECK",
+    "r  build  (r Trombones, r 2-4)",
+    "v  review",
+    "y  analyse again",
+    "f  fit: paper, staff size, turns",
+    "l  pages: see and move page turns",
+    "x  repage: turns while resting",
+    "",
+    "b  back",
+    "",
+    "u r f l x take parts: u Trombones,",
+    "r 2-4. e c p ask which part.",
+]
+ITEM_MENU_HELP = columns(_ITEM_LEFT, _ITEM_RIGHT)
 
 
 def item_menu(item: Path) -> None:
@@ -42,15 +74,7 @@ def item_menu(item: Path) -> None:
         print(f"\n {BOLD}{item_line(item, data)}{RST}")
         st_ = item_status(data)
         print(f"  status: {st_}" + (f" — {', '.join(data['pending'])}" if data.get("pending") else ""))
-        print("  edit (saved, not built):  m title/composer  t part names  g groups  "
-              "n bar numbers and marks")
-        print("                            e expand  c contract  p pages  a paper  k ambitus"
-              "  h short names  s set")
-        print("                            u cues (small staves above a rest: u Trombones)")
-        print("  v review   y analyse again   r build (r Trombones, r 2-4: only those)")
-        print("  f fit (paper, staff size, page turns: f Trombones)   "
-              "l pages (see and move page turns: l Trombones)")
-        print("  x repage (page turns while resting; x Trombones)   b back")
+        print(ITEM_MENU_HELP)
         try:
             raw = ask(">", "b").strip()
         except Abort:
@@ -119,6 +143,7 @@ def item_menu(item: Path) -> None:
             pass
 
 
+DOCS_URL = "https://partitor.ca"
 RECENT_KEYS = "ABCDE"     # menu: the five items changed last
 RECENT_MIN_ITEMS = 9      # the recent block shows from this many items on
 
@@ -141,6 +166,7 @@ def cmd_menu(a: argparse.Namespace) -> int:
     work pending, n new from inbox."""
     share, lib = _lib_or_die()
     words, page = "", 0
+    first_draw = True                       # the docs line shows at start, not at each redraw
     size = list_page_size()
     year = time.localtime().tm_year
 
@@ -178,6 +204,9 @@ def cmd_menu(a: argparse.Namespace) -> int:
         waiting = len(inbox_pdfs(share))
         print(f"\n{BOLD}partitor {VERSION}{RST}  ({lib})"
               + (f"  filter: {words}  ({len(items)} of {len(allit)})" if words else ""))
+        if first_draw:
+            print(f"  {DIM}Documentation: {DOCS_URL}{RST}")
+            first_draw = False
         if not items:
             print("  (no item matches)" if words else "  (library empty)")
         if recent:

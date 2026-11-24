@@ -82,11 +82,21 @@ def _reset_counts(keep_warnings: bool = False) -> None:
         _WARNINGS.clear()
 
 
-def _summary(start: float) -> int:
-    ms = int((time.monotonic() - start) * 1000)
+def _summary(start: float, quiet: bool = False) -> int:
+    """The verdict. Nothing wrong: one line, `ALL OK (12 s)`, no counts. A warning or a failure:
+    the counts and the text of each. quiet: print nothing when nothing failed (an inner step of a
+    command that prints the verdict itself; its warnings are kept and said again there)."""
+    secs = time.monotonic() - start
+    took = f"{secs:.1f} s" if secs < 10 else f"{secs:.0f} s"
+    if not _counts["fail"] and not _counts["warn"]:
+        if not quiet:
+            print(f"\n{GRN}{BOLD}ALL OK{RST}  {DIM}({took}){RST}\n")
+        return 0
+    if quiet and not _counts["fail"]:
+        return 0
     print(f"\n{BOLD}══ Summary{RST}")
     print(f"  {GRN}PASS: {_counts['pass']}{RST}   {RED}FAIL: {_counts['fail']}{RST}"
-          f"   {YLW}WARN: {_counts['warn']}{RST}   (elapsed: {ms}ms)\n")
+          f"   {YLW}WARN: {_counts['warn']}{RST}   ({took})\n")
     if _FAILURES:
         print(f"{BOLD}{RED}Failed checks:{RST}")
         for f in _FAILURES:
@@ -100,11 +110,18 @@ def _summary(start: float) -> int:
     if _counts["fail"]:
         print(f"{RED}{BOLD}NOT OK — {_counts['fail']} check(s) failed{RST}\n")
         return 1
-    if _counts["warn"]:
-        print(f"{YLW}{BOLD}OK with {_counts['warn']} warning(s){RST}\n")
-    else:
-        print(f"{GRN}{BOLD}ALL OK{RST}\n")
+    print(f"{YLW}{BOLD}OK with {_counts['warn']} warning(s){RST}\n")
     return 0
+
+
+def columns(left: list[str], right: list[str], width: int = 40) -> str:
+    """Two aligned columns, one entry per row, for a menu help (80 characters in all)."""
+    rows = []
+    for i in range(max(len(left), len(right))):
+        l_ = left[i] if i < len(left) else ""
+        r_ = right[i] if i < len(right) else ""
+        rows.append(f"  {l_:<{width - 2}}{r_}".rstrip())
+    return "\n".join(rows)
 
 
 class Abort(Exception):

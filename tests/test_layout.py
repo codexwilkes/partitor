@@ -452,6 +452,64 @@ class TestVerdict(unittest.TestCase):
         pt._reset_counts()
         self.assertEqual((console._counts["warn"], list(console._WARNINGS)), (0, []))
 
+    def test_summary_is_one_line_when_all_is_well(self):
+        pt._reset_counts()
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            pt._ok("x")
+            rc = pt._summary(0.0)
+        self.assertEqual(rc, 0)
+        self.assertRegex(out.getvalue(), r"ALL OK  \(\d")
+        self.assertNotIn("PASS", out.getvalue())
+        pt._reset_counts()
+
+    def test_summary_keeps_the_counts_for_a_failure_and_for_a_warning(self):
+        for kind, word in ((pt._fail, "NOT OK"), (pt._warn, "OK with 1 warning")):
+            pt._reset_counts()
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                kind("x")
+                rc = pt._summary(0.0)
+            self.assertIn("PASS: 0", out.getvalue())
+            self.assertIn(word, out.getvalue())
+            self.assertEqual(rc, int(kind is pt._fail))
+        pt._reset_counts()
+
+    def test_quiet_summary_prints_nothing_unless_a_check_failed(self):
+        pt._reset_counts()
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            pt._ok("x")
+            pt._warn("w")
+            self.assertEqual(pt._summary(0.0, quiet=True), 0)
+        self.assertEqual(out.getvalue().count("x") + out.getvalue().count("Summary"), out.getvalue().count("x"))
+        self.assertNotIn("Summary", out.getvalue())
+        pt._reset_counts()
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            pt._fail("f")
+            self.assertEqual(pt._summary(0.0, quiet=True), 1)
+        self.assertIn("NOT OK", out.getvalue())
+        pt._reset_counts()
+
+    def test_build_report_lists_only_the_parts_kept_from_before(self):
+        with tempfile.TemporaryDirectory() as d:
+            item = Path(d, "2026-10-0001-x-y")
+            item.mkdir()
+            pt.save_item(item, {"id": "2026-10-0001", "parts": ["A", "B"], "title": "Y", "composer": "X",
+                                "built": {"parts": [
+                                    {"part": "A", "pages": 1, "staff_mm": 6.5, "gap": 10.0},
+                                    {"part": "B", "pages": 2, "staff_mm": 6.0, "gap": 9.0}]}})
+            saved = list(build.LAST_BUILD)
+            try:
+                build.LAST_BUILD[:] = [{"part": "A"}]
+                with contextlib.redirect_stdout(io.StringIO()) as out:
+                    build.build_report(item)
+                build.LAST_BUILD[:] = [{"part": "A"}, {"part": "B"}]
+                with contextlib.redirect_stdout(io.StringIO()) as all_built:
+                    build.build_report(item)
+            finally:
+                build.LAST_BUILD[:] = saved
+        self.assertIn("B: 2 p", out.getvalue())
+        self.assertNotIn("A: 1 p", out.getvalue())
+        self.assertEqual(all_built.getvalue(), "")
+
     def test_a_rebuild_with_a_warning_does_not_end_with_all_ok(self):
         with tempfile.TemporaryDirectory() as d:
             item = Path(d, "2026-10-0001-x-y")

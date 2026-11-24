@@ -48,9 +48,12 @@ class OperatorProse(unittest.TestCase):
 
     def test_bars_help_says_system(self):
         src = (DOCS.parent.parent / "lib" / "partitor" / "cli_bars.py").read_text(encoding="utf-8")
-        texts = re.findall(r'^BARS_(?:HELP|EXAMPLE) = """\\\n(.*?)"""', src, re.S | re.M)
+        texts = re.findall(r'^BARS_(?:NOTES|EXAMPLE) = """\\\n(.*?)"""', src, re.S | re.M)
         self.assertEqual(len(texts), 2)
-        for txt in texts:
+        import sys
+        sys.path.insert(0, str(DOCS.parent.parent / "lib"))
+        from partitor import cli_bars
+        for txt in texts + [cli_bars.BARS_HELP]:
             self.assertIsNone(re.search(r"\bline\b|\blines\b", txt, re.I))
 
     def test_paragraphs_are_short(self):

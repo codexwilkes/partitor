@@ -6,6 +6,16 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.17.0 — 2026-11-23
+
+### Changed
+- The bar menu (`partitor bars`) and the item menu show their keys in two aligned columns, one key per row, in place of wrapped prose. No key is removed or renamed. The bar menu header says whether edits are saved, a legend explains N, I, B, K and P, and the result of the last command stands under the help, next to the prompt. The long notes (incipit, clef stub, proof marks) moved to `?`, with the example.
+
+- The build output is shorter. A part line names its file, not its whole path; the item folder is said once at the end. A rebuild prints one verdict, not two, and a clean run ends with `ALL OK (12 s)` and no counts; a warning or a failure still shows the counts and each text. The analysis line of a page shows `sp`, `skew`, `dewarp`, `discard` and `review` only when the page is unusual (a skew of 0.1° or more, a dewarp, or a page to review). The lines of the parts after a build list only the parts kept from before.
+
+### Added
+- The menu names the online documentation, https://partitor.ca, once at start.
+
 ## 0.16.3 — 2026-11-23
 
 ### Added

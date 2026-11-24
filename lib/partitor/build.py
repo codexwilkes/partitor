@@ -406,7 +406,8 @@ def cmd_build(a: argparse.Namespace) -> int:
     if bad:
         _note(f"Fix: edit {lay_path}")
         return _summary(start)
-    _ok(f"layout:  {lay_path}  ({len(sysmaps)} systems)")
+    _ok(f"layout:  {lay_path.name if getattr(a, 'parts_dir', None) else lay_path}  "
+        f"({len(sysmaps)} systems)")
 
     _head("Analysis")
     dpi = int(lay["dpi"])
@@ -685,6 +686,8 @@ def cmd_build(a: argparse.Namespace) -> int:
     _head("Parts")
     parts_dir = Path(getattr(a, "parts_dir", None) or out / "parts")   # library: parts.new
     parts_dir.mkdir(exist_ok=True)
+    if not getattr(a, "parts_dir", None):        # library: the item folder is said once, at the end
+        _note(f"files in {parts_dir}")
     tail = getattr(a, "tail", "") or ""       # library: -<piece>--<id>
     lines_dir = Path(a.lines_dir) if getattr(a, "lines_dir", None) else None   # library: lines.new
     if lines_dir is not None:
@@ -828,7 +831,7 @@ def cmd_build(a: argparse.Namespace) -> int:
                **({"pins_dropped": True} if pins_dropped else {})}
         flow = f" (re-flowed from {nsrc})" if opts.get("reflow") == "on" else ""
         _ok(f"{name}:  {len(strips)} systems{flow}  {n} page(s)  staff {h_mm:.1f} mm  "
-            f"gap {g:.2f} sp  -> {fn}")
+            f"gap {g:.2f} sp  -> {fn.name}")
         if rec.get("foldout"):
             _note(f"{name}: {sheet_text(opts['paper'], rec['foldouts'])}: print and assemble as in "
                   f"{rec['assemble']}")
@@ -891,7 +894,7 @@ def cmd_build(a: argparse.Namespace) -> int:
         _note(f"workers: {rjobs}; {worker_memory()} "
               f"(estimate for the worker count: {RENDER_WORKER_GB:.1f} GB)")
     _note(f"rendering took {time.monotonic() - t_render:.0f} s")
-    return _summary(start)
+    return _summary(start, quiet=getattr(a, "parts_dir", None) is not None)
 
 
 def _engine_step(fn, ns: argparse.Namespace) -> int:
@@ -993,8 +996,13 @@ def run_build(item: Path, only: list[str] | None = None, jobs: str | None = None
 
 
 def build_report(item: Path) -> None:
+    """The parts not built in this run (kept from before): the lines of the built ones are in the
+    build output above."""
     data = load_item(item)
+    shown = {r["part"] for r in LAST_BUILD}
     for r in (data.get("built") or {}).get("parts", []):
+        if r["part"] in shown:
+            continue
         print(f"     {r['part']}: {r['pages']} p  staff {r['staff_mm']:.1f} mm  "
               f"gap {r['gap']:.1f} sp")
 
@@ -1014,6 +1022,7 @@ def _rebuild_report(item: Path, before: dict | None, only: list[str] | None = No
         if c1 != c0:
             _warn(f"pages of music:  {c0} -> {c1}  (page turns {turns(c0)} -> {turns(c1)})")
     build_report(item)
+    _note(f"parts:  {item / 'parts'}")
     return 0
 
 

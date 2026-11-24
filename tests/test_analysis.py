@@ -401,6 +401,31 @@ class TestPageAnalysis(unittest.TestCase):
 
 
 @needs_deps
+class TestCheckPageLine(unittest.TestCase):
+    """The summary line of a page: the numbers only when something is unusual."""
+
+    def line(self, **kw):
+        from types import SimpleNamespace
+        from partitor import analysis
+        res = SimpleNamespace(page=13, music=True, gate=[], ink_px=0, discard={}, staves=[0] * 8,
+                              systems=[0, 0], sp=27.0, skew=0.0, dewarp=0.0, review=[])
+        for k, v in kw.items():
+            setattr(res, k, v)
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            analysis.check_page(res)
+        pt._reset_counts()
+        return out.getvalue()
+
+    def test_a_normal_page_has_a_short_line(self):
+        text = self.line()
+        self.assertIn("page 14:  8 staves  2 systems", text)
+        self.assertNotIn("skew", text)
+
+    def test_an_unusual_page_keeps_the_numbers(self):
+        for kw in ({"skew": 0.4}, {"dewarp": 3.0}, {"review": [1]}):
+            self.assertIn("skew=", self.line(**kw), kw)
+
+
 class TestSystemWindow(unittest.TestCase):
     """Ink outside a system's x-range is never a staff's: bracket pieces at
     the left, page edge at the right; dotted Mensurstriche in the gaps are
@@ -748,7 +773,7 @@ class TestDetectParallel(unittest.TestCase):
             rc = pt.cmd_detect(ns)
         text = buf.getvalue().replace(out, "OUT")
         text = re.sub(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d \w+", "DATE", text)
-        text = re.sub(r"elapsed: \d+ms", "elapsed: T", text)
+        text = re.sub(r"\(\d+(?:\.\d)? s\)|elapsed: \d+ms", "(T)", text)
         return rc, text, Path(out)
 
     @staticmethod

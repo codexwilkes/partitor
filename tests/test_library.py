@@ -1023,6 +1023,30 @@ class TestLibrary(unittest.TestCase):
     def test_menu_reads_each_item_once(self):
         self.assertEqual(self.count_menu_loads("q"), 3)
 
+    def test_item_menu_lists_every_key_in_two_columns_within_80(self):
+        from partitor import cli_main
+        lines = cli_main.ITEM_MENU_HELP.splitlines()
+        self.assertLessEqual(max(len(x) for x in lines), 80)
+        import re
+        keys = set(re.findall(r"(?:^  |(?<=\s{2}))([a-z])  (?=\S)", cli_main.ITEM_MENU_HELP, re.M))
+        self.assertEqual(keys, set("mtgnecpakhsuvyrflxb"))      # no key removed
+
+    def test_menu_names_the_documentation_once(self):
+        from partitor import cli_main
+        d = self.share / "library" / "2026-11-0001-x"
+        d.mkdir()
+        pt.save_item(d, {"id": "2026-11-0001", "title": "T", "parts": ["A"]})
+        it = iter(["/t", "q"])                  # a second draw after the filter
+        real_input, out = builtins.input, io.StringIO()
+        builtins.input = lambda prompt="": next(it)
+        try:
+            with mock.patch.dict(os.environ, {"PARTITOR_LIBRARY": str(self.share)}), \
+                    contextlib.redirect_stdout(out):
+                cli_main.cmd_menu(argparse.Namespace())
+        finally:
+            builtins.input = real_input
+        self.assertEqual(out.getvalue().count("https://partitor.ca"), 1)
+
     def test_menu_with_filter_reads_each_item_once_for_a_draw(self):
         self.assertEqual(self.count_menu_loads("/t", "q"), 6)       # a draw before and one after
 

@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import time
 from pathlib import Path
 
@@ -12,7 +14,7 @@ from .bars import (
     mismatch_text, parse_bar_edit, renumber, toggle_mark,
 )
 from .cli_common import _item_or_die, bar_summary, locks_item, saved
-from .console import Abort, RST, YLW, _head, _note, _ok, _warn, ask, yes
+from .console import Abort, DIM, RST, YLW, _head, _note, _ok, _warn, ask, columns, yes
 from .library import item_file, load_item, mark_pending, save_item
 from .proof import _proof_pages, annotate_proof
 
@@ -81,33 +83,53 @@ def confirm_bar_rules(item: Path) -> None:
 
 STUB_SP = 8.0     # a first bar this narrow (a clef, no music) before a repeat start is a stub
 
-BARS_HELP = """\
-  System numbers (N) are the numbers in the list. Bars of a system (I): b N lists them.
-  NUMBERS
-    k N        keep the printed numbers of the source at system N (when the count
-               and the source differ and the source is right)
-    f N=B      system N starts at bar B; the systems after it follow (f N= clears)
-    p N        pickup: the movement that starts at system N begins at bar 0
-    i N        incipit: the first bar of the movement at system N shows the original
-               notation. It stays in the part with no number; the next bar is 1.
-               (p and i on the same system replace each other; the same command = off)
-    s N I      bar I of system N completes the bar before it: both keep one number
-               (a bar cut by a system break, a repeat sign or a change of mensuration).
-               The same command again = off.   s K  = bar after repeat sign K (below)
-  BARLINES (when the proof shows a wrong barline: v)
-    j N I      join bar I of system N with the next (remove a false barline).
-               A clef stub before a repeat sign (a first bar under 8 sp wide):
-               j N 1 - the repeat sign stays.
-    a N I [P]  add a barline in bar I of system N, P % from its left edge (50)
-    u N        undo the last j / a of system N         b N   list the bars of system N
-  REHEARSAL LETTERS (A, B, ... in bar order in each movement)
-    m B [B..]  letter on/off at bar number B (the first bar with that number)
-    m N:I      letter on/off at bar I of system N (for a number two bars share)
-  CHECK
-    v [N]      draw proof.pdf now with these edits (not saved yet): bar numbers
-               in magenta above the top staff, a tick at each barline, boxed
-               letters. N: tells the proof page of system N.
-    ?          help with an example            Enter = save and finish
+_COL = 40     # width of the left column of the help; the right column is 40 wide too (80 in all)
+
+_HELP_LEFT = [
+    "NUMBERS",
+    "k N      keep the printed numbers",
+    "f N=B    system N starts at bar B",
+    "f N=     clear that number",
+    "p N      pickup: starts at bar 0",
+    "i N      incipit: shown, no number",
+    "s N I    bar I joins the bar before",
+    "s K      the same, at repeat sign K",
+    "(the same command again = off)",
+    "",
+    "CHECK",
+    "v [N]    draw proof.pdf (not saved)",
+    "?        notes and an example",
+    "Enter    save and finish",
+]
+_HELP_RIGHT = [
+    "BARLINES (a wrong one in the proof)",
+    "j N I      join bar I with the next",
+    "a N I [P]  add a barline, P % from left",
+    "u N        undo the last j / a of N",
+    "b N        list the bars of system N",
+    "",
+    "REHEARSAL LETTERS",
+    "m B [B..]  letter on/off at bar B",
+    "m N:I      letter at bar I of system N",
+]
+_HELP_LEGEND = "N system (list above)  I bar in system  B bar number  K repeat sign  P percent"
+
+
+BARS_HELP = columns(_HELP_LEFT, _HELP_RIGHT, _COL) + f"\n  {_HELP_LEGEND}\n"
+
+BARS_NOTES = """\
+  k N   keep the printed numbers of the source at system N (when the count and the
+        source differ and the source is right).
+  i N   incipit: the first bar of the movement at system N shows the original
+        notation. It stays in the part with no number; the next bar is 1.
+        p and i on the same system replace each other; the same command again = off.
+  s N I bar I of system N completes the bar before it: both keep one number (a bar
+        cut by a system break, a repeat sign or a change of mensuration).
+        The same command again = off.
+  j N I a clef stub before a repeat sign (a first bar under 8 sp wide): j N 1;
+        the repeat sign stays.
+  v     bar numbers in magenta above the top staff, a tick at each barline, boxed
+        letters. v N tells the proof page of system N.
 """
 
 BARS_EXAMPLE = """\
@@ -199,8 +221,12 @@ def cmd_bars(a: argparse.Namespace) -> int:
     movement_first = [e["id"] for k, e in enumerate(systems) if k == 0 or e.get("restart")]
     line_of = {e["id"]: n_ for n_, e in enumerate(systems, 1)}
     changed = False
+    last: list[str] = []                 # output of the last command, shown again under the help
+    buf, out = io.StringIO(), contextlib.ExitStack()
     try:
         while True:
+            out.close()                  # the last command is done: its output moves under the help
+            last, buf = buf.getvalue().splitlines(), io.StringIO()
             data["bar_rules"] = rules
             renumber(data)
             edit_notes: list[str] = []
@@ -212,7 +238,8 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     k, i = flat[b]
                     cands.append(f"{eff[k]['id']}:{i}")
             ms = bar_mismatches(eff, rules)
-            _head(f"Bar numbers: {data.get('id')}")
+            _head(f"Bar numbers: {data.get('id')}   "
+                  + ("(edits not saved: Enter saves)" if changed else "(no edits yet)"))
             for t in edit_notes:
                 _warn(f"bars:  {t}")
             for n_, e in enumerate(systems, 1):
@@ -235,29 +262,33 @@ def cmd_bars(a: argparse.Namespace) -> int:
                 print(f"  {n_:2d}  {e['id']:7s} {span}"
                       f"{'  (' + ', '.join(tags) + ')' if tags else ''}")
             if ms:
-                print(f"  {YLW}The barline count and the printed numbers of the source differ:{RST}")
+                print(f"  {YLW}The barline count and the printed numbers of the source differ "
+                      f"(the build stops until each is settled):{RST}")
                 for m in ms:
                     ln_ = line_of.get(m['id'], '?')
                     print(f"     system {ln_}: {mismatch_text(m)}")
                     ef_ = eff[ln_ - 1] if isinstance(ln_, int) else {}
                     if ef_ and stub_bar(ef_):
-                        print(f"     its first bar is only {float(ef_['widths'][0]):g} sp wide "
+                        print(f"       its first bar is only {float(ef_['widths'][0]):g} sp wide "
                               f"(a clef before a repeat sign, no music): j {ln_} 1 joins it")
-                print("     The parts should follow the source. k N keeps the printed numbers; "
-                      "j / a mend a barline; f N=B sets the number of system N; s N I joins the two halves of a split bar. "
-                      "The build stops until each is settled. ? = help with an example.")
+                print("     The parts should follow the source. Fix with:")
+                print("       k N  keep the printed numbers      f N=B  set the number of system N")
+                print("       j / a  mend a barline              s N I  join the halves of a split bar")
             print(BARS_HELP, end="")
             if cands:
                 print("  Repeat signs (s K): " +
                       "  ".join(f"{j}={c}{'*' if c in rules['split'] else ''}"
                                 for j, c in enumerate(cands, 1)) + "   (* = on)")
+            for t_ in last:
+                print(t_)
             cmd = ask(">", "").strip()
             if not cmd:
                 break
             op, _, arg = cmd.partition(" ")
+            out.enter_context(contextlib.redirect_stdout(buf))
             try:
                 if op == "?":
-                    print(BARS_EXAMPLE, end="")
+                    print(BARS_NOTES + "\n" + BARS_EXAMPLE, end="")
                     continue
                 if op == "v":
                     ln_ = _line(arg, len(systems)) if arg.strip() else None
@@ -401,10 +432,13 @@ def cmd_bars(a: argparse.Namespace) -> int:
                     print(f"     {YLW}unknown: {cmd}   (? = help){RST}")
                     continue
                 changed = True
+                _ok(cmd)
             except (ValueError, IndexError):
                 print(f"     {YLW}not understood: {cmd}   (? = help){RST}")
     except Abort:
         pass
+    finally:
+        out.close()
     if not changed:
         return 0
     for k_ in ("bar_edits", "bars_ack", "incipit"):
