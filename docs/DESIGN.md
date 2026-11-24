@@ -1724,7 +1724,7 @@ without cues is built exactly as before (the G0 and real-page checks show no dif
 **The key `cues`** (`score.yaml`, §3): `{part or group: [entry, ...]}`. An entry is
 `{src: Canto, bars: [23, 24], clef: true, label: null, size: 0.6, anchor: 24, fit: false, sync: 3, align: 3}` (`clef`, `label`, `size`, `anchor`, `fit`, `sync` and `align` are
 optional; `label: ""` shows no name; `size` is a factor of the staff, 0.3 to 1; absent: 0.6, or 1 with `fit` or `sync`, `cues.cue_size`) or `{text: Canto, bar: 57}`.
-`cues.parse_cues` reads it; an entry that is wrong is left out and named in a warning. `analyse` again keeps
+`cues.parse_cues` reads it; an entry that is wrong is left out and named in a warning. A key that is no part or group is ignored at build and dropped by `cli_cues.prune_cues` when the menu opens. `analyse` again keeps
 the key when the part names are the same and says so (the bars are read by number: look at them again);
 else it says that they were dropped. Set with the menu key `u` (`partitor cues ID [PART]`) or
 `partitor cue ID LINE... --parts LIST`; the line is `VOICE=BARS [noclef] [nolabel] [size=N] [label=T] [anchor=N] [fit] [sync=N] [align=N]`
@@ -1781,7 +1781,7 @@ piece under a cue is at least `CUE_BAR_MIN_SP` (4 sp) wide, so a narrow cue stil
 (`Strip.cue_todo`, sixth item: the index of the first bar to fit; seventh: `sync`; eighth: `(bar index, note)` of `align`) `cueplace.draw_cues` gives each cue bar
 from the anchor on the width of the bar of the part under it (`fit_widths`; it stops at a bar the part
 shows inside a merged rest or on another line) and `scaled_cue` scales that bar sideways to this width
-at the height of the scale. With `sync` (implies `fit`) `cueplace.sync_split` reads the notes with a stem (`cueplace.note_xs`: a run of ink of 2.2 sp in the height of a staff, not on a barline, stems within 0.8 sp are one note; the head is read at the end of the stem with more ink beside it) of the first fitted bar of the cue and of the part's bar on its top staff: the sync-th note of the cue and the first of the part. `scaled_cue` then scales the bar in two pieces, before and after that note, so that they stand over each other; a note that is not found is a warning and the bar is fitted without it. `lines._cue_spans` protects only the rest bars from `justify`.
+at the height of the scale. With `sync` (implies `fit`) `cueplace.sync_split` reads the notes with a stem (`cueplace.note_xs`: a run of ink of 2.2 sp in the height of a staff, not on a barline, stems within 0.8 sp are one note; the head is read at the end of the stem with more ink beside it; a run with no head or beam of 0.9 sp at either end is the stroke of a sharp, flat or natural, not a note; a line of the part is read from 0.6 sp above its staff, so a rehearsal letter is not a stem; the first bar of a cue is read after its clef, `cueplace.cue_notes`) of the first fitted bar of the cue and of the part's bar on its top staff: the sync-th note of the cue and the first of the part. `scaled_cue` then scales the bar in two pieces, before and after that note, so that they stand over each other; a note that is not found is a warning and the bar is fitted without it. `lines._cue_spans` protects only the rest bars from `justify`.
 
 **Align.** `align=N` (`CueSpec.align`, not with `fit` or `sync`; size as without them, 0.6) moves the whole cue sideways without
 scaling it: `cueplace.align_start` reads the notes with a stem (`note_xs`) of the cue bar at the anchor and of the part's bar under it

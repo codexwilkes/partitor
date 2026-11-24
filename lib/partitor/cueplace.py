@@ -233,14 +233,38 @@ def _no_specks(m: np.ndarray, sp: float) -> np.ndarray:
     return m & ~np.isin(lab, small) if small else m
 
 
+HEAD_MIN_SP = 0.9                 # a stem has a head or a beam at one end that is this wide (sp); a stroke of a sharp or flat has none
+PART_ABOVE_SP = 0.6               # a line of the part: ink this far above the staff or more is not a stem
+
+
+def _wide(reg: np.ndarray, lines: np.ndarray, cx: float, ra: int, rb: int) -> int:
+    """_wide -> the width (px) of the run of columns with ink (staff lines left out) in the rows
+    ra to rb that holds column cx: a head or a beam at the end of a stem is wide, a stroke is not."""
+    cols = (reg[max(0, ra):rb] & ~lines[max(0, ra):rb, None]).any(axis=0)
+    c = int(round(cx))
+    if not cols[c]:
+        c = next((x for x in (c - 1, c + 1) if 0 <= x < cols.size and cols[x]), -1)
+        if c < 0:
+            return 0
+    lo = hi = c
+    while lo > 0 and cols[lo - 1]:
+        lo -= 1
+    while hi + 1 < cols.size and cols[hi + 1]:
+        hi += 1
+    return hi - lo + 1
+
+
 def note_xs(img: np.ndarray, staff_top: float, sp: float, x0: int, x1: int,
-            skip: tuple = ()) -> list[float]:
+            skip: tuple = (), above: float = 3.0) -> list[float]:
     """note_xs -> the columns of the heads of the notes with a stem between columns x0 and x1,
     from the left. A stem is a run of ink of 2.2 sp or more in the height of a staff (a gap of up to
     0.2 sp, where a staff line was); a barline (columns within 0.6 sp of those in `skip`; a thick
     final barline too) is not one, two stems less than 0.8 sp apart are one note (a chord), and a rest has no stem. The head is read at the end of the stem that has more ink
-    beside it. Notes without a stem (a whole note) are not found."""
-    top = max(0, int(staff_top - 3 * sp))
+    beside it. Notes without a stem (a whole note) are not found. above: how far above the staff
+    (sp) ink is read; a line of the part is read from 0.6 sp, so that a rehearsal letter or a
+    word over the staff is not a stem. A stroke with no head or beam
+    at either end (ink 0.9 sp wide) is the stroke of a sharp, flat or natural, not a note."""
+    top = max(0, int(staff_top - above * sp))
     bot = min(img.shape[0], int(staff_top + 7 * sp))
     reg = img[top:bot, x0:x1]
     if reg.size == 0:
@@ -270,17 +294,23 @@ def note_xs(img: np.ndarray, staff_top: float, sp: float, x0: int, x1: int,
                     run = 0
         if best >= need and reg[first:first + best, c].sum() >= 0.6 * best:
             stems.append((c, first, first + best))
-    out: list[float] = []
+    groups: list[tuple[float, int, int]] = []
     k = 0
     while k < len(stems):
         j = k
         while j + 1 < len(stems) and stems[j + 1][0] <= stems[j][0] + 1:
             j += 1
-        cx, ya, yb = (stems[k][0] + stems[j][0]) / 2.0, min(s[1] for s in stems[k:j + 1]), max(s[2] for s in stems[k:j + 1])
+        groups.append(((stems[k][0] + stems[j][0]) / 2.0, min(s[1] for s in stems[k:j + 1]), max(s[2] for s in stems[k:j + 1])))
         k = j + 1
-        h = max(2, int(0.9 * sp))
+    out: list[float] = []
+    sign_x = -1e9                                          # where the last stroke of an accidental stands
+    h = max(2, int(0.9 * sp))
+    for cx, ya, yb in groups:
+        if not any(_wide(reg, lines, cx, ra, rb) >= HEAD_MIN_SP * sp for ra, rb in ((ya, ya + h), (yb - h, yb))):
+            sign_x = cx
+            continue
         reach = int(1.6 * sp)
-        a, b = max(0, int(cx - reach)), min(reg.shape[1], int(cx + reach) + 1)
+        a, b = max(0, int(cx - reach), int(sign_x + 0.6 * sp) if cx - sign_x < 2.2 * sp else 0), min(reg.shape[1], int(cx + reach) + 1)
         best_ink, best_x = -1, cx
         for ra, rb in ((ya, ya + h), (yb - h, yb)):
             blob = reg[max(0, ra):rb, a:b] & ~lines[max(0, ra):rb, None]
@@ -564,6 +594,14 @@ def draw_cues(strips: list[Strip]) -> tuple[list[Strip], list[str]]:
     return out, warns
 
 
+def cue_notes(cue: CueImg, k: int) -> list[float]:
+    """cue_notes -> the columns of the notes with a stem in bar k of the cue (from 0). The first bar
+    starts after the clef and the key (`clef_px`), whose strokes are not notes."""
+    edges = [0] + [b + 1 for b in cue.bars]
+    x0 = edges[k] if k > 0 else min(int(cue.clef_px), edges[1] - 1)
+    return note_xs(cue.img, cue.staff_row, cue.sp, x0, edges[k + 1], tuple(cue.bars))
+
+
 def align_start(s: Strip, cue: CueImg, number: int, k: int, n: int, scale: float,
                 start: int, ax: int) -> tuple[int, str]:
     """align_start -> (the column for the first barline of the cue, "") such that the n-th note with
@@ -575,7 +613,7 @@ def align_start(s: Strip, cue: CueImg, number: int, k: int, n: int, scale: float
     edges = [0] + [b + 1 for b in cue.bars]
     if k + 1 >= len(edges):
         return start, "the bar of the cue is not there"
-    mine = note_xs(cue.img, cue.staff_row, cue.sp, edges[k], edges[k + 1], tuple(cue.bars))
+    mine = cue_notes(cue, k)
     if len(mine) < n:
         return start, f"the bar of the cue has {len(mine)} note(s) with a stem"
     num = number + k
@@ -585,7 +623,7 @@ def align_start(s: Strip, cue: CueImg, number: int, k: int, n: int, scale: float
     if j >= len(s.bars_x):
         return start, "the bar of the part has no barline after it"
     left, right = (int(s.bars_x[j - 1]) if j > 0 else ax), int(s.bars_x[j])
-    theirs = note_xs(s.img & ~s.hdr, s.staff_top, s.sp, left + 1, right, (left, right))
+    theirs = note_xs(s.img & ~s.hdr, s.staff_top, s.sp, left + 1, right, (left, right), PART_ABOVE_SP)
     if not theirs:
         return start, "the part has no note with a stem in its bar"
     new = int(round(theirs[0] - mine[n - 1] * scale + cue.clef_px * scale))
@@ -602,7 +640,7 @@ def sync_split(s: Strip, cue: CueImg, number: int, fit_from: int, widths: list[i
     the first fitted bar of the cue, and how far from the left barline of the bar of the part
     under it the first note of the part (on its top staff) stands, for `scaled_cue`."""
     edges = [0] + [b + 1 for b in cue.bars]
-    mine = note_xs(cue.img, cue.staff_row, cue.sp, edges[fit_from], edges[fit_from + 1], tuple(cue.bars))
+    mine = cue_notes(cue, fit_from)
     if len(mine) < sync:
         return None, f"the bar of the cue has {len(mine)} note(s) with a stem"
     n = number + fit_from
@@ -612,7 +650,7 @@ def sync_split(s: Strip, cue: CueImg, number: int, fit_from: int, widths: list[i
     if j == 0 or j >= len(s.bars_x):
         return None, "the bar of the part has no barline before it"
     left, right = int(s.bars_x[j - 1]), int(s.bars_x[j])
-    theirs = note_xs(s.img & ~s.hdr, s.staff_top, s.sp, left + 1, right, (left, right))
+    theirs = note_xs(s.img & ~s.hdr, s.staff_top, s.sp, left + 1, right, (left, right), PART_ABOVE_SP)
     if not theirs:
         return None, "the part has no note with a stem in its bar"
     wl = int(round(theirs[0] - (left + 1)))

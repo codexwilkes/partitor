@@ -77,6 +77,8 @@ A cue is a small staff of another voice above a rest, or a word. Nothing is adde
 | `"Canto"=97` | the word, at bar 97 |
 | `x 2` | takes cue 2 away |
 
+Cues kept under a part or group name that no longer exists are dropped when you open the cue menu, with a message.
+
 Options after the bars:
 
 | Option | Does |
@@ -97,7 +99,7 @@ The cue stands above the staff (above the top staff of a group). The bars under 
 - The bars before the anchor must be rests.
 - `fit` draws the cue at full size unless you type `size=`. At 0.6 the stretch is about 1.7 times. `size=0.8` is a compromise. Use `fit` per cue.
 - `sync` counts stemmed notes from the left barline of the cue bar. Rests and whole notes are not counted. A chord is one note. The bar is stretched in two pieces, before and after that note. If the note is not found, the build says so and fits the bar without it.
-- `align` keeps the size and the spacing of the cue (0.6 unless you type `size=`). The cue barline then does not meet the part barline. It counts notes as `sync` does. The bar is the first bar where the part plays. The cue does not move left of the clef room at the start of the staff, nor past the end of the system. If it cannot, or the note is not found, the build says so and leaves the cue where it falls.
+- `align` keeps the size and the spacing of the cue (0.6 unless you type `size=`). The cue barline then does not meet the part barline. It counts notes as `sync` does; the clef, sharps, flats and naturals, and rehearsal letters are not notes. The bar is the first bar where the part plays. The cue does not move left of the clef room at the start of the staff, nor past the end of the system. If it cannot, or the note is not found, the build says so and leaves the cue where it falls.
 - Build the part (<kbd>r</kbd>) and look at it. partitor warns when it cannot confirm that the part rests in a bar, or when the cue stands above ink.
 
 Command-line forms:

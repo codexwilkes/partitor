@@ -666,6 +666,7 @@ class TestNotesAndSync(unittest.TestCase):
         img = self.staff()
         img[25:65, 100] = True
         img[25:65, 104] = True                                    # two stems 4 px apart: one note
+        img[57:65, 96:108] = True                                 # and one head
         img[30:71, 196:203] = True                                # a thick final barline
         self.assertEqual(len(cueplace.note_xs(img, 30, 10.0, 0, 300, (202,))), 1)
 
@@ -675,22 +676,24 @@ class TestNotesAndSync(unittest.TestCase):
             img[30 + 10 * k // 2 * 2 // 1, :] = True
         for x in (120, 140, 170):
             img[25:60, x] = True                                  # three stems in the second bar of the cue
+            img[52:60, x - 5:x + 6] = True                        # each with a head
         cue = cues.CueImg(img, 0, 10.0, 30, (99, 199, 299))
         src, _ = make_source()
         src.img[25:60, 160] = True                                # the part enters at column 160, in its bar 2
+        src.img[52:60, 155:166] = True
         return cue, src
 
     def test_the_sync_note_of_the_cue_meets_the_first_note_of_the_part(self):
         cue, part = self.cue_and_part()
         got, why = cueplace.sync_split(part, cue, 1, 1, [100], 2)
         self.assertEqual(why, "")
-        self.assertEqual(got[0], 140)
+        self.assertTrue(abs(got[0] - 140) <= 3, got)
         self.assertTrue(abs(got[1] - 59) <= 2, got)             # 160 px less the barline at 100 and its column
 
     def test_sync_names_why_it_cannot_be_done(self):
         cue, part = self.cue_and_part()
         self.assertIn("3 note", cueplace.sync_split(part, cue, 1, 1, [100], 5)[1])
-        part.img[25:60, 160] = False
+        part.img[25:60, 155:166] = False
         self.assertIn("no note", cueplace.sync_split(part, cue, 1, 1, [100], 2)[1])
 
     def test_scaled_cue_splits_the_first_fitted_bar_at_a_column(self):
@@ -724,6 +727,43 @@ class TestNotesAndSync(unittest.TestCase):
         self.assertEqual(why, "")
         self.assertTrue(abs(small - 90) <= 2, small)             # at half size the note stands at 70: 160 - 70
 
+    def test_the_clef_of_the_cue_is_not_a_note(self):
+        cue, _ = self.cue_and_part()
+        cue.img[25:60, 20] = True                                # a stroke of the clef, tall as a stem
+        cue.img[25:60, 40] = True
+        cue.img[52:60, 15:26] = True                             # (with a wide foot each)
+        cue.img[52:60, 35:46] = True
+        cue = cues.CueImg(cue.img, 50, 10.0, 30, (99, 199, 299))
+        self.assertEqual(cueplace.cue_notes(cue, 0), [])         # no note in the first bar, but its clef
+        self.assertEqual(len(cueplace.cue_notes(cue, 1)), 3)
+
+    def test_a_rehearsal_letter_over_the_staff_is_not_the_first_note_of_the_part(self):
+        cue, part = self.cue_and_part()
+        part.staff_x0 = 0
+        part.img[2:24, 150] = True                               # the side of a box over the staff
+        part.img[22:24, 145:156] = True                          # and its lower edge
+        start, why = cueplace.align_start(part, cue, 1, 1, 2, 1.0, 100, 0)
+        self.assertEqual(why, "")
+        self.assertTrue(abs(start - 20) <= 2, start)             # the note of the part at 160, not the box at 150
+        got, why = cueplace.sync_split(part, cue, 1, 1, [100], 2)
+        self.assertTrue(abs(got[1] - 59) <= 2, got)
+
+    def test_a_sharp_before_the_note_is_not_a_note(self):
+        cue, part = self.cue_and_part()
+        part.staff_x0 = 0
+        part.img[33:60, 148] = True                              # the two strokes of a sharp, 2.7 sp, 1.2 sp before the stem
+        part.img[33:60, 151] = True
+        start, why = cueplace.align_start(part, cue, 1, 1, 2, 1.0, 100, 0)
+        self.assertEqual(why, "")
+        self.assertTrue(abs(start - 20) <= 2, start)             # the stem at 160, not the sharp at 150
+        img = self.staff()
+        img[25:60, 100] = True
+        img[25:60, 120] = True                                   # two stems of 3.5 sp 2 sp apart (beamed notes): both count
+        img[25:28, 100:121] = True                               # a beam joins them
+        img[52:60, 95:106] = True
+        img[52:60, 115:126] = True                               # and each has a head
+        self.assertEqual(len(cueplace.note_xs(img, 30, 10.0, 0, 300)), 2)
+
     def test_align_leaves_the_cue_where_it_falls_and_says_why(self):
         cue, part = self.cue_and_part()
         part.staff_x0 = 0
@@ -734,11 +774,14 @@ class TestNotesAndSync(unittest.TestCase):
         self.assertIn("left of the staff", why)
         part.staff_x0 = 0
         part.img[25:60, 160] = False
+        part.img[25:60, 155:166] = False
         part.img[25:60, 190] = True                              # the part enters late: the cue starts at 70, ends at 370
+        part.img[52:60, 185:196] = True
         part.img = part.img[:, :300]
         part.hdr = part.hdr[:, :300]
         self.assertIn("past the end", cueplace.align_start(part, cue, 1, 1, 1, 1.0, 100, 0)[1])
         part.img[25:60, 190] = False
+        part.img[52:60, 185:196] = False
         self.assertIn("no note", cueplace.align_start(part, cue, 1, 1, 2, 1.0, 100, 0)[1])
 
     def test_align_is_noted_in_the_build_and_is_not_a_fit(self):
@@ -1032,6 +1075,25 @@ class TestCueCommands(unittest.TestCase):
         _, out = self.run_cmd(cli_cues.cmd_cues, ["Bass", "1=5-6", '"Canto"=9', "x 1", "", ""], part=None)
         # (the part prompt takes Bass, then three lines, then Enter ends the part, Enter ends the menu)
         self.assertEqual(pt.load_item(self.item)["cues"], {"Bass": [{"text": "Canto", "bar": 9}]})
+
+    def test_a_removed_cue_is_gone_from_the_saved_file_also_the_last_of_a_part(self):
+        self.run_cmd(cli_cues.cmd_cues, ["Bass", "1=5-6", "1=9", "", ""], part=None)
+        self.run_cmd(cli_cues.cmd_cues, ["Bass", "x 2", "", ""], part=None)
+        self.assertEqual(pt.load_item(self.item)["cues"], {"Bass": [{"src": "Canto", "bars": [5, 6]}]})
+        self.run_cmd(cli_cues.cmd_cues, ["Bass", "x 1", "", ""], part=None)
+        self.assertNotIn("cues", pt.load_item(self.item))             # no empty key stays
+
+    def test_the_cues_of_a_name_that_is_not_a_part_or_a_group_are_dropped_and_saved(self):
+        data = pt.load_item(self.item)
+        data["cues"] = {"Bass": [{"src": "Canto", "bars": [5, 6]}], "Gone": [{"src": "Canto", "bars": [1, 2]}]}
+        pt.save_item(self.item, data)
+        _, out = self.run_cmd(cli_cues.cmd_cues, ["", ""], part=None)
+        self.assertIn("'Gone' is not a part or a group any more: its 1 cue(s) are dropped", out)
+        self.assertEqual(pt.load_item(self.item)["cues"], {"Bass": [{"src": "Canto", "bars": [5, 6]}]})
+        self.assertEqual(cli_cues.prune_cues(pt.load_item(self.item)), [])      # nothing more to drop
+        data = {"parts": ["Canto"], "cues": {"Gone": [{"src": "Canto", "bars": [1, 1]}]}}
+        self.assertEqual(len(cli_cues.prune_cues(data)), 1)
+        self.assertNotIn("cues", data)
 
     def test_the_menu_shows_a_wrong_line_and_goes_on(self):
         _, out = self.run_cmd(cli_cues.cmd_cues, ["Bass", "9=1", "1=5", "", ""], part=None)

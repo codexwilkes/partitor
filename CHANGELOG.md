@@ -6,6 +6,12 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.18.1 — 2026-11-24
+
+### Fixed
+- Cue `align=N` (and `sync=N`) put the cue at the wrong place on a real score. The note count took the strokes of the clef of the cue, the sharps, flats and naturals, and a rehearsal letter box over the staff of the part for notes. A note now needs a head or a beam at one end of its stem; the clef of the cue is skipped; ink more than 0.6 sp above the staff of the part is not read. The cue of bar 59 of the test score now stands with its half note over the entry of the part.
+- The cues of a name that is no part or group any more (a part or group that was renamed or dropped) stayed in `score.yaml`, out of reach of the cue menu. `partitor cues` now drops them, names each, and saves. The build note says so.
+
 ## 0.18.0 — 2026-11-24
 
 ### Added

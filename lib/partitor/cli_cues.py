@@ -53,6 +53,24 @@ def add_cue(data: dict, target: str, line: str) -> str:
     return ""
 
 
+def prune_cues(data: dict) -> list[str]:
+    """prune_cues -> the cues of names that are no part or group any more are taken out of
+    `data` (the menu lists only the names that exist, so they could not be removed); returns a
+    line for each."""
+    names = set(_targets(data))
+    allc = dict(data.get("cues") or {})
+    out = []
+    for t in [t for t in allc if t not in names]:
+        n = len(allc.pop(t) or [])
+        out.append(f"'{t}' is not a part or a group any more: its {n} cue(s) are dropped")
+    if out:
+        if allc:
+            data["cues"] = allc
+        else:
+            data.pop("cues", None)
+    return out
+
+
 def remove_cue(data: dict, target: str, n: int) -> str:
     mine = list((data.get("cues") or {}).get(target) or [])
     if not 1 <= n <= len(mine):
@@ -99,6 +117,8 @@ def cmd_cues(a: argparse.Namespace) -> int:
     if getattr(a, "part", None) and target is None:
         _die(f"cues: no part or group '{a.part}'", f"Parts: {', '.join(names)}")
     before = dict(data.get("cues") or {})
+    for line in prune_cues(data):
+        _warn(f"cues:  {line}")
     try:
         while target is None:
             _head(f"Cues: {data.get('id')}")
@@ -121,7 +141,7 @@ def cmd_cues(a: argparse.Namespace) -> int:
     if (data.get("cues") or {}) == before:
         return 0
     mark_pending(data, *[f"{t}:cues" for t in set(data.get("cues") or {}) | set(before)
-                         if (data.get("cues") or {}).get(t) != before.get(t)])
+                         if t in names and (data.get("cues") or {}).get(t) != before.get(t)])
     save_item(item, data)
     _ok(f"cues:  saved for {', '.join(data.get('cues') or {}) or '(none)'}")
     return saved(item, a, start)

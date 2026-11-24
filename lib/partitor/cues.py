@@ -197,7 +197,7 @@ def parse_cues(raw: object, parts: list[str], groups: dict[str, list[str]]) -> t
         return out, ["cues: the key is not a table of parts; ignored"]
     for target, items in raw.items():
         if target not in parts and target not in groups:
-            notes.append(f"cues: '{target}' is not a part or a group; its cues are ignored")
+            notes.append(f"cues: '{target}' is not a part or a group; its cues are ignored (partitor cues drops them)")
             continue
         for it in items if isinstance(items, list) else []:
             try:
