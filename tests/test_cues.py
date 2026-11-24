@@ -836,19 +836,6 @@ class TestGuessMusicStart(unittest.TestCase):
         self.assertIsNotNone(x)
         self.assertTrue(30 <= x <= 50, x)
 
-    def test_the_rest_of_a_faint_staff_line_does_not_join_the_clef_to_the_notes(self):
-        img = np.zeros((100, 400), bool)
-        for k in range(5):
-            img[30 + 10 * k, 5:390] = True                 # a staff, sp 10
-        img[33, 28:120] = True                             # what a wavy staff line left, 3 rows off the line
-        img[35:60, 8:30] = True                            # the clef
-        img[25:60, 100] = True                             # the first notes, far from it
-        img[52:60, 95:106] = True
-        src = Strip(img, 5, 30, 70, 10.0, np.zeros_like(img), bars_x=[390], bar_nums=[1])
-        x = cueplace.guess_music_x(src)
-        self.assertIsNotNone(x)
-        self.assertTrue(30 <= x <= 95, x)                  # in the gap after the clef, not after the notes
-
     def test_a_count_over_a_rest_lifts_the_cue_and_the_word(self):
         s, pre = rest_line()
         r = cueplace.respan(s, cueplace.shown_bars(s, pre), 0, 0, 10, 12)

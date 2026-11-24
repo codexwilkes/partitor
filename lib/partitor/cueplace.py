@@ -718,8 +718,7 @@ def draw_label(s: Strip, ax: int, text: str) -> Strip:
 def guess_music_x(s: Strip) -> int | None:
     """guess_music_x -> where the music of a line starts when find_prefixes has no answer (a
     line that keeps its own clef): the middle of the first blank gap
-    after the clef (0.15 sp or more), read from the ink outside the staff lines and the long thin
-    runs that a faint staff line leaves; None when there is none."""
+    after the clef (0.15 sp or more), read from the ink outside the staff lines; None when there is none."""
     sl = staff_lines(s)
     if not sl:
         return None
@@ -730,10 +729,7 @@ def guess_music_x(s: Strip) -> int | None:
             rows[int(round(c))] = True
     k = 2 * max(1, int(0.2 * sp)) + 1                   # the thickness of a staff line and its fringe
     rows = cv2.dilate(rows.astype(np.uint8)[:, None], np.ones((k, 1), np.uint8))[:, 0] > 0
-    band = (s.img & ~rows[:, None] & ~s.hdr)[int(s.staff_top - 0.5 * sp):int(s.staff_bottom + 0.5 * sp)].astype(np.uint8)
-    # what is left of a staff line on a wavy or faint scan (a long thin horizontal run) joins the clef to the notes
-    rest = cv2.morphologyEx(band, cv2.MORPH_OPEN, np.ones((1, max(3, int(1.5 * sp))), np.uint8))
-    ink = (band & ~cv2.dilate(rest, np.ones((3, 1), np.uint8)).astype(bool)).any(axis=0)
+    ink = (s.img & ~rows[:, None] & ~s.hdr)[int(s.staff_top - 0.5 * sp):int(s.staff_bottom + 0.5 * sp)].any(axis=0)
     x0 = int(s.staff_x0 + 1.5 * sp)
     x1 = staff_end(s)
     need = max(2, int(0.15 * sp))
