@@ -551,6 +551,36 @@ class TestApplyCues(unittest.TestCase):
         self.assertEqual(out[0].rest_counts, [1, 2, 1])
 
 
+    def cut_sources(self, a_nums, b_nums):
+        a, apre = make_source()
+        b, bpre = make_source()
+        a.bar_nums, b.bar_nums = list(a_nums), list(b_nums)
+        return a, b, {"Canto": ([a, b], {id(a): apre, id(b): bpre})}
+
+    def piece_taken(self, bar, a_nums, b_nums):
+        line, pre = rest_line(merge=False)
+        a, b, srcs = self.cut_sources(a_nums, b_nums)
+        got = []
+        real = cueplace.source_pieces
+
+        def spy(*args, **kw):
+            r = real(*args, **kw)
+            got.extend(r)
+            return r
+        with mock.patch.object(cueplace, "source_pieces", spy):
+            cueplace.apply_cues([line], [pre], [cues.CueSpec("Canto", bar, bar, False)], srcs, "Alto")
+        return "a" if got[0][0] is a else "b"
+
+    def test_a_cut_bar_is_read_from_the_half_that_stands_like_the_bar_of_the_part(self):
+        # the part's bar 10 starts its line: the half that starts a line of the source (b), not the one that ends a line (a)
+        self.assertEqual(self.piece_taken(10, [6, 7, 8, 9, 10], [10, 11, 12, 13, 14]), "b")
+        # the part's bar 13 ends its line: the half that ends a line of the source (a)
+        self.assertEqual(self.piece_taken(13, [9, 10, 11, 12, 13], [13, 14, 15, 16, 17]), "a")
+        # a bar in the middle of the part's line, or no half in that place: where it first stands
+        self.assertEqual(self.piece_taken(11, [7, 8, 9, 10, 11], [11, 12, 13, 14, 15]), "a")
+        self.assertEqual(self.piece_taken(10, [6, 7, 8, 9, 10], [11, 10, 12, 13, 14]), "a")
+
+
 class TestTextMarkAndConfig(unittest.TestCase):
     def test_a_text_mark_splits_the_rest_and_draws_a_word(self):
         s, pre = rest_line()

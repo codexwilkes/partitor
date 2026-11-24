@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.18.5 — 2026-11-24
+
+### Changed
+- A cue over a bar that a system break cuts (the same number on two lines of the source) reads the half that stands like the bar of the part: the first bar of its line, or the last. It read the first half only, so the cue of bar 88 of the test score showed the end of the bar before the double bar, not the "hast." where the trombones enter. A bar in the middle of a line of the part is read where it first stands, as before.
+
 ## 0.18.4 — 2026-11-24
 
 ### Changed

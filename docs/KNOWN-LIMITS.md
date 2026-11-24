@@ -74,7 +74,7 @@ per-system consistency.
   first note of the part; it counts notes with a stem only (a whole note is not found) and reads the top
   staff of a group. `align=N` does the same without stretching: the cue moves sideways as it is, so its
   barline no longer meets the barline of the part; it cannot move left of the start of the staff.
-- A bar that a system break cuts keeps its number on both systems; a cue reads it where it first stands.
+- A bar that a system break cuts keeps its number on both systems; a cue reads the half that stands like the bar of the part (first or last of its line); a bar in the middle of a line of the part is read where it first stands.
 - A system with more bar numbers than barlines (a false barline next to the clef, found by `partitor bars`) has no
   bar numbers in the part, and a cue from it is left out; the build names the system. Settle its barlines first.
 - No separate proof for cues: build the part (the set before is kept in `parts.prev`) and look at it.

@@ -1732,7 +1732,8 @@ or `"word"=BAR` (`cues.parse_cue_line`). Saved, not built: `pending` names `PART
 
 **Rules.**
 - Whole bars. The numbers are those printed in the part. A number that stands twice (a bar cut by a
-  line break) is read where it first stands.
+  line break) is read from the half that stands where the bar of the part stands: the first bar of its line, or the last;
+  else where it first stands (`cueplace.source_pieces`, `edge`).
 - One voice per cue. The voice is a part with one staff. A part does not cue itself, nor a group its own
   member.
 - The cue is a crop of the source line (`cues.crop_cue`) at its bars as one piece, with the clef and key

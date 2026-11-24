@@ -400,19 +400,31 @@ def draw_cue(s: Strip, cue: CueImg, start_x: int, scale: float, label: str = "",
                       cue_boxes=[*s.cue_boxes, (ax, y0 - label_h, ax + w_c, bottom)]), warns
 
 
-def source_pieces(items: list, first: int, last: int, src: str) -> list[tuple[Strip, int, int, int, int]]:
+def source_pieces(items: list, first: int, last: int, src: str,
+                  edge=None) -> list[tuple[Strip, int, int, int, int]]:
     """source_pieces -> [(line, k1, k2, n1, n2)] of the source part (`items`: its Strip or
     RestRun per system): the bars first..last, each run of consecutive bars of one line
     as one piece; k: index of the bar in the line (bars_x), n: its number. A bar number
-    that stands twice (a bar cut by a line break) is read where it first stands.
+    that stands twice (a bar cut by a line break) is read where the bar of the part stands:
+    edge(n) says "first" or "last" when that bar is the first or the last of its line, and the
+    half of the source that is first or last in its line is taken; else, or when there is none,
+    where it first stands.
     CueError: a bar is not in the lines of the source (it rests there)."""
     got: dict[int, tuple[Strip, int]] = {}
+    twice: dict[int, list[tuple[Strip, int]]] = {}
     for s in items:
         if not isinstance(s, Strip):
             continue
         for k, n in enumerate(s.bar_nums):
-            if first <= n <= last and n not in got and k < len(s.bars_x):
+            if first <= n <= last and k < len(s.bars_x):
+                twice.setdefault(n, []).append((s, k))
+                got.setdefault(n, (s, k))
+    for n, seen in twice.items():
+        want = edge(n) if edge is not None and len(seen) > 1 else None
+        for s, k in seen:
+            if (want == "first" and k == 0) or (want == "last" and k == len(s.bar_nums) - 1):
                 got[n] = (s, k)
+                break
     for n in range(first, last + 1):
         if n not in got:
             raise CueError(f"{src} has no music in bar {n} (it rests there, or the bar is not in the score)")
@@ -464,7 +476,16 @@ def apply_cues(strips: list[Strip], starts: list[int | None], specs: list[CueSpe
             items, music = sources[spec.src]
             label = spec.src if spec.label is None else spec.label
             where: dict[int, tuple[Strip, int, int | None]] = {}      # bar number -> (source line, bar in it, its music start)
-            for src, k1, k2, n1, n2 in source_pieces(items, spec.first, spec.last, spec.src):
+            def edge(n: int, work=work) -> str | None:           # where the bar of the part stands in its line
+                for t_, s_ in enumerate(work):
+                    bars_ = shown_bars(s_, starts[t_] or 0)
+                    i_ = find_bar(bars_, n)
+                    if i_ is not None:
+                        if bars_[i_].count > 1:
+                            return None
+                        return "first" if i_ == 0 else ("last" if i_ == len(bars_) - 1 else None)
+                return None
+            for src, k1, k2, n1, n2 in source_pieces(items, spec.first, spec.last, spec.src, edge):
                 if len(src.staff_labels) > 1:
                     raise CueError(f"{spec.src} has several staves; a cue takes one")
                 mx = music.get(id(src))
