@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.18.3 — 2026-11-24
+
+### Fixed
+- A cue could carry notes of the bar before its first bar. The clef block of a cue is the start of the source line up to the place where its music starts; on a faint or wavy scan the rest of a staff line joined the clef to the first notes, so that place was found far to the right, and those notes were drawn as part of the clef. The search now leaves out long thin horizontal runs.
+
 ## 0.18.2 — 2026-11-24
 
 ### Changed
