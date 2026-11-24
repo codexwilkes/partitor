@@ -60,7 +60,14 @@ The tag has no `v`. It is annotated. The tag points to the commit that passed CI
 
 The steps are in the maintainer's release procedure. In short: green CI on `main`, release edit (version, CHANGELOG heading,
 generated docs), all gates on the final tree, one release commit, push, wait for CI, tag, GitHub Release (flag a pre-release),
-attach the Windows setup program with the manual workflow.
+attach the Windows setup program with the manual workflow only when someone needs it.
+
+## Windows builds
+
+- A Windows setup program is built on request, never by a tag. The workflow `windows-release` is started by hand with an existing tag (`platforms/windows/README.md`). Windows has no users now, and an automatic build would only use runner time on every tag.
+- The setup file is an asset of the release of the same tag. There is no separate Windows tag or release.
+- A stable release keeps its Windows assets, so that the download links stay valid. The site links the newest stable release only. A release without a Windows asset shows no Windows download.
+- A tag or a release is never deleted for this (R9). Only the Windows assets of a pre-release may be removed with `gh release delete-asset`.
 
 ## Gates by kind of change
 

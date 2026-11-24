@@ -84,7 +84,7 @@ attaches it to a release. (GitHub needs workflow files in that folder; this is t
 3. When it ends, the release of that tag has `partitor-<version>-setup.exe` and a `.sha256` file. A release
    that did not exist is made as a **draft**: read it, then publish it on GitHub.
 
-A failure of this workflow never blocks a Linux release. You can still build by hand (above) and upload the file.
+A build is made on request only: nothing starts it for a new tag, and most releases have no setup file. The site shows a Windows download only for a release that has one. A stable release keeps its setup file; the setup file of a pre-release may be removed later. A failure of this workflow never blocks a Linux release. You can still build by hand (above) and upload the file.
 
 ## Build the program
 

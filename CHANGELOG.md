@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.18.4 — 2026-11-24
+
+### Changed
+- Windows builds are made on request, not for each release (`docs/RELEASING.md`, "Windows builds"; `platforms/windows/README.md`). A stable release keeps its setup file; only the setup file of a pre-release may be removed. The operator guide says that the Download page offers the setup program only when a build exists. No program change.
+
 ## 0.18.3 — 2026-11-24
 
 ### Fixed

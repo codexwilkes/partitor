@@ -31,7 +31,7 @@ footer: >-
 | Windows (PowerShell) | experimental | `partitor` |
 | macOS (Terminal) | best effort | see [Advanced](advanced.md) |
 
-Windows and macOS have no sandbox: open only PDFs you trust. Install once: `INSTALL.md` on Linux, the setup program from the Download page on Windows. Where this guide says “run `partitor`”, use the start command of your system. On Windows, type `\` in paths.
+Windows and macOS have no sandbox: open only PDFs you trust. Install once: `INSTALL.md` on Linux, the setup program on Windows (the Download page offers it when a build exists; if not, build it: `platforms/windows/README.md`). Where this guide says “run `partitor`”, use the start command of your system. On Windows, type `\` in paths.
 
 Linux library: `/var/lib/partitor/library`. Windows library: `Documents\partitor`.
 
