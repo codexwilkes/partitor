@@ -6,6 +6,11 @@ Format: [SemVer](https://semver.org). Entries list user-visible changes. The
 engine file (`lib/partitor-engine`) keeps the detailed history of the private
 development line (0.1.0 to 0.3.0-dev.42) in its header comment.
 
+## 0.18.7 — 2026-11-26
+
+### Fixed
+- Windows icon: the stroke under the rectangle was past the right edge of the rectangle. The two now end on the same pixel column at every size (16 to 256 px). The stroke is also thinner. The icon shows in a Windows build made from this version or later.
+
 ## 0.18.6 — 2026-11-24
 
 ### Added

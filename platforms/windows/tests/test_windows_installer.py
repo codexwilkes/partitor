@@ -10,6 +10,7 @@ import struct
 import subprocess
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 from unittest import mock
 
@@ -28,6 +29,34 @@ def opener_for(data: bytes):
     opener.urls = []
     opener.agents = []
     return opener
+
+
+def ico_frames(data):
+    """{size: rows of grey values on a white ground} of an .ico with 8-bit RGBA PNG frames (no Pillow)."""
+    frames = {}
+    for i in range(struct.unpack("<H", data[4:6])[0]):
+        length, start = struct.unpack("<II", data[14 + 16 * i:22 + 16 * i])
+        png, pos, idat = data[start:start + length], 8, b""
+        while pos < len(png):
+            n, kind = struct.unpack(">I4s", png[pos:pos + 8])
+            body, pos = png[pos + 8:pos + 8 + n], pos + 12 + n
+            if kind == b"IHDR":
+                width, height, depth, colour = struct.unpack(">IIBB", body[:10])
+                assert (depth, colour) == (8, 6), "not 8-bit RGBA"
+            elif kind == b"IDAT":
+                idat += body
+        raw, stride, prev, rows = zlib.decompress(idat), 4 * width, bytes(4 * width), []
+        for y in range(height):
+            mode, line = raw[y * (stride + 1)], bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+            for x in range(stride):
+                a, b, c = line[x - 4] if x >= 4 else 0, prev[x], prev[x - 4] if x >= 4 else 0
+                p = a + b - c
+                paeth = min((abs(p - a), 0, a), (abs(p - b), 1, b), (abs(p - c), 2, c))[2]
+                line[x] = (line[x] + (0, a, b, (a + b) // 2, paeth)[mode]) & 255
+            prev = bytes(line)
+            rows.append([255 - (255 - sum(line[x:x + 3]) // 3) * line[x + 3] // 255 for x in range(0, stride, 4)])
+        frames[width] = rows
+    return frames
 
 
 class FetchTests(unittest.TestCase):
@@ -253,6 +282,29 @@ class ScriptTests(unittest.TestCase):
         self.assertEqual((reserved, kind), (0, 1))
         sizes = {data[6 + 16 * i] or 256 for i in range(count)}
         self.assertEqual(sizes, {16, 24, 32, 48, 64, 128, 256})
+
+    def test_icon_stroke_is_thin_and_flush_right_at_every_size(self):
+        """The stroke under the rectangle ends on the same pixel column as the rectangle."""
+        frames = ico_frames((INST / "partitor.ico").read_bytes())
+        for size in (16, 24, 32, 48, 64, 128, 256):
+            with self.subTest(size=size):
+                grey = frames[size]
+                runs = []                           # first run of ink from the left, per row
+                for y in range(size):
+                    ink = [x for x in range(size) if grey[y][x] < 250]
+                    if ink and ink[0] < size * 45 // 100:  # rows of the rectangle and of the stroke
+                        end = ink[0]
+                        while end + 1 in ink:
+                            end += 1
+                        runs.append((ink[0], end))
+                left = min(a for a, _ in runs)
+                rect = [r for r in runs if r[0] == left]
+                stroke = [r for r in runs if r[0] != left]
+                self.assertTrue(rect and stroke, runs)
+                self.assertEqual(len({b for _, b in runs}), 1, runs)
+                self.assertEqual(len(set(stroke)), 1, runs)
+                width = stroke[0][1] - stroke[0][0] + 1
+                self.assertLessEqual(width, max(2, size // 40), runs)
 
     def test_installer_and_program_use_the_icon(self):
         self.assertIn("SetupIconFile=partitor.ico", self.iss)

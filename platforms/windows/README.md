@@ -71,7 +71,8 @@ package `tesseract-ocr-eng` 1:4.1.0-2.
 
 The icon (`installer\partitor.ico`) is made from the neume of the author's logo (`installer\neume.png`).
 Icon design: Nathan Wilkes. It is used as the icon of partitor; the AGPL licence of the code does not cover it.
-`installer\make-icon.py` makes the icon again (needs Pillow).
+`installer\make-icon.py` makes the icon again (needs Pillow and numpy). At every size, the stroke under the
+rectangle ends on the same pixel column as the rectangle; a test checks this.
 
 ## Publish the setup program (maintainers)
 
